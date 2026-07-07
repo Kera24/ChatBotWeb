@@ -1,0 +1,15 @@
+{
+  "name": "chatbotweb-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "api:install": "python -m pip install -r apps/api/requirements.txt",
+    "api:dev": "cd apps/api && uvicorn app.main:app --reload",
+    "api:test": "cd apps/api && python -m pytest",
+    "api:db:upgrade": "cd apps/api && python -m alembic upgrade head",
+    "web:install": "npm --prefix apps/web install",
+    "web:dev": "npm --prefix apps/web run dev",
+    "web:lint": "npm --prefix apps/web run lint",
+    "web:build": "npm --prefix apps/web run build"
+  }
+}

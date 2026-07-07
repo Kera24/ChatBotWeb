@@ -1,4 +1,7 @@
 fastapi
 uvicorn[standard]
-pydantic
-python-multipart
+pytest
+httpx
+SQLAlchemy
+alembic
+psycopg[binary]

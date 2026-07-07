@@ -77,6 +77,30 @@ Phase 1: research, product definition, technical architecture, and implementatio
 
 No production feature should be built until the MVP requirements, architecture, database model, API design, and RAG pipeline design are documented.
 
+## Local development
+
+Start here:
+
+- Local development guide: `docs/04_Engineering/Local_Development.md`
+- Database local setup: `docs/04_Engineering/Database_Local_Setup.md`
+- API app: `apps/api/README.md`
+- Web app: `apps/web/README.md`
+
+Common root commands:
+
+```bash
+npm run api:install
+npm run api:dev
+npm run api:test
+npm run api:db:upgrade
+npm run web:install
+npm run web:dev
+npm run web:lint
+npm run web:build
+```
+
+Current foundation scope does not include database, authentication, RAG, tenancy, or Docker.
+
 ## Engineering principle
 
 Every feature must answer three questions:
