@@ -8,6 +8,25 @@ Source sprint plan:
 - `docs/07_Roadmap/01_MVP_Implementation_Plan.md`
 - `planning/tasks/TASK-001-complete-monorepo-foundation.md`
 - `planning/tasks/TASK-002-backend-foundation.md`
+- `planning/tasks/TASK-017-docker-compose-foundation.md`
+- `planning/tasks/TASK-018-root-test-and-api-db-hardening.md`
+- `planning/tasks/TASK-019-developer-verification-script.md`
+- `planning/tasks/TASK-020-ci-verify-workflow.md`
+- `planning/tasks/TASK-021-pgvector-foundation.md`
+- `planning/tasks/TASK-022-document-chunk-schema.md`
+- `planning/tasks/TASK-023-document-management-api-foundation.md`
+- `planning/tasks/TASK-024-document-version-api-foundation.md`
+- `planning/tasks/TASK-025-chunk-metadata-api-foundation.md`
+- `planning/tasks/TASK-026-document-lifecycle-status-transitions.md`
+- `planning/tasks/TASK-027-lifecycle-transition-api.md`
+- `planning/tasks/TASK-028-audit-event-foundation.md`
+- `planning/tasks/TASK-029-audit-event-read-api.md`
+- `planning/tasks/TASK-030-api-documentation-update.md`
+- `planning/tasks/TASK-031-file-upload-api-foundation.md`
+- `planning/tasks/TASK-032-document-text-extraction-foundation.md`
+- `planning/tasks/TASK-033-manual-extraction-pipeline-integration.md`
+- `planning/tasks/TASK-034-chunking-foundation.md`
+- `planning/tasks/TASK-035-embedding-job-foundation.md`
 
 ## Sprint goal
 
@@ -43,4 +62,4 @@ Sprint 1 is Database and Tenancy. It must establish organisation, workspace, use
 
 ## Current/Next Planning Task
 
-- `planning/tasks/TASK-009-frontend-api-integration-planning.md`
+- `planning/tasks/TASK-035-embedding-job-foundation.md`

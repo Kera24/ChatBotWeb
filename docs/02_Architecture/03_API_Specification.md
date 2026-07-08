@@ -1,46 +1,20 @@
 # API Specification
 
-Version: 0.1
+Version: 0.2
 Status: Draft
+Last updated for: TASK-030
 
 ## 1. Purpose
 
-Define the initial API surface for the ChatBotWeb / Yoranix AI Platform MVP.
+Define the currently implemented REST API surface for the ChatBotWeb / Yoranix AI Platform foundation.
 
-The API must support dashboard operations, document management, chatbot messaging, analytics, and public widget access.
+This specification documents only endpoints that exist in the application today. Planned upload, storage, ingestion, retrieval, RAG, chat runtime, analytics, and widget APIs are explicitly marked as not implemented.
 
 ## 2. API style
 
-Initial API style: REST.
+Initial API style: REST over JSON.
 
-Future options:
-
-- WebSocket streaming for chat responses
-- GraphQL for complex dashboard querying
-- Public SDK for partner integrations
-
-## 3. Base paths
-
-```text
-/api/v1/admin
-/api/v1/orgs
-/api/v1/workspaces
-/api/v1/knowledge
-/api/v1/chat
-/api/v1/widget
-/api/v1/analytics
-/api/v1/audit
-```
-
-## 4. Authentication model
-
-Dashboard APIs require authenticated user sessions or bearer tokens.
-
-Public widget APIs use a workspace public key and domain validation.
-
-## 5. Common response format
-
-Successful response:
+Common response wrapper:
 
 ```json
 {
@@ -50,31 +24,95 @@ Successful response:
 }
 ```
 
-Error response:
+Common error responses are returned by FastAPI using the standard `detail` field.
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human readable message"
-  }
-}
+## 3. Base paths
+
+Implemented API base paths:
+
+```text
+/health
+/api/v1/system
+/api/v1/admin
+/api/v1/orgs
+/api/v1/workspaces
 ```
 
-## 6. Admin APIs
+Planned but not implemented API base paths:
+
+```text
+/api/v1/knowledge
+/api/v1/chat
+/api/v1/widget
+/api/v1/analytics
+```
+
+## 4. Authentication model
+
+Authentication is currently a development-only placeholder.
+
+Protected routes accept these temporary headers:
+
+| Header | Default | Purpose |
+| --- | --- | --- |
+| `X-Development-User-Email` | `dev-super-admin@example.test` | Supplies the current development user email. |
+| `X-Development-Role` | `super_admin` | Supplies the current development role. |
+
+Important development-only constraints:
+
+- This is not production authentication.
+- These headers exist only to develop and test RBAC and tenant-isolation behaviour before hosted auth is integrated.
+- `super_admin` bypasses organisation membership checks.
+- Non-`super_admin` requests require an active user matching `X-Development-User-Email` and a valid organisation membership for routes guarded by organisation roles.
+
+Current role gates:
+
+| Role gate | Allowed roles |
+| --- | --- |
+| Super admin | `super_admin` |
+| Workspace manager | `super_admin`, `org_owner`, `client_admin` |
+| Workspace/document viewer | `super_admin`, `org_owner`, `client_admin`, `viewer` |
+| Audit reader | `super_admin`, `org_owner`, `client_admin` |
+
+## 5. Tenant context rules
+
+Routes nested under `/api/v1/orgs/{organisation_id}` receive tenant context from the `organisation_id` path parameter.
+
+Workspace-scoped routes under `/api/v1/workspaces/{workspace_id}` require an `organisation_id` query parameter:
+
+```text
+?organisation_id={organisation_id}
+```
+
+This query parameter is required until production authentication can safely infer organisation access. The API validates that the workspace belongs to the supplied organisation before returning workspace, document, chunk, lifecycle, or audit data.
+
+## 6. System APIs
+
+### GET /health
+
+Returns the service health status.
+
+Authentication: none.
+
+### GET /api/v1/system/info
+
+Returns system metadata for the running API service.
+
+Authentication: none.
+
+## 7. Organisation APIs
 
 ### GET /api/v1/admin/organisations
 
-List organisations.
+Lists active organisations.
 
-Required role: super_admin.
+Required role: `super_admin`.
 
 ### POST /api/v1/admin/organisations
 
-Create organisation.
+Creates an organisation.
 
-Required role: super_admin.
+Required role: `super_admin`.
 
 Request body:
 
@@ -85,218 +123,333 @@ Request body:
 }
 ```
 
-### PATCH /api/v1/admin/organisations/{organisation_id}
+Response data fields include:
 
-Update organisation.
+- `id`
+- `name`
+- `slug`
+- `status`
+- `plan_key`
+- `created_at`
+- `updated_at`
 
-Required role: super_admin.
+Conflict behaviour: returns `409` when the organisation slug already exists.
 
-### POST /api/v1/admin/organisations/{organisation_id}/deactivate
-
-Deactivate organisation.
-
-Required role: super_admin.
-
-## 7. Workspace APIs
+## 8. Workspace APIs
 
 ### GET /api/v1/orgs/{organisation_id}/workspaces
 
-List workspaces for organisation.
+Lists workspaces for an organisation.
 
-Required role: org_owner or client_admin.
+Required role: workspace manager.
 
 ### POST /api/v1/orgs/{organisation_id}/workspaces
 
-Create workspace.
+Creates a workspace for an organisation.
 
-Required role: org_owner or client_admin.
+Required role: workspace manager.
 
 Request body:
 
 ```json
 {
   "name": "Admissions Assistant",
-  "slug": "admissions"
+  "slug": "admissions",
+  "default_language": "en"
 }
 ```
 
-### GET /api/v1/workspaces/{workspace_id}
+Response data fields include:
 
-Get workspace details.
+- `id`
+- `organisation_id`
+- `name`
+- `slug`
+- `status`
+- `default_language`
+- `created_at`
+- `updated_at`
 
-### PATCH /api/v1/workspaces/{workspace_id}
+Conflict behaviour: returns `409` when the workspace slug already exists for the organisation.
 
-Update workspace details.
+### GET /api/v1/workspaces/{workspace_id}?organisation_id={organisation_id}
 
-## 8. Knowledge APIs
+Returns one workspace by ID within the supplied organisation.
 
-### GET /api/v1/workspaces/{workspace_id}/documents
+Required role: workspace/document viewer.
 
-List documents.
+Tenant requirement: `organisation_id` query parameter is required.
 
-### POST /api/v1/workspaces/{workspace_id}/documents
+## 9. Document Metadata APIs
 
-Upload a document.
+Document APIs currently manage metadata records only. They do not upload files, persist object storage assets, extract text, chunk content, create embeddings, or run ingestion pipelines.
 
-Content type: multipart/form-data.
+### GET /api/v1/workspaces/{workspace_id}/documents?organisation_id={organisation_id}
 
-Fields:
+Lists document metadata records for a workspace.
 
-- file
-- title
-- category
+Required role: workspace/document viewer.
 
-### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}
+Tenant requirement: `organisation_id` query parameter is required.
 
-Get document details.
+### POST /api/v1/workspaces/{workspace_id}/documents?organisation_id={organisation_id}
 
-### POST /api/v1/workspaces/{workspace_id}/documents/{document_id}/archive
+Creates a document metadata record for a workspace.
 
-Archive document.
+Required role: workspace manager.
 
-### DELETE /api/v1/workspaces/{workspace_id}/documents/{document_id}
-
-Soft delete document.
-
-### POST /api/v1/workspaces/{workspace_id}/faqs
-
-Create manual FAQ.
+Tenant requirement: `organisation_id` query parameter is required.
 
 Request body:
 
 ```json
 {
-  "question": "When does orientation start?",
-  "answer": "Orientation starts on the published date in the current intake schedule.",
-  "category": "Admissions"
+  "title": "Admissions Guide",
+  "source_type": "manual",
+  "source_key": "admissions-guide",
+  "category": "admissions",
+  "visibility": "workspace",
+  "metadata_json": {}
 }
 ```
 
-## 9. Chat APIs
+Response data fields include:
 
-### POST /api/v1/chat/sessions
+- `id`
+- `organisation_id`
+- `workspace_id`
+- `title`
+- `source_type`
+- `source_key`
+- `status`
+- `category`
+- `visibility`
+- `created_by_user_id`
+- `active_document_version_id`
+- `metadata_json`
+- `archived_at`
+- `expires_at`
+- `deleted_at`
+- `created_at`
+- `updated_at`
 
-Create dashboard test chat session.
+### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}?organisation_id={organisation_id}
 
-Authenticated route.
+Returns one document metadata record by ID within a workspace.
 
-### POST /api/v1/chat/sessions/{session_id}/messages
+Required role: workspace/document viewer.
 
-Send a message inside an authenticated dashboard test session.
+Tenant requirement: `organisation_id` query parameter is required.
+
+## 10. Document Version APIs
+
+Document version APIs currently read existing metadata only. Version creation and file processing are not implemented as public endpoints.
+
+### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions?organisation_id={organisation_id}
+
+Lists document versions for a document.
+
+Required role: workspace/document viewer.
+
+Tenant requirement: `organisation_id` query parameter is required.
+
+### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}?organisation_id={organisation_id}
+
+Returns one document version by ID within a document.
+
+Required role: workspace/document viewer.
+
+Tenant requirement: `organisation_id` query parameter is required.
+
+Response data fields include:
+
+- `id`
+- `organisation_id`
+- `workspace_id`
+- `document_id`
+- `version_number`
+- `original_file_path`
+- `extracted_text_path`
+- `checksum`
+- `processing_status`
+- `processing_error`
+- `effective_from`
+- `expires_at`
+- `created_by_user_id`
+- `metadata_json`
+- `created_at`
+- `updated_at`
+
+## 11. Chunk Metadata APIs
+
+Chunk APIs currently read chunk metadata and stored chunk content only. They do not create chunks, generate embeddings, or perform retrieval.
+
+### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/chunks?organisation_id={organisation_id}
+
+Lists chunks for a document version.
+
+Required role: workspace/document viewer.
+
+Tenant requirement: `organisation_id` query parameter is required.
+
+### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/chunks/{chunk_id}?organisation_id={organisation_id}
+
+Returns one chunk by ID within a document version.
+
+Required role: workspace/document viewer.
+
+Tenant requirement: `organisation_id` query parameter is required.
+
+Response data fields include:
+
+- `id`
+- `organisation_id`
+- `workspace_id`
+- `document_id`
+- `document_version_id`
+- `chunk_index`
+- `content`
+- `content_hash`
+- `token_count`
+- `source_type`
+- `source_title`
+- `language`
+- `chunking_strategy_version`
+- `heading_path`
+- `section_title`
+- `page_number`
+- `parser_name`
+- `parser_version`
+- `status`
+- `metadata_json`
+- `embedding_model`
+- `embedding_provider`
+- `embedding_dimension`
+- `embedding_created_at`
+- `created_at`
+- `updated_at`
+
+## 12. Lifecycle Transition APIs
+
+Lifecycle transition APIs update document and document-version statuses and create audit events for successful transitions.
+
+### POST /api/v1/workspaces/{workspace_id}/documents/{document_id}/transition?organisation_id={organisation_id}
+
+Transitions a document status.
+
+Required role: workspace manager.
+
+Tenant requirement: `organisation_id` query parameter is required.
 
 Request body:
 
 ```json
 {
-  "message": "When is the next intake?"
+  "target_status": "processing"
 }
 ```
 
-Response body:
+Allowed document transitions:
 
-```json
-{
-  "success": true,
-  "data": {
-    "answer": "The answer generated from the workspace knowledge base.",
-    "answer_state": "answered",
-    "citations": []
-  }
-}
-```
+- `uploaded` -> `processing`
+- `processing` -> `ready`, `failed`
+- `ready` -> `archived`, `expired`
 
-## 10. Public widget APIs
+Response metadata includes `previous_status` and `new_status`.
 
-### GET /api/v1/widget/config/{public_key}
+### POST /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/transition?organisation_id={organisation_id}
 
-Return public widget configuration.
+Transitions a document version processing status.
 
-Response includes:
+Required role: workspace manager.
 
-- bot_name
-- welcome_message
-- primary_colour
-- logo_url
-- suggested_questions
-
-### POST /api/v1/widget/{public_key}/sessions
-
-Create public chat session.
-
-### POST /api/v1/widget/{public_key}/messages
-
-Send public chatbot message.
+Tenant requirement: `organisation_id` query parameter is required.
 
 Request body:
 
 ```json
 {
-  "session_id": "session-id",
-  "message": "How do I apply?"
+  "target_status": "queued",
+  "error_message": null
 }
 ```
 
-## 11. Analytics APIs
+Allowed document-version transitions:
 
-### GET /api/v1/workspaces/{workspace_id}/analytics/overview
+- `pending` -> `queued`
+- `queued` -> `extracting`
+- `extracting` -> `chunking`, `failed`
+- `chunking` -> `embedding`, `failed`
+- `embedding` -> `ready`, `failed`
+- `ready` -> `superseded`
 
-Returns overview metrics.
+Response metadata includes `previous_status` and `new_status`.
 
-### GET /api/v1/workspaces/{workspace_id}/analytics/unanswered
+## 13. Audit Read APIs
 
-Returns unanswered or low-confidence questions.
+Audit read APIs expose metadata-only audit events with tenant scoping. They do not implement audit UI or analytics dashboards.
 
-### GET /api/v1/workspaces/{workspace_id}/analytics/conversations
+### GET /api/v1/orgs/{organisation_id}/audit-events?limit=100
 
-Returns chat sessions.
+Lists audit events for an organisation.
 
-## 12. Widget settings APIs
+Required role: audit reader.
 
-### GET /api/v1/workspaces/{workspace_id}/widget-settings
+Query parameters:
 
-Get widget settings.
+- `limit`: optional result cap. Values are bounded to `1..500`. Default is `100`.
 
-### PATCH /api/v1/workspaces/{workspace_id}/widget-settings
+### GET /api/v1/workspaces/{workspace_id}/audit-events?organisation_id={organisation_id}&limit=100
 
-Update widget settings.
+Lists audit events for a workspace.
 
-Request body:
+Required role: audit reader.
 
-```json
-{
-  "bot_name": "Admissions Assistant",
-  "welcome_message": "Hi, how can I help?",
-  "primary_colour": "blue",
-  "suggested_questions": [
-    "When is orientation?",
-    "How do I apply?"
-  ]
-}
-```
+Tenant requirement: `organisation_id` query parameter is required.
 
-## 13. Audit APIs
+Query parameters:
 
-### GET /api/v1/workspaces/{workspace_id}/audit-events
+- `limit`: optional result cap. Values are bounded to `1..500`. Default is `100`.
 
-Returns audit events for a workspace.
+Response data fields include:
 
-Required role: org_owner or client_admin.
+- `id`
+- `organisation_id`
+- `workspace_id`
+- `actor_user_id`
+- `action`
+- `entity_type`
+- `entity_id`
+- `document_id`
+- `document_version_id`
+- `previous_status`
+- `new_status`
+- `metadata_json`
+- `created_at`
+- `updated_at`
 
-## 14. API security rules
+## 14. Not Implemented Yet
 
-1. Every protected route must validate authentication.
-2. Every tenant-scoped route must validate membership.
-3. Public widget routes must validate public key and allowed domains.
-4. Public chat routes must be rate-limited.
-5. Document upload routes must validate file type and size.
-6. All admin actions must create audit events.
+The following API areas remain planned but are not implemented:
 
-## 15. Future API additions
+- File upload endpoints.
+- Object storage endpoints.
+- Document ingestion endpoints.
+- Text extraction and parsing endpoints.
+- Chunk creation endpoints.
+- Embedding generation endpoints.
+- Retrieval and RAG runtime endpoints.
+- Authenticated chat endpoints.
+- Public widget configuration, session, and message endpoints.
+- Analytics dashboard endpoints.
+- Widget settings endpoints.
+- Production authentication and token/session handling.
 
-- Streaming chat responses
-- Website crawler endpoints
-- Integration connection APIs
-- Billing APIs
-- Evaluation APIs
-- Agent tool APIs
-- Human handover APIs
+## 15. API security rules
+
+1. Every protected route uses the development-only auth placeholder until production auth exists.
+2. Every tenant-scoped route validates organisation membership or `super_admin` role.
+3. Every workspace-scoped route validates the workspace belongs to the supplied organisation.
+4. Workspace-scoped routes under `/api/v1/workspaces/{workspace_id}` require `organisation_id` as a query parameter.
+5. Successful lifecycle transitions create tenant-scoped audit events.
+6. Upload, public chat, RAG, and widget routes must not be documented as available until implemented.
