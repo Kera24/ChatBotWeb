@@ -28,7 +28,10 @@ class Settings:
     CHUNK_OVERLAP_WORDS: int = _get_int("CHUNK_OVERLAP_WORDS", 50)
     EMBEDDING_PROVIDER: str = getenv("EMBEDDING_PROVIDER", "local-mock")
     EMBEDDING_MODEL: str = getenv("EMBEDDING_MODEL", "local-mock-v1")
-    EMBEDDING_DIMENSION: int = _get_int("EMBEDDING_DIMENSION", 16)
+    EMBEDDING_DIMENSION: int = _get_int("EMBEDDING_DIMENSION", 1536)
+    RETRIEVAL_MAX_CONTEXT_CHUNKS: int = _get_int("RETRIEVAL_MAX_CONTEXT_CHUNKS", 10)
+    RETRIEVAL_MAX_CONTEXT_CHARS: int = _get_int("RETRIEVAL_MAX_CONTEXT_CHARS", 12000)
+    PROMPT_VERSION: str = getenv("PROMPT_VERSION", "grounded-answer-v1")
 
 
 settings = Settings()

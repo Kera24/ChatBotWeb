@@ -27,6 +27,10 @@ Source sprint plan:
 - `planning/tasks/TASK-033-manual-extraction-pipeline-integration.md`
 - `planning/tasks/TASK-034-chunking-foundation.md`
 - `planning/tasks/TASK-035-embedding-job-foundation.md`
+- `planning/tasks/TASK-036-vector-search-foundation.md`
+- `planning/tasks/TASK-037-retrieval-context-assembly.md`
+- `planning/tasks/TASK-038-prompt-assembly-foundation.md`
+- `planning/tasks/TASK-039-ai-provider-framework-architecture.md`
 
 ## Sprint goal
 
@@ -62,4 +66,4 @@ Sprint 1 is Database and Tenancy. It must establish organisation, workspace, use
 
 ## Current/Next Planning Task
 
-- `planning/tasks/TASK-035-embedding-job-foundation.md`
+- `planning/tasks/TASK-039-ai-provider-framework-architecture.md`
