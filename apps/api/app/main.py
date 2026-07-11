@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.ai.dependencies import create_ai_core
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
 
@@ -10,6 +11,8 @@ def create_app() -> FastAPI:
         description=settings.PROJECT_DESCRIPTION,
         version=settings.VERSION,
     )
+
+    app.state.ai_core = create_ai_core()
 
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 

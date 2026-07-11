@@ -32,6 +32,10 @@ class Settings:
     RETRIEVAL_MAX_CONTEXT_CHUNKS: int = _get_int("RETRIEVAL_MAX_CONTEXT_CHUNKS", 10)
     RETRIEVAL_MAX_CONTEXT_CHARS: int = _get_int("RETRIEVAL_MAX_CONTEXT_CHARS", 12000)
     PROMPT_VERSION: str = getenv("PROMPT_VERSION", "grounded-answer-v1")
+    DEFAULT_AI_PROVIDER_KEY: str = getenv("DEFAULT_AI_PROVIDER_KEY", "mock")
+    DEFAULT_AI_MODEL_KEY: str = getenv("DEFAULT_AI_MODEL_KEY", "mock-grounded-answer")
+    AI_REQUEST_TIMEOUT_SECONDS: float = float(getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
+    MOCK_PROVIDER_FAILURE_MODE: str = getenv("MOCK_PROVIDER_FAILURE_MODE", "disabled")
 
 
 settings = Settings()
