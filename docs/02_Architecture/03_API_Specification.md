@@ -2,7 +2,7 @@
 
 Version: 0.2
 Status: Draft
-Last updated for: TASK-030
+Last updated for: TASK-051
 
 ## 1. Purpose
 
@@ -428,7 +428,66 @@ Response data fields include:
 - `created_at`
 - `updated_at`
 
-## 14. Not Implemented Yet
+## 14. Conversation History APIs
+
+Conversation history APIs expose read-only dashboard access to tenant-scoped conversations created by internal RAG flows. They are not public widget endpoints.
+
+### GET /api/v1/workspaces/{workspace_id}/conversations?organisation_id={organisation_id}
+
+Lists conversation summaries for a workspace.
+
+Required role: workspace/document viewer (`org_owner`, `client_admin`, or `viewer`; `super_admin` bypasses membership in development auth).
+
+Tenant requirement: `organisation_id` query parameter is required.
+
+Optional query parameters:
+
+- `status`
+- `channel`
+- `limit`: default `50`, maximum `100`
+- `offset`: default `0`
+- `started_after`
+- `started_before`
+
+Response data fields include:
+
+- `id`
+- `organisation_id`
+- `workspace_id`
+- `channel`
+- `status`
+- `title`
+- `started_at`
+- `last_message_at`
+- `ended_at`
+- `message_count`
+- `last_message_preview`
+- `metadata`
+
+### GET /api/v1/workspaces/{workspace_id}/conversations/{conversation_id}?organisation_id={organisation_id}
+
+Returns one conversation by ID within the supplied organisation/workspace, with ordered messages and citations attached to assistant messages.
+
+Required role: workspace/document viewer.
+
+Tenant requirement: `organisation_id` query parameter is required. Cross-tenant or missing conversations return a safe `404`.
+
+Message response fields include:
+
+- `id`
+- `role`
+- `content`
+- `sequence_number`
+- `answer_state`
+- model, provider, prompt, execution, token, cost, latency, finish, and error metadata
+- `created_at`
+- `citations`
+
+Excluded fields include raw prompts, message metadata JSON, anonymous/external user identifiers, provider internals, secrets, and stack traces.
+
+A separate message-list endpoint is not implemented for MVP because conversation detail returns ordered messages and citations in one response.
+
+## 15. Not Implemented Yet
 
 The following API areas remain planned but are not implemented:
 
@@ -438,14 +497,14 @@ The following API areas remain planned but are not implemented:
 - Text extraction and parsing endpoints.
 - Chunk creation endpoints.
 - Embedding generation endpoints.
-- Retrieval and RAG runtime endpoints.
-- Authenticated chat endpoints.
+- Public RAG runtime endpoints.
+- Authenticated chat write endpoints beyond the internal dashboard-test RAG answer endpoint.
 - Public widget configuration, session, and message endpoints.
 - Analytics dashboard endpoints.
 - Widget settings endpoints.
 - Production authentication and token/session handling.
 
-## 15. API security rules
+## 16. API security rules
 
 1. Every protected route uses the development-only auth placeholder until production auth exists.
 2. Every tenant-scoped route validates organisation membership or `super_admin` role.

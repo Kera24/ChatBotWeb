@@ -20,6 +20,11 @@ export const navigationItems = [
     glyph: "AN",
   },
   {
+    label: "Conversations",
+    href: "/conversations",
+    glyph: "CV",
+  },
+  {
     label: "Users",
     href: "/users",
     glyph: "US",

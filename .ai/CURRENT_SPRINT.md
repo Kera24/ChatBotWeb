@@ -1,7 +1,7 @@
 # Current Sprint
 
-Current phase: Sprint 2B ? AI Core Foundation
-Current task: TASK-050
+Current phase: Sprint 2C ? Dashboard Integration
+Current task: TASK-052
 
 Source sprint plan:
 
@@ -42,42 +42,42 @@ Source sprint plan:
 - `planning/tasks/TASK-048-provider-execution-hardening.md`
 - `planning/tasks/TASK-050-rag-orchestrator-implementation.md`
 - `planning/tasks/TASK-049-conversation-message-schema-foundation.md`
+- `planning/tasks/TASK-051-conversation-history-read-api.md`
+- `planning/tasks/TASK-052-dashboard-conversation-history-integration.md`
 
 ## Sprint goal
 
-Implement the internal reusable RAG orchestration path that coordinates retrieval, prompt rendering, AI Core execution, conversation persistence, citations, fallback, and provider failure handling without exposing the public widget endpoint.
+Connect the dashboard to tenant-scoped conversation history using the implemented API while preserving controlled Expressionism, accessibility, privacy exclusions, and current temporary-auth boundaries.
 
 ## Active priorities
 
-1. Keep the orchestrator tenant-safe and provider-neutral.
-2. Reuse existing retrieval, prompt registry, AI Core, accounting, and conversation services.
-3. Preserve existing document pipeline, vector search, prompt assembly, RBAC, and API behaviour.
-4. Use deterministic mock provider behaviour only; no external network LLM calls.
-5. Persist conversation state consistently for success, fallback, and provider failure paths.
+1. Centralise dashboard API calls and development auth headers.
+2. Track explicit organisation and workspace context in temporary development configuration.
+3. Render conversation list/detail views with clear loading, empty, access-denied, missing-config, and retry states.
+4. Preserve source citations, answer states, and safe technical execution metadata.
+5. Keep public widget, production auth, analytics aggregation, and frontend features outside this task.
 
 ## Guardrails
 
-- Do not implement real OpenAI, Anthropic, Gemini, Azure OpenAI, Ollama, or other provider integrations yet.
-- Do not expose a public widget endpoint.
-- Do not implement streaming, memory/history injection, query rewriting, hybrid search, reranking, citation LLM validation, tool calling, agents, billing, analytics UI, or background workers.
-- Do not hide mutable registries, health stores, accounting repositories, or orchestrator dependencies in module globals.
-- Do not break tenant isolation, existing RBAC, current APIs, document pipeline, retrieval behaviour, prompt behaviour, AI Core provider neutrality, accounting, health handling, or existing tests.
+- Do not implement production auth, public widget, live public chat, deletion, export, feedback capture, analytics aggregation, search, streaming, real external LLM providers, prompt editing UI, or model configuration UI.
+- Do not scatter development headers across components.
+- Do not attach dashboard auth headers to any public-widget client.
+- Do not expose raw prompts, secrets, provider internals, or hidden metadata.
 
-## Definition of done for TASK-050
+## Definition of done for TASK-052
 
-- RAG orchestrator service exists with explicit request/result contracts.
-- Internal dashboard-test RAG answer endpoint exists under workspace scope.
-- User and assistant messages are persisted in deterministic sequence.
-- Retrieved citation candidates are persisted only for assistant messages and tenant-scoped chunks.
-- Empty retrieval produces a persisted fallback answer and zero citations.
-- Provider failures preserve the user message and failed assistant state.
-- Tests cover success, conversation reuse, tenant isolation, RBAC, fallback, limits, metadata, provider failure, and timeout handling.
-- `npm run api:test`, `npm run verify`, and PostgreSQL Alembic upgrade have been run or reported with blockers.
+- Dashboard API client foundation exists under `apps/web/lib/api`.
+- Development tenant/session configuration exists and is explicit.
+- `/conversations` and `/conversations/[conversationId]` routes render API-backed states.
+- Conversations navigation item exists alongside Analytics.
+- Conversation messages, citations, status badges, and technical details render accessibly.
+- Documentation and safe environment placeholders are updated.
+- `npm run web:lint`, `npm run web:build`, `npm run api:test`, and `npm run verify` have been run or reported with blockers.
 
 ## Next recommended task
 
-Add the first dashboard chat-history/read model or prepare the public widget API boundary only after TASK-050 is reviewed.
+Add dashboard conversation feedback/fallback review workflows or introduce a dedicated frontend testing foundation before expanding dashboard integrations.
 
 ## Current/Next Planning Task
 
-- `planning/tasks/TASK-050-rag-orchestrator-implementation.md`
+- `planning/tasks/TASK-052-dashboard-conversation-history-integration.md`
