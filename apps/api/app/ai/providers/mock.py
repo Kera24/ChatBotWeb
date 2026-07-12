@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from hashlib import sha256
 
 from app.ai.contracts import (
@@ -7,8 +8,9 @@ from app.ai.contracts import (
     ProviderMetadata,
     TokenUsage,
 )
-from app.ai.errors import AIProviderError, AIProviderTimeoutError
-from app.ai.providers.base import AIProvider, ProviderCapabilities, ProviderHealth
+from app.ai.errors import AIProviderError, AIProviderTimeoutError, AIProviderUnavailableError
+from app.ai.health import ProviderHealth, ProviderHealthStatus
+from app.ai.providers.base import AIProvider, ProviderCapabilities
 
 
 class MockAIProvider(AIProvider):
@@ -16,9 +18,19 @@ class MockAIProvider(AIProvider):
     display_name = "Deterministic Mock AI Provider"
     capabilities = ProviderCapabilities(streaming=False, json_mode=False, tools=False, vision=False)
 
+    def __init__(self, *, health_status: ProviderHealthStatus = ProviderHealthStatus.HEALTHY) -> None:
+        self.health_status = health_status
+
+    def set_health_status(self, status: ProviderHealthStatus) -> None:
+        self.health_status = status
+
     def generate(self, request: AIRequest, *, timeout_seconds: float | None = None) -> AIResponse:
+        attempt_number = int(request.metadata.get("attempt_number", 1))
+        transient_failures = int(request.metadata.get("simulate_transient_failures", 0) or 0)
         if request.metadata.get("simulate_timeout"):
             raise AIProviderTimeoutError("Mock provider timeout simulation requested.")
+        if transient_failures and attempt_number <= transient_failures:
+            raise AIProviderUnavailableError("Mock provider transient unavailable simulation requested.")
         if request.metadata.get("simulate_failure"):
             raise AIProviderError("Mock provider failure simulation requested.")
 
@@ -47,17 +59,23 @@ class MockAIProvider(AIProvider):
                 provider_model_name=request.provider_model_name,
                 response_id=f"mock-{digest}",
                 raw_finish_reason="stop",
-                metadata={"digest": digest, "network": False, "deterministic": True},
+                metadata={"digest": digest, "network": False, "deterministic": True, "attempt_number": attempt_number},
             ),
-            metadata={"mock": True, "digest": digest},
+            metadata={"mock": True, "digest": digest, "attempt_number": attempt_number},
         )
 
     def health(self) -> ProviderHealth:
+        messages = {
+            ProviderHealthStatus.HEALTHY: "Mock provider is healthy.",
+            ProviderHealthStatus.DEGRADED: "Mock provider degraded simulation active.",
+            ProviderHealthStatus.UNAVAILABLE: "Mock provider unavailable simulation active.",
+            ProviderHealthStatus.UNKNOWN: "Mock provider health is unknown.",
+        }
         return ProviderHealth(
             provider_key=self.provider_key,
-            display_name=self.display_name,
-            healthy=True,
-            status="mock-ok",
+            status=self.health_status,
+            checked_at=datetime.now(UTC),
+            message=messages[self.health_status],
             metadata={"network": False, "deterministic": True},
         )
 

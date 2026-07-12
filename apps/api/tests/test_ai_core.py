@@ -260,3 +260,362 @@ def test_ai_core_successful_execution_includes_metadata() -> None:
     assert response.prompt_hash
     assert response.token_usage.total_tokens > 0
     assert response.finish_reason == FinishReason.STOP
+
+from decimal import Decimal
+
+from app.ai.accounting import AIExecutionOutcome, AIUsageAccountingRepository, AIUsageAccountingService
+from app.ai.errors import AIProviderError, AIProviderTimeoutError
+
+
+def test_ai_usage_accounting_records_successful_execution() -> None:
+    container = create_ai_core()
+
+    response = container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="mock-grounded-answer",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+            execution_id="success-record",
+        )
+    )
+    records = container.accounting_service.list_recent()
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.execution_id == "success-record"
+    assert record.outcome == AIExecutionOutcome.SUCCESS
+    assert record.prompt_tokens == response.token_usage.input_tokens
+    assert record.completion_tokens == response.token_usage.output_tokens
+    assert record.total_tokens == response.token_usage.total_tokens
+    assert record.finish_reason == FinishReason.STOP
+
+
+def test_ai_usage_accounting_zero_cost_mock_model() -> None:
+    container = create_ai_core()
+
+    container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="mock-grounded-answer",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+            execution_id="zero-cost",
+        )
+    )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.estimated_input_cost == Decimal("0")
+    assert record.estimated_output_cost == Decimal("0")
+    assert record.total_estimated_cost == Decimal("0")
+
+
+def test_ai_usage_accounting_deterministic_cost_calculation() -> None:
+    container = create_ai_core()
+    model = container.model_registry.get("mock-grounded-answer")
+    priced_model = model.model_copy(
+        update={
+            "model_key": "priced-mock",
+            "input_cost_per_million_tokens": Decimal("2.50"),
+            "output_cost_per_million_tokens": Decimal("10.00"),
+        }
+    )
+    container.model_registry.register(priced_model)
+
+    response = container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="priced-mock",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+            execution_id="priced-cost",
+        )
+    )
+    record = container.accounting_service.list_recent()[0]
+
+    expected_input = (Decimal(response.token_usage.input_tokens) / Decimal(1_000_000)) * Decimal("2.50")
+    expected_output = (Decimal(response.token_usage.output_tokens) / Decimal(1_000_000)) * Decimal("10.00")
+    assert record.estimated_input_cost == expected_input
+    assert record.estimated_output_cost == expected_output
+    assert record.total_estimated_cost == expected_input + expected_output
+
+
+def test_ai_usage_accounting_records_failed_execution() -> None:
+    container = create_ai_core()
+
+    with pytest.raises(AIProviderError):
+        container.service.generate(
+            AICoreGenerateInput(
+                prompt_key="grounded_rag_answer",
+                model_key="mock-grounded-answer",
+                variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+                execution_id="failed-record",
+                simulate_failure=True,
+            )
+        )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.execution_id == "failed-record"
+    assert record.outcome == AIExecutionOutcome.FAILED
+    assert record.finish_reason == FinishReason.ERROR
+    assert record.error_code == "AI_PROVIDER_ERROR"
+    assert record.total_tokens == record.prompt_tokens
+    assert record.completion_tokens == 0
+
+
+def test_ai_usage_accounting_records_timeout_execution() -> None:
+    container = create_ai_core()
+
+    with pytest.raises(AIProviderTimeoutError):
+        container.service.generate(
+            AICoreGenerateInput(
+                prompt_key="grounded_rag_answer",
+                model_key="mock-grounded-answer",
+                variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+                execution_id="timeout-record",
+                simulate_timeout=True,
+            )
+        )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.execution_id == "timeout-record"
+    assert record.outcome == AIExecutionOutcome.TIMEOUT
+    assert record.finish_reason == FinishReason.TIMEOUT
+    assert record.error_code == "AI_PROVIDER_TIMEOUT_EXHAUSTED"
+
+
+def test_ai_usage_accounting_preserves_provider_model_prompt_metadata() -> None:
+    container = create_ai_core()
+
+    response = container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="mock-grounded-answer",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+            execution_id="metadata-record",
+            organisation_id="org-1",
+            workspace_id="workspace-1",
+        )
+    )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.organisation_id == "org-1"
+    assert record.workspace_id == "workspace-1"
+    assert record.provider_key == response.provider_key
+    assert record.model_key == response.model_key
+    assert record.provider_model_name == response.provider_model_name
+    assert record.prompt_key == response.prompt_key
+    assert record.prompt_version == response.prompt_version
+    assert record.prompt_hash == response.prompt_hash
+
+
+def test_ai_usage_accounting_duplicate_execution_ids_rejected() -> None:
+    repository = AIUsageAccountingRepository()
+    service = AIUsageAccountingService(repository)
+    container = create_ai_core()
+    response = container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="mock-grounded-answer",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+        )
+    )
+    request = make_request()
+    model = container.model_registry.get("mock-grounded-answer")
+
+    service.record_success(execution_id="duplicate", request=request, response=response, model=model)
+    with pytest.raises(ValueError):
+        service.record_success(execution_id="duplicate", request=request, response=response, model=model)
+
+from app.ai.errors import (
+    AIProviderRetryExhaustedError,
+    AIProviderTimeoutExhaustedError,
+    ProviderNotFoundError,
+)
+from app.ai.execution_policy import ProviderExecutionPolicy
+from app.ai.executor import ProviderRetryExecutor
+from app.ai.health import ProviderHealthService, ProviderHealthStatus
+from app.ai.providers.mock import MockAIProvider
+
+
+def test_provider_execution_successful_first_attempt_records_attempt_metadata() -> None:
+    container = create_ai_core()
+
+    container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="mock-grounded-answer",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+            execution_id="first-attempt",
+        )
+    )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.attempt_count == 1
+    assert record.final_attempt_number == 1
+    assert record.retry_performed is False
+    assert record.timeout_seconds == container.execution_policy.timeout_seconds
+    assert record.provider_health_at_start == "unknown"
+    assert record.provider_health_at_end == "healthy"
+
+
+def test_provider_execution_transient_failure_then_success_retries_deterministically() -> None:
+    container = create_ai_core()
+
+    response = container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="mock-grounded-answer",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+            execution_id="retry-success",
+            simulate_transient_failures=1,
+        )
+    )
+    record = container.accounting_service.list_recent()[0]
+
+    assert response.metadata["attempt_number"] == 2
+    assert record.attempt_count == 2
+    assert record.final_attempt_number == 2
+    assert record.retry_performed is True
+    assert record.outcome == AIExecutionOutcome.SUCCESS
+
+
+def test_provider_execution_retry_exhaustion_records_failure() -> None:
+    container = create_ai_core()
+
+    with pytest.raises(AIProviderRetryExhaustedError):
+        container.service.generate(
+            AICoreGenerateInput(
+                prompt_key="grounded_rag_answer",
+                model_key="mock-grounded-answer",
+                variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+                execution_id="retry-exhausted",
+                simulate_transient_failures=5,
+            )
+        )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.error_code == "AI_PROVIDER_RETRY_EXHAUSTED"
+    assert record.attempt_count == container.execution_policy.max_attempts
+    assert record.retry_performed is True
+    assert record.provider_health_at_end == "unavailable"
+
+
+def test_provider_execution_non_retryable_failure_performs_no_retry() -> None:
+    container = create_ai_core()
+
+    with pytest.raises(AIProviderError):
+        container.service.generate(
+            AICoreGenerateInput(
+                prompt_key="grounded_rag_answer",
+                model_key="mock-grounded-answer",
+                variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+                execution_id="no-retry-failure",
+                simulate_failure=True,
+            )
+        )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.error_code == "AI_PROVIDER_ERROR"
+    assert record.attempt_count == 1
+    assert record.retry_performed is False
+
+
+def test_provider_execution_timeout_retry_exhaustion_records_timeout() -> None:
+    container = create_ai_core()
+
+    with pytest.raises(AIProviderTimeoutExhaustedError):
+        container.service.generate(
+            AICoreGenerateInput(
+                prompt_key="grounded_rag_answer",
+                model_key="mock-grounded-answer",
+                variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+                execution_id="timeout-exhausted",
+                simulate_timeout=True,
+            )
+        )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.outcome == AIExecutionOutcome.TIMEOUT
+    assert record.error_code == "AI_PROVIDER_TIMEOUT_EXHAUSTED"
+    assert record.attempt_count == container.execution_policy.max_attempts
+    assert record.retry_performed is True
+
+
+def test_provider_retry_executor_respects_max_attempts_and_backoff_sequence() -> None:
+    sleeps: list[float] = []
+    executor = ProviderRetryExecutor(sleep_func=sleeps.append)
+    policy = ProviderExecutionPolicy(max_attempts=3, retry_backoff_seconds=0.25, timeout_seconds=3)
+    provider = MockAIProvider()
+    request = make_request(simulate_transient_failures=2)
+
+    result = executor.execute(provider=provider, request=request, policy=policy)
+
+    assert result.attempt_count == 3
+    assert result.retry_performed is True
+    assert sleeps == [0.25, 0.5]
+
+
+def test_provider_health_checks_and_states_are_deterministic() -> None:
+    provider = MockAIProvider()
+    health = provider.health()
+    assert health.status == ProviderHealthStatus.HEALTHY
+    assert health.metadata["network"] is False
+
+    provider.set_health_status(ProviderHealthStatus.DEGRADED)
+    assert provider.health().status == ProviderHealthStatus.DEGRADED
+
+    provider.set_health_status(ProviderHealthStatus.UNAVAILABLE)
+    assert provider.health().status == ProviderHealthStatus.UNAVAILABLE
+
+
+def test_provider_health_service_unknown_provider_rejected() -> None:
+    registry = ProviderRegistry()
+    health_service = ProviderHealthService(registry)
+
+    with pytest.raises(ProviderNotFoundError):
+        health_service.get("missing")
+
+
+def test_provider_execution_updates_health_state() -> None:
+    container = create_ai_core()
+
+    container.service.generate(
+        AICoreGenerateInput(
+            prompt_key="grounded_rag_answer",
+            model_key="mock-grounded-answer",
+            variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+        )
+    )
+    assert container.health_service.get("mock").status == ProviderHealthStatus.HEALTHY
+
+    with pytest.raises(AIProviderError):
+        container.service.generate(
+            AICoreGenerateInput(
+                prompt_key="grounded_rag_answer",
+                model_key="mock-grounded-answer",
+                variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+                simulate_failure=True,
+            )
+        )
+    assert container.health_service.get("mock").status == ProviderHealthStatus.UNAVAILABLE
+
+
+def test_provider_health_fail_fast_records_accounting_when_required() -> None:
+    container = create_ai_core()
+    provider = container.provider_registry.get("mock")
+    provider.set_health_status(ProviderHealthStatus.DEGRADED)
+    container.service.execution_policy = container.execution_policy.model_copy(update={"health_check_required": True})
+
+    with pytest.raises(AIProviderError):
+        container.service.generate(
+            AICoreGenerateInput(
+                prompt_key="grounded_rag_answer",
+                model_key="mock-grounded-answer",
+                variables={"question": "What is Yoranix?", "context": "[1] Yoranix is an AI platform."},
+                execution_id="fail-fast-degraded",
+            )
+        )
+    record = container.accounting_service.list_recent()[0]
+
+    assert record.error_code == "AI_PROVIDER_DEGRADED"
+    assert record.attempt_count == 0
+    assert record.provider_health_at_start == "degraded"
+    assert record.provider_health_at_end == "degraded"

@@ -1,7 +1,7 @@
 # Current Sprint
 
-Current phase: Sprint 2B - AI Core Foundation.
-Current task: TASK-046.
+Current phase: Sprint 2B ? AI Core Foundation
+Current task: TASK-050
 
 Source sprint plan:
 
@@ -38,43 +38,46 @@ Source sprint plan:
 - `planning/tasks/TASK-038-prompt-assembly-foundation.md`
 - `planning/tasks/TASK-039-ai-provider-framework-architecture.md`
 - `planning/tasks/TASK-046-ai-core-foundation-implementation.md`
+- `planning/tasks/TASK-047-token-cost-accounting-foundation.md`
+- `planning/tasks/TASK-048-provider-execution-hardening.md`
+- `planning/tasks/TASK-050-rag-orchestrator-implementation.md`
+- `planning/tasks/TASK-049-conversation-message-schema-foundation.md`
 
 ## Sprint goal
 
-Create the first reusable provider-neutral AI Core foundation without connecting to an external LLM provider and without exposing a public chat or final RAG answer endpoint.
+Implement the internal reusable RAG orchestration path that coordinates retrieval, prompt rendering, AI Core execution, conversation persistence, citations, fallback, and provider failure handling without exposing the public widget endpoint.
 
 ## Active priorities
 
-1. Keep AI Core provider-neutral and testable.
-2. Preserve existing document pipeline, embeddings, vector search, retrieval context, and prompt assembly behaviour.
-3. Use deterministic mock generation for local development and automated tests.
-4. Keep provider, model, and prompt registries explicit and isolated.
-5. Preserve existing temporary development RBAC boundaries and tenant isolation.
+1. Keep the orchestrator tenant-safe and provider-neutral.
+2. Reuse existing retrieval, prompt registry, AI Core, accounting, and conversation services.
+3. Preserve existing document pipeline, vector search, prompt assembly, RBAC, and API behaviour.
+4. Use deterministic mock provider behaviour only; no external network LLM calls.
+5. Persist conversation state consistently for success, fallback, and provider failure paths.
 
 ## Guardrails
 
 - Do not implement real OpenAI, Anthropic, Gemini, Azure OpenAI, Ollama, or other provider integrations yet.
-- Do not add external LLM API keys or secrets.
-- Do not expose a public chat endpoint.
-- Do not implement chat sessions, message storage, final grounded-answer generation, widget, billing, or analytics UI.
-- Do not hide mutable registries in module globals.
-- Do not break tenant isolation, existing RBAC, current APIs, document pipeline, retrieval behaviour, or existing tests.
+- Do not expose a public widget endpoint.
+- Do not implement streaming, memory/history injection, query rewriting, hybrid search, reranking, citation LLM validation, tool calling, agents, billing, analytics UI, or background workers.
+- Do not hide mutable registries, health stores, accounting repositories, or orchestrator dependencies in module globals.
+- Do not break tenant isolation, existing RBAC, current APIs, document pipeline, retrieval behaviour, prompt behaviour, AI Core provider neutrality, accounting, health handling, or existing tests.
 
-## Definition of done for TASK-046
+## Definition of done for TASK-050
 
-- Provider-neutral AI contracts exist and serialise cleanly.
-- Mock provider is deterministic, local-only, and failure/timeout testable.
-- Provider, model, and prompt registries are explicit and isolated.
-- Default grounded answer prompt is registered as an immutable prompt version.
-- AI Core service can render prompts, resolve model/provider, execute mock generation, and return metadata.
-- Internal `POST /api/v1/ai/generate` endpoint is super-admin only.
-- Local development documentation exists.
-- `npm run api:test` and `npm run verify` have been run or reported with any blockers.
+- RAG orchestrator service exists with explicit request/result contracts.
+- Internal dashboard-test RAG answer endpoint exists under workspace scope.
+- User and assistant messages are persisted in deterministic sequence.
+- Retrieved citation candidates are persisted only for assistant messages and tenant-scoped chunks.
+- Empty retrieval produces a persisted fallback answer and zero citations.
+- Provider failures preserve the user message and failed assistant state.
+- Tests cover success, conversation reuse, tenant isolation, RBAC, fallback, limits, metadata, provider failure, and timeout handling.
+- `npm run api:test`, `npm run verify`, and PostgreSQL Alembic upgrade have been run or reported with blockers.
 
 ## Next recommended task
 
-Define the next implementation slice for real-provider adapter planning or AI Core persistence only after TASK-046 is reviewed.
+Add the first dashboard chat-history/read model or prepare the public widget API boundary only after TASK-050 is reviewed.
 
 ## Current/Next Planning Task
 
-- `planning/tasks/TASK-046-ai-core-foundation-implementation.md`
+- `planning/tasks/TASK-050-rag-orchestrator-implementation.md`

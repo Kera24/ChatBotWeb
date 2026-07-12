@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel
 
 from app.ai.errors import ModelDisabledError, ModelNotFoundError
@@ -18,8 +20,8 @@ class ModelConfig(BaseModel):
     display_name: str
     enabled: bool = True
     context_window: int
-    input_cost_per_million_tokens: float | None = None
-    output_cost_per_million_tokens: float | None = None
+    input_cost_per_million_tokens: Decimal | None = None
+    output_cost_per_million_tokens: Decimal | None = None
     capabilities: ModelCapabilities = ModelCapabilities()
 
 
@@ -56,6 +58,8 @@ def register_default_mock_model(registry: ModelRegistry) -> None:
             display_name="Mock Grounded Answer Model",
             enabled=True,
             context_window=16000,
+            input_cost_per_million_tokens=Decimal("0"),
+            output_cost_per_million_tokens=Decimal("0"),
             capabilities=ModelCapabilities(streaming=False, json_mode=False, tools=False, vision=False),
         )
     )

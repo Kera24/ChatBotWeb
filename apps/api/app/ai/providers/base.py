@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.ai.contracts import AIRequest, AIResponse
+from app.ai.health import ProviderHealth, ProviderHealthStatus
 
 
 class ProviderCapabilities(BaseModel):
@@ -11,14 +11,6 @@ class ProviderCapabilities(BaseModel):
     json_mode: bool = False
     tools: bool = False
     vision: bool = False
-
-
-class ProviderHealth(BaseModel):
-    provider_key: str
-    display_name: str
-    healthy: bool
-    status: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class AIProvider(ABC):
@@ -31,11 +23,13 @@ class AIProvider(ABC):
         pass
 
     def health(self) -> ProviderHealth:
+        from datetime import UTC, datetime
+
         return ProviderHealth(
             provider_key=self.provider_key,
-            display_name=self.display_name,
-            healthy=True,
-            status="ok",
+            status=ProviderHealthStatus.HEALTHY,
+            checked_at=datetime.now(UTC),
+            message="Provider health check succeeded.",
             metadata={"capabilities": self.capabilities.model_dump(mode="json")},
         )
 

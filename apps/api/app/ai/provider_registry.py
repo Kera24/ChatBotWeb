@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from app.ai.errors import ProviderNotFoundError
-from app.ai.providers.base import AIProvider, ProviderHealth
+from app.ai.health import ProviderHealth
+from app.ai.providers.base import AIProvider
 
 
 class ProviderRegistry:
