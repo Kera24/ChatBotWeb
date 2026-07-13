@@ -11,6 +11,7 @@
     "web:dev": "npm --prefix apps/web run dev",
     "web:lint": "npm --prefix apps/web run lint",
     "web:build": "npm --prefix apps/web run build",
-    "verify": "docker compose config && npm run api:test && npm run web:lint && npm run web:build"
+    "verify": "docker compose config && npm run api:test && npm run web:test && npm run web:lint && npm run web:build",
+    "web:test": "npm --prefix apps/web run test:run"
   }
 }

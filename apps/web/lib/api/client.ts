@@ -5,7 +5,8 @@ import type { ApiEnvelope } from "./types";
 const DEFAULT_API_BASE_URL = "http://localhost:8000";
 
 export function getDashboardApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  return (configuredBaseUrl || DEFAULT_API_BASE_URL).replace(/\/$/, "");
 }
 
 type DashboardApiRequest = {
@@ -13,6 +14,10 @@ type DashboardApiRequest = {
   session: DevelopmentDashboardSession;
   searchParams?: Record<string, string | number | undefined | null>;
   cache?: RequestCache;
+};
+
+type DashboardApiMutationRequest = DashboardApiRequest & {
+  body: Record<string, unknown>;
 };
 
 export async function dashboardApiGet<TData, TMeta = Record<string, unknown>>({
@@ -37,6 +42,46 @@ export async function dashboardApiGet<TData, TMeta = Record<string, unknown>>({
         ...developmentDashboardHeaders(session),
       },
       cache,
+    });
+  } catch (error) {
+    throw new DashboardApiError("network", "Network failure while calling dashboard API.", { detail: error });
+  }
+
+  const payload = await readPayload(response);
+  if (!response.ok) {
+    throw new DashboardApiError(apiErrorKindFromStatus(response.status), "Dashboard API request failed.", {
+      status: response.status,
+      detail: payload,
+    });
+  }
+
+  return payload as ApiEnvelope<TData, TMeta>;
+}
+
+export async function dashboardApiPatch<TData, TMeta = Record<string, unknown>>({
+  path,
+  session,
+  searchParams,
+  body,
+}: DashboardApiMutationRequest): Promise<ApiEnvelope<TData, TMeta>> {
+  const url = new URL(`${getDashboardApiBaseUrl()}${path}`);
+  for (const [key, value] of Object.entries(searchParams ?? {})) {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...developmentDashboardHeaders(session),
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
     });
   } catch (error) {
     throw new DashboardApiError("network", "Network failure while calling dashboard API.", { detail: error });

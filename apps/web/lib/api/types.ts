@@ -90,3 +90,51 @@ export type ConversationListParams = {
   limit?: number;
   offset?: number;
 };
+
+export type ReviewStatus = "open" | "reviewed" | "dismissed" | "knowledge_gap";
+
+export type ReviewItem = {
+  conversation_id: string;
+  assistant_message_id: string;
+  user_question: string | null;
+  assistant_answer: string;
+  answer_state: AnswerState | string;
+  error_code: string | null;
+  channel: ConversationChannel | string;
+  conversation_status: ConversationStatus | string;
+  model_key: string | null;
+  provider_key: string | null;
+  prompt_key: string | null;
+  prompt_version: number | null;
+  citation_count: number;
+  citations: ConversationCitation[];
+  created_at: string;
+  estimated_cost: string | number | null;
+  latency_ms: number | null;
+  review_status: ReviewStatus | string;
+  reviewer_note: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+};
+
+export type ReviewItemDetail = {
+  item: ReviewItem;
+  conversation_context: ConversationMessage[];
+};
+
+export type ReviewListMeta = {
+  limit: number;
+  offset: number;
+  count: number;
+  total: number;
+};
+
+export type ReviewListParams = {
+  answer_state?: string;
+  review_status?: string;
+  channel?: string;
+  created_after?: string;
+  created_before?: string;
+  limit?: number;
+  offset?: number;
+};

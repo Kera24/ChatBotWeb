@@ -31,7 +31,7 @@ export default async function ConversationsPage({ searchParams }: ConversationsP
   const tenant = getDevelopmentDashboardSession();
 
   if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} />;
+    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
   }
 
   const result = await loadConversationList(tenant.session, {

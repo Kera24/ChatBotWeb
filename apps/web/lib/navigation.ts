@@ -25,6 +25,11 @@ export const navigationItems = [
     glyph: "CV",
   },
   {
+    label: "Knowledge Gaps",
+    href: "/review/unanswered",
+    glyph: "KG",
+  },
+  {
     label: "Users",
     href: "/users",
     glyph: "US",

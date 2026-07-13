@@ -749,3 +749,154 @@ code {
     justify-self: stretch;
   }
 }
+
+
+.reviewQueuePage .reviewHero {
+  border-left: 6px solid var(--accent);
+}
+
+.reviewHeroAside {
+  background: #15120f;
+}
+
+.reviewList {
+  display: grid;
+  gap: 1rem;
+}
+
+.reviewRow {
+  border: 1px solid var(--border);
+  border-left: 6px solid #7c8a99;
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+  gap: 1rem;
+}
+
+.review-answer-fallback {
+  border-left-color: #b7791f;
+}
+
+.review-answer-failed {
+  border-left-color: #b42318;
+}
+
+.review-answer-low_confidence {
+  border-left-color: #5b6ee1;
+}
+
+.reviewRowMain h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.reviewStatusBadge {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.review-knowledge_gap {
+  background: #fff2cc;
+  color: #5f4100;
+}
+
+.review-reviewed {
+  background: #e7f7ed;
+  color: #14532d;
+}
+
+.review-dismissed {
+  background: #eef0f3;
+  color: #343a40;
+}
+
+.review-open {
+  background: #fff7ed;
+  color: #7c2d12;
+}
+
+.reviewDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.reviewStoryPanel,
+.reviewDecisionPanel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.reviewStoryPanel h3,
+.reviewDecisionPanel h2 {
+  margin: 0 0 0.75rem;
+}
+
+.reviewHeroBadges {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.compactMeta {
+  grid-template-columns: 1fr;
+}
+
+.reviewDecisionPanel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.reviewDecisionPanel label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+.reviewDecisionPanel textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+.reviewDecisionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mutedText {
+  color: var(--muted);
+}
+
+.errorText {
+  color: #b42318;
+  font-weight: 700;
+}
+
+@media (max-width: 860px) {
+  .reviewRow,
+  .reviewDetailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewHeroBadges {
+    justify-content: flex-start;
+  }
+}

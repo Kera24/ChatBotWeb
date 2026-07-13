@@ -2,7 +2,7 @@
 
 Version: 0.2
 Status: Draft
-Last updated for: TASK-051
+Last updated for: TASK-054
 
 ## 1. Purpose
 
@@ -487,7 +487,54 @@ Excluded fields include raw prompts, message metadata JSON, anonymous/external u
 
 A separate message-list endpoint is not implemented for MVP because conversation detail returns ordered messages and citations in one response.
 
-## 15. Not Implemented Yet
+## 15. Unanswered Review APIs
+
+Unanswered review APIs expose dashboard access to assistant answers that need human review. Review candidates are derived from existing assistant messages where `answer_state` is `fallback`, `failed`, or `low_confidence`.
+
+### GET /api/v1/workspaces/{workspace_id}/review/unanswered?organisation_id={organisation_id}
+
+Lists review items for a workspace.
+
+Required role: workspace/document viewer (`org_owner`, `client_admin`, or `viewer`; `super_admin` bypasses membership in development auth).
+
+Optional query parameters:
+
+- `answer_state`: one of `fallback`, `failed`, `low_confidence`
+- `review_status`: one of `open`, `reviewed`, `dismissed`, `knowledge_gap`
+- `channel`
+- `created_after`
+- `created_before`
+- `limit`: default `50`, maximum `100`
+- `offset`: default `0`
+
+Response items include the conversation ID, assistant message ID, preceding user question, assistant answer, answer state, error code, channel, conversation status, model/provider/prompt identity, citation count, safe citations, created time, estimated cost, latency, review status, reviewer note, and review timestamps.
+
+### GET /api/v1/workspaces/{workspace_id}/review/unanswered/{assistant_message_id}?organisation_id={organisation_id}
+
+Returns one review item by assistant message ID with tenant-safe conversation context and citations. Cross-tenant or missing items return a safe `404`.
+
+Required role: workspace/document viewer.
+
+### PATCH /api/v1/workspaces/{workspace_id}/review/unanswered/{assistant_message_id}?organisation_id={organisation_id}
+
+Updates review status and optional reviewer note.
+
+Required role: review updater (`org_owner` or `client_admin`; `super_admin` bypasses membership in development auth).
+
+Request body:
+
+```json
+{
+  "review_status": "knowledge_gap",
+  "reviewer_note": "Add a clearer source article."
+}
+```
+
+Successful updates create a `review.status.changed` audit event. The original user and assistant message content is not mutated.
+
+Excluded fields include raw prompts, rendered prompts, provider internals, secrets, stack traces, and message metadata JSON.
+
+## 16. Not Implemented Yet
 
 The following API areas remain planned but are not implemented:
 
@@ -504,11 +551,11 @@ The following API areas remain planned but are not implemented:
 - Widget settings endpoints.
 - Production authentication and token/session handling.
 
-## 16. API security rules
+## 17. API security rules
 
 1. Every protected route uses the development-only auth placeholder until production auth exists.
 2. Every tenant-scoped route validates organisation membership or `super_admin` role.
 3. Every workspace-scoped route validates the workspace belongs to the supplied organisation.
 4. Workspace-scoped routes under `/api/v1/workspaces/{workspace_id}` require `organisation_id` as a query parameter.
-5. Successful lifecycle transitions create tenant-scoped audit events.
+5. Successful lifecycle transitions and review status changes create tenant-scoped audit events.
 6. Upload, public chat, RAG, and widget routes must not be documented as available until implemented.

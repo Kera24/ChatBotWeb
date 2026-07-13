@@ -19,7 +19,7 @@ export default async function ConversationDetailPage({ params }: ConversationDet
   const tenant = getDevelopmentDashboardSession();
 
   if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} />;
+    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
   }
 
   const result = await loadConversationDetail(tenant.session, conversationId);

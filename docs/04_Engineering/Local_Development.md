@@ -52,6 +52,7 @@ npm run api:test
 npm run api:db:upgrade
 npm run web:install
 npm run web:dev
+npm run web:test
 npm run web:lint
 npm run web:build
 npm run verify
@@ -74,8 +75,9 @@ This command runs, in order:
 
 1. `docker compose config`
 2. `npm run api:test`
-3. `npm run web:lint`
-4. `npm run web:build`
+3. `npm run web:test`
+4. `npm run web:lint`
+5. `npm run web:build`
 
 The command uses `&&` so it stops on the first failing step and works in common Windows, macOS, and Linux npm shells.
 
@@ -225,6 +227,12 @@ Run the web app from `apps/web`:
 npm run dev
 ```
 
+Run tests from `apps/web`:
+
+```bash
+npm run test:run
+```
+
 Run lint from `apps/web`:
 
 ```bash
@@ -243,6 +251,8 @@ Current web routes:
 - `/knowledge`
 - `/chatbot`
 - `/analytics`
+- `/conversations`
+- `/conversations/[conversationId]`
 - `/users`
 - `/settings`
 

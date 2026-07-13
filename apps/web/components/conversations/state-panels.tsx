@@ -20,17 +20,29 @@ export function EmptyState() {
   );
 }
 
-export function MissingTenantConfiguration({ missing }: { missing: string[] }) {
+export function MissingTenantConfiguration({ missing, invalid = [] }: { missing: string[]; invalid?: string[] }) {
   return (
     <section className="statePanel urgentState">
       <p className="sectionKicker">Development setup required</p>
       <h2>Tenant context is missing</h2>
       <p>Add these safe local variables before loading conversation history:</p>
-      <ul>
-        {missing.map((item) => (
-          <li key={item}><code>{item}</code></li>
-        ))}
-      </ul>
+      {missing.length > 0 ? (
+        <ul aria-label="Missing development variables">
+          {missing.map((item) => (
+            <li key={item}><code>{item}</code></li>
+          ))}
+        </ul>
+      ) : null}
+      {invalid.length > 0 ? (
+        <>
+          <p>Correct these invalid local variables:</p>
+          <ul aria-label="Invalid development variables">
+            {invalid.map((item) => (
+              <li key={item}><code>{item}</code></li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </section>
   );
 }

@@ -20,7 +20,7 @@ The current frontend uses explicit development-only tenant context:
 - `NEXT_PUBLIC_DEVELOPMENT_USER_EMAIL`
 - `NEXT_PUBLIC_DEVELOPMENT_ROLE`
 
-The UI shows a missing-configuration state if organisation or workspace IDs are absent. These values are temporary placeholders until production authentication and tenant selection exist.
+The UI shows a missing-configuration state if organisation ID, workspace ID, development user email, or role are absent, and an invalid-configuration state if the role is unsupported. These values are temporary placeholders until production authentication and tenant selection exist.
 
 ## API Client Structure
 
@@ -63,9 +63,10 @@ The screen uses large expressive page typography, a high-contrast conversation c
 
 ## Local Testing
 
-Run:
+Run focused frontend verification from the repository root:
 
 ```bash
+npm run web:test
 npm run web:lint
 npm run web:build
 ```
@@ -77,7 +78,7 @@ npm run api:test
 npm run verify
 ```
 
-A frontend unit test runner is not yet installed. Adding Vitest or Jest would be a separate foundation decision; this task relies on strict TypeScript, ESLint, and Next build verification.
+Conversation-history tests use Vitest, React Testing Library, user-event, and jsdom. API calls are mocked; no test calls a live backend.
 
 ## Temporary Auth Limitation
 
