@@ -1,11 +1,15 @@
 # Sprint Plan
 
-Version: 1.0
+Version: 1.1
 Status: Active Draft
 
 ## Sprint model
 
 Use short implementation sprints. Each sprint should produce working software, not only documentation.
+
+## Architecture-before-implementation rule
+
+Every major feature must be split into an architecture task and an implementation task. The architecture task must be reviewed and approved before implementation starts. Use the pattern in `implementation-pack/00_Operating_Model/03_Architecture_Implementation_Task_Pattern.md`.
 
 ## Sprint 0: Foundation
 
@@ -169,3 +173,39 @@ Exit criteria:
 
 - One pilot client can be onboarded safely.
 - Known limitations are documented.
+
+
+## Sprint 3A: Public Access Layer Architecture
+
+Goal:
+
+Define the reusable Public Access Layer bounded context before implementing public widget, public API, or external channel runtime paths.
+
+Tasks:
+
+- TASK-055 Public Widget Security Architecture
+- TASK-056A Public Access Layer Architecture
+
+Exit criteria:
+
+- Public widget security boundary is documented.
+- Public Access Layer bounded context is documented.
+- ADR-0005 and ADR-0006 record public boundary decisions.
+- Future public/external channel implementation tasks are blocked until architecture tasks are approved.
+
+## Sprint 3B: Public Access Layer Foundation Implementation
+
+Goal:
+
+Implement only the approved internal Public Access Layer contracts and service skeleton. Do not expose public endpoints until the specific endpoint architecture tasks are approved.
+
+Tasks:
+
+- TASK-056B Public Access Layer Implementation
+- Future architecture/implementation pairs for public identity schema, domain validation, rate limiting, sessions, and config/message endpoints.
+
+Exit criteria:
+
+- Internal contracts exist.
+- Tests prove tenant context must be server-resolved.
+- No public endpoints are exposed.

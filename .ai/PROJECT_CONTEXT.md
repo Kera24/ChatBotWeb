@@ -53,6 +53,12 @@ This supersedes any older interpretation that the product should look like a gen
 - Queue: Redis and Celery
 - Deployment: Docker first; Kubernetes later only when needed
 
+## Architecture-before-implementation rule
+
+Every major feature must have an architecture task and an implementation task. The architecture task must be reviewed and approved before implementation starts. Follow `implementation-pack/00_Operating_Model/03_Architecture_Implementation_Task_Pattern.md`.
+
+For public or external channel work, use the Public Access Layer bounded context from `implementation-pack/02_Architecture/01_Public_Access_Layer_Architecture.md` and ADR-0006. Do not let new channels call the RAG Orchestrator directly.
+
 ## Implementation rules
 
 - Do not build features outside the active task.
@@ -62,6 +68,12 @@ This supersedes any older interpretation that the product should look like a gen
 - Do not expose system prompts, internal chain-of-thought, hidden instructions, or other tenants' data.
 - Keep docs and code aligned when behavior changes.
 - Preserve existing user work in the repository.
+
+## Public widget security gate
+
+No public widget endpoint, anonymous widget session, public RAG route, or embeddable widget UI may be implemented until TASK-055 and the relevant Public Access Layer architecture task are reviewed and approved.
+
+Future public widget and external-channel work must go through the Public Access Layer. Public traffic must stay separate from dashboard APIs and internal development APIs. Public requests must not reuse dashboard authentication, development headers, or client-supplied tenant IDs. Tenant context must be resolved server-side from a public identity mapping to an active workspace and organisation.
 
 ## Tenant isolation rules
 

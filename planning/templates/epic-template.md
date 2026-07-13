@@ -14,7 +14,7 @@ Draft | Ready | In Progress | Done
 
 ## Problem
 
-Describe the business or user problem this epic solves.
+Describe the business, user, or platform problem this epic solves.
 
 ## Goal
 
@@ -28,6 +28,7 @@ Describe the outcome this epic must achieve.
 - Contributor
 - Viewer
 - Public chatbot user
+- External integration user
 
 ## Scope
 
@@ -37,11 +38,30 @@ List what is included.
 
 List what is intentionally excluded.
 
+## Architecture tasks
+
+Major features require architecture tasks before implementation tasks.
+
+- TASK-XXXA <architecture task>
+
+## Implementation tasks
+
+Implementation tasks must link to approved architecture.
+
+- TASK-XXXB <implementation task>
+
 ## Requirements
 
 - Requirement 1
 - Requirement 2
 - Requirement 3
+
+## Security and tenant isolation
+
+- Boundary rules
+- Tenant context rules
+- Auth/RBAC rules
+- Privacy rules
 
 ## Acceptance criteria
 
@@ -53,6 +73,7 @@ List what is intentionally excluded.
 
 - Document links
 - Architecture links
+- ADR links
 - Other epics
 
 ## Risks
