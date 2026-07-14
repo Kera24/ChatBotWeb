@@ -1,7 +1,8 @@
-from app.access.channels.base import DevelopmentTestChannelAdapter
+﻿from app.access.channels.base import DevelopmentTestChannelAdapter
 from app.access.credentials.registry import CredentialResolver, InMemoryCredentialRegistry
 from app.access.gateway import ChannelRegistry, PublicAccessGateway
 from app.access.observability.events import InMemoryAccessEventSink
+from app.access.origin_validation.service import OriginValidationService
 from app.access.policies.registry import default_policy_registry
 from app.access.tenant_resolution.service import PublicTenantResolutionService, TenantResolutionChecks
 
@@ -41,10 +42,12 @@ def create_public_access_gateway(
     tenant_resolution_service: PublicTenantResolutionService,
     policy_registry,
     event_sink: InMemoryAccessEventSink,
+    origin_validation_service: OriginValidationService | None = None,
 ) -> PublicAccessGateway:
     return PublicAccessGateway(
         channel_registry=channel_registry,
         tenant_resolution_service=tenant_resolution_service,
         policy_registry=policy_registry,
         event_sink=event_sink,
+        origin_validation_service=origin_validation_service,
     )

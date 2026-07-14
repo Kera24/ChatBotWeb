@@ -155,3 +155,20 @@ New implementation modules:
 `DatabaseCredentialRegistry` can resolve persisted credentials into the existing `CredentialRecord` contract. `InMemoryCredentialRegistry` remains available for isolated tests.
 
 The gateway behaviour is unchanged and no public route has been added. Runtime origin validation, Redis rate limiting, anonymous sessions, public config endpoint, public message endpoint, public RAG, and widget UI remain unimplemented.
+
+## TASK-058B Origin Validation Update
+
+TASK-058B adds the runtime origin-validation foundation while preserving the no-public-route boundary.
+
+New modules:
+
+- `apps/api/app/access/origin_validation/contracts.py`
+- `apps/api/app/access/origin_validation/normalisation.py`
+- `apps/api/app/access/origin_validation/matcher.py`
+- `apps/api/app/access/origin_validation/repository.py`
+- `apps/api/app/access/origin_validation/service.py`
+- `apps/api/app/access/origin_validation/errors.py`
+
+`PublicAccessGateway` now accepts an optional injected `OriginValidationService`. When injected, origin validation runs after credential, tenant, policy, and request-limit checks. The gateway still stops before rate limiting, sessions, abuse checks, cost enforcement, RAG orchestration, and response generation.
+
+No public endpoint, CORS middleware, Redis cache, anonymous session, widget SDK/UI, or RAG invocation was added.

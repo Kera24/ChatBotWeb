@@ -157,3 +157,17 @@ Guardrails for future Codex sessions:
 - Do not infer client origin from `Host`.
 - Trust forwarded headers only from configured trusted proxies.
 - Do not implement runtime origin validation, CORS changes, or public widget endpoints until TASK-058B or a later approved implementation task.
+
+## Distributed rate limiting guardrails
+
+TASK-059A and ADR-0009 define distributed rate-limiting policy for future public and external channels.
+
+Guardrails for future Codex sessions:
+
+- No public message/session endpoint may bypass the distributed limiter.
+- Forwarded client-IP headers are trusted only from configured proxies.
+- Short-window rate limits are separate from daily/monthly quotas.
+- Security-sensitive Redis uncertainty fails closed unless architecture explicitly permits a constrained read-only fallback.
+- Redis keys must not contain raw public keys, partner secrets, raw IP addresses, session tokens, message content, or PII.
+- Rate-limit denial must prevent anonymous session creation, RAG orchestration, provider execution, and cost-bearing side effects.
+- Do not implement Redis client code, Lua scripts, rate-limit middleware, or public runtime endpoints until TASK-059B or a later approved implementation task.

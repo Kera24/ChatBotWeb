@@ -580,3 +580,22 @@ TASK-058A is complete when:
 - Threat model and diagrams are complete.
 - ADR-0008 records the decision.
 - No runtime code is added.
+
+## TASK-058B Implementation Note
+
+Implemented module paths:
+
+```text
+apps/api/app/access/origin_validation/
+  __init__.py
+  contracts.py
+  errors.py
+  normalisation.py
+  matcher.py
+  repository.py
+  service.py
+```
+
+The implementation provides strict Origin normalisation, exact matching, conservative one-label wildcard matching, credential/environment-scoped allowed-origin lookup, safe public errors, safe operational events, and optional Public Access Gateway integration through dependency injection.
+
+No CORS middleware, public endpoint, Redis cache, anonymous session, DNS verification, widget SDK/UI, or RAG call is implemented by TASK-058B.

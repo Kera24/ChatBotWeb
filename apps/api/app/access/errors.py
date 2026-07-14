@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+﻿from dataclasses import asdict, dataclass
 
 
 @dataclass(frozen=True)
@@ -55,6 +55,10 @@ ERROR_CATALOG: dict[str, PublicAccessErrorDetail] = {
     "disabled_credential": PublicAccessErrorDetail("disabled_credential", "This public access credential is disabled.", False, 403),
     "expired_credential": PublicAccessErrorDetail("expired_credential", "This public access credential has expired.", False, 401),
     "origin_not_allowed": PublicAccessErrorDetail("origin_not_allowed", "This origin is not allowed.", False, 403),
+    "origin_required": PublicAccessErrorDetail("origin_required", "A valid request origin is required.", False, 403),
+    "malformed_origin": PublicAccessErrorDetail("malformed_origin", "The request origin is not valid.", False, 400),
+    "insecure_origin": PublicAccessErrorDetail("insecure_origin", "The request origin is not secure enough for this public access credential.", False, 403),
+    "unsupported_origin_scheme": PublicAccessErrorDetail("unsupported_origin_scheme", "The request origin scheme is not supported.", False, 400),
     "invalid_session": PublicAccessErrorDetail("invalid_session", "The public access session is not valid.", False, 401),
     "expired_session": PublicAccessErrorDetail("expired_session", "The public access session has expired.", False, 401),
     "request_too_large": PublicAccessErrorDetail("request_too_large", "The request is too large.", False, 413),

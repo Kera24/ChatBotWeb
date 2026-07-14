@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, field
+﻿from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
 SAFE_EVENT_TYPES = {
@@ -9,6 +9,12 @@ SAFE_EVENT_TYPES = {
     "access.tenant.resolved",
     "access.request.rejected",
     "access.request.validated",
+    "origin.validation.allowed",
+    "origin.validation.denied",
+    "origin.validation.missing",
+    "origin.validation.malformed",
+    "origin.validation.wildcard_matched",
+    "origin.validation.development_exception",
 }
 
 

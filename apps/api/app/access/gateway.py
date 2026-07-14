@@ -5,6 +5,8 @@ from app.access.channels.base import PublicChannelAdapter
 from app.access.contracts import NormalisedAccessContext, PublicAccessRequest, PublicAccessResponse
 from app.access.errors import PublicAccessError, error_detail, raise_public_error
 from app.access.observability.events import AccessEvent, InMemoryAccessEventSink
+from app.access.origin_validation.contracts import OriginValidationRequest
+from app.access.origin_validation.service import OriginValidationService
 from app.access.policies.registry import AccessPolicyRegistry
 from app.access.tenant_resolution.service import PublicTenantResolutionService
 
@@ -46,11 +48,13 @@ class PublicAccessGateway:
         tenant_resolution_service: PublicTenantResolutionService,
         policy_registry: AccessPolicyRegistry,
         event_sink: InMemoryAccessEventSink,
+        origin_validation_service: OriginValidationService | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
         self.policy_registry = policy_registry
         self.event_sink = event_sink
+        self.origin_validation_service = origin_validation_service
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -86,6 +90,22 @@ class PublicAccessGateway:
             self._emit("access.tenant.resolved", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="resolved")
             policy = self.policy_registry.resolve(context.policy_profile)
             self._validate_limits(request, raw_request, policy.max_request_bytes, policy.max_message_characters)
+            if self.origin_validation_service is not None:
+                self.origin_validation_service.validate(
+                    OriginValidationRequest(
+                        credential_id=credential_record.credential_id,
+                        credential_environment=credential_record.environment,
+                        credential_type=credential_record.credential_type,
+                        policy_profile=policy,
+                        origin_header=request.origin,
+                        referer_header=None,
+                        request_method=str(raw_request.get("method") or "POST"),
+                        channel=request.channel,
+                        trusted_proxy_context=None,
+                        request_id=request.request_id,
+                        trace_id=trace_id,
+                    )
+                )
             self._emit("access.request.validated", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="validated")
             response = PublicAccessResponse(
                 request_id=request.request_id,
