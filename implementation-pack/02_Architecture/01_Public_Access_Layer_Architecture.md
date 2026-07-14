@@ -425,3 +425,26 @@ This architecture is ready when:
 - Shared rate, cost, validation, privacy, and error policies are defined.
 - Channel adapters have a clear contract.
 - Future implementation tasks can be written from this document.
+
+## 20. Implemented Foundation Module Paths
+
+TASK-056B records the first internal code foundation under `apps/api/app/access` rather than the earlier placeholder `app/public_access` path. The implemented package remains an internal bounded context and exposes no public FastAPI route.
+
+Concrete paths:
+
+```text
+apps/api/app/access/
+  contracts.py
+  errors.py
+  gateway.py
+  dependencies.py
+  channels/base.py
+  credentials/contracts.py
+  credentials/registry.py
+  tenant_resolution/service.py
+  policies/models.py
+  policies/registry.py
+  observability/events.py
+```
+
+The implemented foundation covers contracts, registries, safe errors, tenant resolution, gateway validation, and safe event contracts only. Origin validation, Redis rate limiting, anonymous sessions, public credentials in the database, widget routes, and RAG execution remain future tasks.

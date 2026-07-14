@@ -1,4 +1,4 @@
-# Project Context
+﻿# Project Context
 
 This is the first file every Codex session must read.
 
@@ -128,3 +128,17 @@ After implementation:
 1. Run focused tests or explain why they could not run.
 2. Summarise files changed.
 3. Call out tenant isolation, security, RAG grounding, and MVP-scope impact.
+
+## Public credential and widget configuration guardrails
+
+TASK-057A and ADR-0007 define the future persistent credential and widget-configuration subsystem.
+
+Guardrails for future Codex sessions:
+
+- No public credential should be created automatically.
+- No workspace becomes public by default.
+- Widget public keys are public identifiers, not secrets, and never grant dashboard access.
+- Secret-bearing credential values, such as partner API keys or webhook secrets, are shown once and stored only as strong hashes.
+- Public credential admin paths must be tenant-scoped by organisation and workspace; never fetch credential-owned records by ID alone.
+- Allowed origins must be normalised records, not arbitrary unvalidated strings.
+- Public configuration responses must exclude tenant IDs, credential database IDs, policy internals, provider details, allowed-origin lists, audit metadata, internal paths, and secret hashes.
