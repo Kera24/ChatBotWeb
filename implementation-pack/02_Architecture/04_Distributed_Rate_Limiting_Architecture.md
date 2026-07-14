@@ -678,3 +678,25 @@ TASK-059A is complete when:
 - Threat model and diagrams are complete.
 - ADR-0009 records the decision.
 - No runtime code is added.
+
+## TASK-059B Implementation Note
+
+Implemented module paths:
+
+```text
+apps/api/app/access/rate_limit/
+  __init__.py
+  contracts.py
+  errors.py
+  identities.py
+  policies.py
+  token_bucket.py
+  redis_store.py
+  local_fallback.py
+  service.py
+  client_ip.py
+```
+
+The implementation provides serialisable contracts, HMAC identity hashing, safe Redis key generation, trusted client-IP extraction, token-bucket math, Redis Lua script wrapper, injectable in-memory test store, constrained local degraded fallback, safe events, safe errors, and optional Public Access Gateway integration.
+
+No public endpoint, Redis-backed quota persistence, anonymous session, billing workflow, CORS middleware, widget SDK/UI, or RAG invocation is implemented by TASK-059B.

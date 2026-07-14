@@ -1,5 +1,8 @@
 ﻿from dataclasses import asdict, dataclass
 
+from app.access.rate_limit.contracts import RateLimitRule
+from app.access.rate_limit.policies import internal_test_rate_limit_rules, partner_api_rate_limit_rules, validate_rate_limit_rules, widget_rate_limit_rules
+
 
 @dataclass(frozen=True)
 class AccessPolicyProfile:
@@ -16,6 +19,7 @@ class AccessPolicyProfile:
     fail_closed_on_rate_limit_store_failure: bool
     allowed_model_keys: tuple[str, ...]
     retention_days: int
+    rate_limit_rules: tuple[RateLimitRule, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.policy_key:
@@ -35,9 +39,12 @@ class AccessPolicyProfile:
             raise ValueError("Policy limits must be non-negative.")
         if self.max_request_bytes == 0 or self.max_message_characters == 0 or self.request_timeout_seconds == 0:
             raise ValueError("Core policy limits must be positive.")
+        object.__setattr__(self, "rate_limit_rules", validate_rate_limit_rules(tuple(self.rate_limit_rules)))
 
     def to_dict(self) -> dict[str, object]:
-        return asdict(self)
+        data = asdict(self)
+        data["rate_limit_rules"] = [rule.to_dict() for rule in self.rate_limit_rules]
+        return data
 
 
 def internal_test_policy() -> AccessPolicyProfile:
@@ -55,6 +62,7 @@ def internal_test_policy() -> AccessPolicyProfile:
         fail_closed_on_rate_limit_store_failure=True,
         allowed_model_keys=("mock-grounded-answer",),
         retention_days=7,
+        rate_limit_rules=internal_test_rate_limit_rules(),
     )
 
 
@@ -73,6 +81,7 @@ def planned_widget_policy() -> AccessPolicyProfile:
         fail_closed_on_rate_limit_store_failure=True,
         allowed_model_keys=("mock-grounded-answer",),
         retention_days=30,
+        rate_limit_rules=widget_rate_limit_rules(),
     )
 
 
@@ -91,4 +100,5 @@ def planned_partner_api_policy() -> AccessPolicyProfile:
         fail_closed_on_rate_limit_store_failure=True,
         allowed_model_keys=("mock-grounded-answer",),
         retention_days=30,
+        rate_limit_rules=partner_api_rate_limit_rules(),
     )

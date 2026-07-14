@@ -15,6 +15,13 @@ SAFE_EVENT_TYPES = {
     "origin.validation.malformed",
     "origin.validation.wildcard_matched",
     "origin.validation.development_exception",
+    "rate_limit.allowed",
+    "rate_limit.denied",
+    "rate_limit.redis_unavailable",
+    "rate_limit.redis_timeout",
+    "rate_limit.degraded_local_fallback",
+    "rate_limit.invalid_policy",
+    "rate_limit.emergency_mode",
 }
 
 

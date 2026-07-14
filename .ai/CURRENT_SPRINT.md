@@ -1,7 +1,7 @@
 ﻿# Current Sprint
 
 Current phase: Sprint 3B - Public Access Foundation
-Current task: TASK-059A - Distributed Rate Limiting Architecture
+Current task: TASK-060A - Anonymous Public Session Architecture
 
 Source sprint plan:
 
@@ -13,15 +13,18 @@ Source sprint plan:
 - `implementation-pack/02_Architecture/02_Credential_Widget_Configuration_Architecture.md`
 - `implementation-pack/02_Architecture/03_Origin_Validation_Architecture.md`
 - `implementation-pack/02_Architecture/04_Distributed_Rate_Limiting_Architecture.md`
+- `implementation-pack/02_Architecture/05_Anonymous_Public_Session_Architecture.md`
 - `implementation-pack/07_Security/02_Public_Widget_Security_Architecture.md`
 - `docs/adr/0005-public-widget-security-boundary.md`
 - `docs/adr/0006-public-access-layer-bounded-context.md`
 - `docs/adr/0007-public-credential-storage-and-widget-configuration.md`
 - `docs/adr/0008-origin-validation-policy.md`
 - `docs/adr/0009-distributed-rate-limiting-policy.md`
+- `docs/adr/0010-anonymous-public-session-security.md`
 - `docs/04_Engineering/Public_Access_Layer_Foundation.md`
 - `docs/04_Engineering/Public_Credentials_and_Widget_Configuration.md`
 - `docs/04_Engineering/Origin_Validation.md`
+- `docs/04_Engineering/Distributed_Rate_Limiting.md`
 - `planning/epics/EPIC-004-public-access-layer.md`
 - `planning/tasks/TASK-055-public-widget-security-architecture.md`
 - `planning/tasks/TASK-056A-public-access-layer-architecture.md`
@@ -31,51 +34,46 @@ Source sprint plan:
 - `planning/tasks/TASK-058A-origin-validation-architecture.md`
 - `planning/tasks/TASK-058B-origin-validation-implementation.md`
 - `planning/tasks/TASK-059A-distributed-rate-limiting-architecture.md`
+- `planning/tasks/TASK-059B-distributed-rate-limiting-implementation.md`
+- `planning/tasks/TASK-060A-anonymous-public-session-architecture.md`
 
 ## Sprint goal
 
-Introduce the reusable Public Access Layer bounded context and continue the public access foundation with credential, widget configuration, origin-validation, and distributed rate-limiting architecture before exposing public runtime endpoints.
+Continue the Public Access Foundation by designing anonymous public sessions before any widget session, widget message, or public RAG endpoint is exposed.
 
 ## Active priorities
 
 1. Keep public/external channels separate from authenticated dashboard and internal development APIs.
-2. Route future website widget, public REST API, Slack, Teams, WhatsApp, voice, MCP, and external channels through the Public Access Layer.
-3. Ensure public/external tenant context is resolved server-side and never trusted from client-supplied tenant IDs.
-4. Preserve existing RAG Orchestrator, AI Core, tenant isolation, and current implemented APIs.
-5. Keep TASK-059A limited to distributed rate-limiting architecture, ADR, and planning artifacts only.
+2. Ensure public session tokens never contain trusted tenant IDs or raw conversation IDs.
+3. Bind future public sessions to credential, organisation, workspace, channel, environment, policy, and validated origin context.
+4. Preserve credential, origin-validation, distributed rate-limiting, RAG Orchestrator, AI Core, and tenant-isolation boundaries.
+5. Keep TASK-060A strictly architecture and planning only.
 
 ## Guardrails
 
-- Do not implement Redis client code, Lua scripts, rate-limit middleware, public routes, sessions, RAG calls, quota persistence, billing, or widget UI in TASK-059A.
-- No public message/session endpoint may bypass the future distributed limiter.
-- Forwarded client-IP headers are trusted only from configured proxies.
-- Short-window rate limits are separate from daily/monthly quotas.
-- Security-sensitive Redis uncertainty fails closed unless architecture explicitly permits a constrained read-only fallback.
-- Do not let public or external channels call RAG Orchestrator directly.
+- Do not implement SQLAlchemy models, Alembic migrations, token generation, hashing code, session repositories/services, gateway session validation, public session endpoints, Redis session cache, widget code, RAG calls, cleanup jobs, or CORS changes in TASK-060A.
+- Public session tokens must not contain trusted tenant IDs.
+- Widget message requests must validate a credential-bound public session.
+- Browsers must not submit trusted conversation IDs for public widget message processing.
+- Public sessions are designed as PostgreSQL-backed and revocable.
+- Session validation occurs after credential resolution, tenant resolution, request validation, origin validation, and rate limiting.
+- No public session endpoint may be added before TASK-060A is reviewed and approved and a later implementation task explicitly authorises it.
 - Do not let public traffic reuse dashboard authentication, development headers, or dashboard tenant parameters.
-- Widget state-changing endpoints require a validated `Origin` before future public message/session processing.
-- Missing `Origin` fails closed for widget session and message endpoints.
-- Origin validation is not authentication; credential resolution, sessions, rate limits, and tenant isolation remain separate controls.
-- Partner API credentials use separate secret authentication rules and do not rely on browser-origin validation.
 
-## Definition of done for TASK-059A
+## Definition of done for TASK-060A
 
-- Distributed rate-limiting responsibilities and non-responsibilities are defined.
-- Token bucket is selected as the MVP algorithm.
-- Limit dimensions and combination rules are explicit.
-- Redis key and identity model avoids raw secrets, IPs, sessions, and message content.
-- Trusted client-IP extraction model is defined.
-- Gateway order is clear.
-- Failure policies are explicit by endpoint category.
-- Quota boundary is separate from short-window rate limits.
-- Threat model, diagrams, and test strategy are complete.
-- ADR-0009 records the decision.
-- No runtime code is added.
+- Token model is selected.
+- Persistent session schema is defined.
+- Credential, origin, channel, and tenant binding are explicit.
+- Session lifecycle and expiry are defined.
+- Conversation relationship is decided.
+- Concurrency and replay risks are covered.
+- Safe errors and events are defined.
+- Threat model and diagrams are complete.
+- ADR-0010 records the decision.
+- `git diff --check` passes.
+- No runtime code or public endpoint is added.
 
 ## Next recommended task
 
-Implement `TASK-059B` for rate-limit contracts, policy models, Redis client foundation, token-bucket implementation, trusted IP extraction, and gateway integration. Public message/session endpoints must remain out of scope until sessions and abuse controls are approved.
-
-## Current/Next Planning Task
-
-- `planning/tasks/TASK-059A-distributed-rate-limiting-architecture.md`
+TASK-060B should implement only the approved public session model, token service, repository/service foundation, and tests. Public widget message endpoints must wait until a later approved public API task wires credential resolution, origin validation, rate limiting, session validation, and RAG orchestration together.

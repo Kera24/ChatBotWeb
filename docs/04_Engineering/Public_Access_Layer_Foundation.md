@@ -172,3 +172,22 @@ New modules:
 `PublicAccessGateway` now accepts an optional injected `OriginValidationService`. When injected, origin validation runs after credential, tenant, policy, and request-limit checks. The gateway still stops before rate limiting, sessions, abuse checks, cost enforcement, RAG orchestration, and response generation.
 
 No public endpoint, CORS middleware, Redis cache, anonymous session, widget SDK/UI, or RAG invocation was added.
+
+## TASK-059B Distributed Rate Limiting Update
+
+TASK-059B adds a distributed rate-limiting foundation while preserving the no-public-route boundary.
+
+New modules:
+
+- `apps/api/app/access/rate_limit/contracts.py`
+- `apps/api/app/access/rate_limit/policies.py`
+- `apps/api/app/access/rate_limit/identities.py`
+- `apps/api/app/access/rate_limit/client_ip.py`
+- `apps/api/app/access/rate_limit/token_bucket.py`
+- `apps/api/app/access/rate_limit/redis_store.py`
+- `apps/api/app/access/rate_limit/local_fallback.py`
+- `apps/api/app/access/rate_limit/service.py`
+
+`PublicAccessGateway` now accepts an optional injected `RateLimitService`. When injected, rate limiting runs after credential, tenant, policy, request-size, and origin checks. The gateway still stops before anonymous sessions, abuse detection, cost enforcement, RAG orchestration, and response generation.
+
+No public endpoint, anonymous session, quota persistence, billing path, CORS middleware, widget SDK/UI, or RAG call was added.

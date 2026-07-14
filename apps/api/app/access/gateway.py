@@ -8,6 +8,8 @@ from app.access.observability.events import AccessEvent, InMemoryAccessEventSink
 from app.access.origin_validation.contracts import OriginValidationRequest
 from app.access.origin_validation.service import OriginValidationService
 from app.access.policies.registry import AccessPolicyRegistry
+from app.access.rate_limit.contracts import RateLimitRequest
+from app.access.rate_limit.service import RateLimitService
 from app.access.tenant_resolution.service import PublicTenantResolutionService
 
 
@@ -49,12 +51,14 @@ class PublicAccessGateway:
         policy_registry: AccessPolicyRegistry,
         event_sink: InMemoryAccessEventSink,
         origin_validation_service: OriginValidationService | None = None,
+        rate_limit_service: RateLimitService | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
         self.policy_registry = policy_registry
         self.event_sink = event_sink
         self.origin_validation_service = origin_validation_service
+        self.rate_limit_service = rate_limit_service
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -104,6 +108,24 @@ class PublicAccessGateway:
                         trusted_proxy_context=None,
                         request_id=request.request_id,
                         trace_id=trace_id,
+                    )
+                )
+            if self.rate_limit_service is not None:
+                self.rate_limit_service.enforce(
+                    RateLimitRequest(
+                        request_id=request.request_id,
+                        trace_id=trace_id,
+                        environment=credential_record.environment,
+                        channel=request.channel,
+                        category=str(raw_request.get("rate_limit_category") or "internal_test"),
+                        credential_id=credential_record.credential_id,
+                        organisation_id=context.organisation_id,
+                        workspace_id=context.workspace_id,
+                        client_ip_identity=request.client_ip,
+                        session_id=context.session_id,
+                        policy_profile=policy,
+                        request_cost=int(raw_request.get("rate_limit_cost") or 1),
+                        received_at=request.received_at,
                     )
                 )
             self._emit("access.request.validated", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="validated")

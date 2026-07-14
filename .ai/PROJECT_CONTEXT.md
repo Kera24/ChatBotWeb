@@ -171,3 +171,17 @@ Guardrails for future Codex sessions:
 - Redis keys must not contain raw public keys, partner secrets, raw IP addresses, session tokens, message content, or PII.
 - Rate-limit denial must prevent anonymous session creation, RAG orchestration, provider execution, and cost-bearing side effects.
 - Do not implement Redis client code, Lua scripts, rate-limit middleware, or public runtime endpoints until TASK-059B or a later approved implementation task.
+
+## Anonymous public session guardrails
+
+TASK-060A and ADR-0010 define the anonymous public-session security model for future widget and browser-based public channels.
+
+Guardrails for future Codex sessions:
+
+- Public session tokens never contain trusted tenant IDs, workspace IDs, organisation IDs, raw conversation IDs, or other internal tenant-routing claims.
+- Widget message requests must validate a credential-bound public session before any RAG orchestration or conversation append occurs.
+- The browser must not submit a trusted conversation ID for public widget messages; server-side session state owns the optional conversation mapping.
+- Public sessions are PostgreSQL-backed, revocable, and validated against credential, organisation, workspace, channel, environment, policy profile, and origin binding on every use.
+- Session validation occurs after credential resolution, tenant resolution, request validation, origin validation, and rate-limit checks.
+- No public session endpoint may be added before TASK-060A is reviewed and approved and a later implementation task explicitly authorises it.
+- Raw public session tokens and token secrets must never be logged, stored in plaintext, returned after creation, or included in audit/operational events.

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 from os import getenv
 
 
@@ -22,6 +22,11 @@ class Settings:
     API_V1_PREFIX: str = getenv("API_V1_PREFIX", "/api/v1")
     DATABASE_URL: str = getenv("DATABASE_URL", "sqlite:///./local.db")
     REDIS_URL: str = getenv("REDIS_URL", "redis://localhost:6379/0")
+    RATE_LIMIT_IDENTITY_SECRET: str = getenv("RATE_LIMIT_IDENTITY_SECRET", "dev-rate-limit-identity-secret-change-me")
+    RATE_LIMIT_REDIS_PREFIX: str = getenv("RATE_LIMIT_REDIS_PREFIX", "rate")
+    RATE_LIMIT_REDIS_TIMEOUT_SECONDS: float = float(getenv("RATE_LIMIT_REDIS_TIMEOUT_SECONDS", "0.2"))
+    RATE_LIMIT_LOCAL_FALLBACK_ENABLED: bool = getenv("RATE_LIMIT_LOCAL_FALLBACK_ENABLED", "false").lower() in {"1", "true", "yes"}
+    TRUSTED_PROXY_NETWORKS: str = getenv("TRUSTED_PROXY_NETWORKS", "")
     LOCAL_UPLOAD_ROOT: str = getenv("LOCAL_UPLOAD_ROOT", "./local_uploads")
     MAX_UPLOAD_BYTES: int = _get_int("MAX_UPLOAD_BYTES", 10 * 1024 * 1024)
     CHUNK_SIZE_WORDS: int = _get_int("CHUNK_SIZE_WORDS", 300)
