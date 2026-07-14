@@ -1,5 +1,5 @@
 from app.access.channels.base import DevelopmentTestChannelAdapter
-from app.access.credentials.registry import InMemoryCredentialRegistry
+from app.access.credentials.registry import CredentialResolver, InMemoryCredentialRegistry
 from app.access.gateway import ChannelRegistry, PublicAccessGateway
 from app.access.observability.events import InMemoryAccessEventSink
 from app.access.policies.registry import default_policy_registry
@@ -24,7 +24,7 @@ def create_event_sink() -> InMemoryAccessEventSink:
 
 def create_tenant_resolution_service(
     *,
-    credential_registry: InMemoryCredentialRegistry,
+    credential_registry: CredentialResolver,
     policy_registry,
     checks: TenantResolutionChecks,
 ) -> PublicTenantResolutionService:

@@ -1,9 +1,18 @@
+﻿from typing import Protocol
+
+from sqlalchemy.orm import Session
+
 from app.access.credentials.contracts import CredentialRecord
 from app.access.errors import raise_public_error
 
 
 class DuplicateCredentialError(ValueError):
     pass
+
+
+class CredentialResolver(Protocol):
+    def resolve(self, public_identifier: str) -> CredentialRecord:
+        ...
 
 
 class InMemoryCredentialRegistry:
@@ -14,7 +23,7 @@ class InMemoryCredentialRegistry:
 
     def register(self, record: CredentialRecord) -> None:
         if record.public_identifier in self._records:
-            raise DuplicateCredentialError("Public credential identifier already registered.")
+            raise DuplicateCredentialError("Credential public identifier already registered.")
         self._records[record.public_identifier] = record
 
     def resolve(self, public_identifier: str) -> CredentialRecord:
@@ -34,3 +43,25 @@ class InMemoryCredentialRegistry:
         if record.status == "expired" or record.is_expired():
             raise_public_error("expired_credential")
         raise_public_error("invalid_credential")
+
+
+class DatabaseCredentialRegistry:
+    def __init__(self, db: Session) -> None:
+        self.db = db
+
+    def resolve(self, public_identifier: str) -> CredentialRecord:
+        from app.access.credentials.repository import list_credential_origins, resolve_credential_by_public_identifier
+        from app.access.credentials.service import public_credential_to_record
+
+        credential = resolve_credential_by_public_identifier(self.db, public_identifier=public_identifier)
+        if credential is None:
+            raise_public_error("invalid_credential")
+        origins = list_credential_origins(
+            self.db,
+            organisation_id=credential.organisation_id,
+            workspace_id=credential.workspace_id,
+            credential_id=credential.id,
+        )
+        record = public_credential_to_record(credential, origins)
+        InMemoryCredentialRegistry().validate_usable(record)
+        return record

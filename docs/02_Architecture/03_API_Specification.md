@@ -2,7 +2,7 @@
 
 Version: 0.2
 Status: Draft
-Last updated for: TASK-054
+Last updated for: TASK-057B
 
 ## 1. Purpose
 
@@ -559,3 +559,70 @@ The following API areas remain planned but are not implemented:
 4. Workspace-scoped routes under `/api/v1/workspaces/{workspace_id}` require `organisation_id` as a query parameter.
 5. Successful lifecycle transitions and review status changes create tenant-scoped audit events.
 6. Upload, public chat, RAG, and widget routes must not be documented as available until implemented.
+
+## TASK-057B Update - Public Credentials and Widget Configuration Admin APIs
+
+Implemented authenticated dashboard/admin endpoints under `/api/v1/workspaces/{workspace_id}`. These are not public widget endpoints and still require development dashboard authentication and organisation membership.
+
+Required role: `org_owner` or `client_admin`. `viewer`, `contributor`, and non-members are denied.
+
+Credential management:
+
+- `GET /api/v1/workspaces/{workspace_id}/public-credentials?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces/{workspace_id}/public-credentials?organisation_id={organisation_id}`
+- `GET /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}?organisation_id={organisation_id}`
+- `PATCH /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/activate?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/disable?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/revoke?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/rotate?organisation_id={organisation_id}`
+
+Allowed origins:
+
+- `GET /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins?organisation_id={organisation_id}`
+- `DELETE /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins/{origin_id}?organisation_id={organisation_id}`
+
+Widget configuration:
+
+- `GET /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config?organisation_id={organisation_id}`
+- `PUT /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config/publish?organisation_id={organisation_id}`
+
+Credential create request example:
+
+```json
+{
+  "credential_type": "widget_public_key",
+  "display_name": "Website widget",
+  "environment": "development",
+  "policy_profile": "widget",
+  "capabilities": ["widget_config"]
+}
+```
+
+Credential response includes the public identifier for widget keys because it is intentionally public. Responses exclude `secret_hash`, raw secret-bearing credential values, hidden metadata, and unrelated tenant data.
+
+Origin create request example:
+
+```json
+{
+  "origin": "https://www.example.edu",
+  "wildcard_subdomains": false
+}
+```
+
+Widget configuration upsert request example:
+
+```json
+{
+  "bot_name": "Admissions Assistant",
+  "welcome_message": "Ask about admissions.",
+  "launcher_label": "Ask us",
+  "primary_colour": "#111827",
+  "suggested_questions_json": ["How do I apply?"],
+  "max_initial_suggestions": 1
+}
+```
+
+The migration creates no credentials automatically. No workspace becomes public by default.

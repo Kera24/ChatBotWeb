@@ -1,7 +1,7 @@
-from dataclasses import asdict, dataclass, field
+﻿from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
-VALID_CREDENTIAL_TYPES = {"widget_public_key", "partner_api_key", "channel_installation", "future_webhook"}
+VALID_CREDENTIAL_TYPES = {"widget_public_key", "partner_api_key", "channel_installation", "future_webhook", "webhook_secret"}
 VALID_CREDENTIAL_STATUSES = {"draft", "active", "disabled", "revoked", "expired"}
 VALID_ENVIRONMENTS = {"development", "staging", "production"}
 

@@ -142,3 +142,18 @@ Guardrails for future Codex sessions:
 - Public credential admin paths must be tenant-scoped by organisation and workspace; never fetch credential-owned records by ID alone.
 - Allowed origins must be normalised records, not arbitrary unvalidated strings.
 - Public configuration responses must exclude tenant IDs, credential database IDs, policy internals, provider details, allowed-origin lists, audit metadata, internal paths, and secret hashes.
+
+## Origin validation guardrails
+
+TASK-058A and ADR-0008 define runtime origin-validation policy for future browser-based public channels.
+
+Guardrails for future Codex sessions:
+
+- Widget state-changing endpoints require a validated `Origin` before they may process public session or message requests.
+- Origin validation is not authentication; it must be combined with public credential resolution, anonymous session validation, rate limiting, cost controls, and tenant-scoped RAG.
+- Missing `Origin` fails closed for widget message and session endpoints.
+- `Referer` fallback is disabled for state-changing widget endpoints and may be used only for future config GET when an explicit policy allows it.
+- Partner API credentials use separate secret authentication rules and do not rely on browser-origin validation.
+- Do not infer client origin from `Host`.
+- Trust forwarded headers only from configured trusted proxies.
+- Do not implement runtime origin validation, CORS changes, or public widget endpoints until TASK-058B or a later approved implementation task.

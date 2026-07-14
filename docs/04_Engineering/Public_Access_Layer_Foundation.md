@@ -131,3 +131,27 @@ npm run verify
 ## Public Route Warning
 
 No public route is wired in this task. Future public endpoints must be introduced by a separate approved implementation task and must continue to route through this boundary rather than directly into RAG Orchestrator or dashboard authentication.
+
+## TASK-057B Credential Persistence Update
+
+TASK-057B adds the database-backed credential/configuration foundation while preserving the Public Access gateway boundary.
+
+New persistent tables:
+
+- `public_credentials`
+- `credential_allowed_origins`
+- `widget_configurations`
+
+New implementation modules:
+
+- `apps/api/app/access/credentials/repository.py`
+- `apps/api/app/access/credentials/service.py`
+- `apps/api/app/access/credentials/identifiers.py`
+- `apps/api/app/access/credentials/origins.py`
+- `apps/api/app/access/widget_config/repository.py`
+- `apps/api/app/access/widget_config/service.py`
+- `apps/api/app/access/widget_config/validation.py`
+
+`DatabaseCredentialRegistry` can resolve persisted credentials into the existing `CredentialRecord` contract. `InMemoryCredentialRegistry` remains available for isolated tests.
+
+The gateway behaviour is unchanged and no public route has been added. Runtime origin validation, Redis rate limiting, anonymous sessions, public config endpoint, public message endpoint, public RAG, and widget UI remain unimplemented.

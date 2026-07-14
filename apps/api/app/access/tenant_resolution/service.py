@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from app.access.contracts import CostLimits, NormalisedAccessContext, PublicAccessRequest
 from app.access.credentials.contracts import CredentialRecord
-from app.access.credentials.registry import InMemoryCredentialRegistry
+from app.access.credentials.registry import CredentialResolver
 from app.access.errors import raise_public_error
 from app.access.policies.registry import AccessPolicyRegistry
 
@@ -23,7 +23,7 @@ class PublicTenantResolutionService:
     def __init__(
         self,
         *,
-        credential_registry: InMemoryCredentialRegistry,
+        credential_registry: CredentialResolver,
         policy_registry: AccessPolicyRegistry,
         checks: TenantResolutionChecks,
     ) -> None:
