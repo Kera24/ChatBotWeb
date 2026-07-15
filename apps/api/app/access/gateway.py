@@ -65,6 +65,7 @@ class PublicAccessGateway:
         config_read_projector: ConfigReadProjector | None = None,
         message_preparation_service: Any | None = None,
         message_security_service: Any | None = None,
+        message_rag_adapter: Any | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
@@ -77,6 +78,7 @@ class PublicAccessGateway:
         self.config_read_projector = config_read_projector
         self.message_preparation_service = message_preparation_service
         self.message_security_service = message_security_service
+        self.message_rag_adapter = message_rag_adapter
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -220,6 +222,10 @@ class PublicAccessGateway:
                         secured = self.message_security_service.secure(prepared_result.prepared, access_policy=policy)
                         payload["secured"] = secured.to_dict()
                         status = "message_secured"
+                        if self.message_rag_adapter is not None:
+                            rag_result = self.message_rag_adapter.execute(secured)
+                            payload["public_response"] = rag_result.public_response
+                            status = "message_completed"
                 if prepared_result.idempotency.stored_response is not None:
                     payload["stored_response"] = prepared_result.idempotency.stored_response
                 if prepared_result.idempotency.safe_error_code is not None:

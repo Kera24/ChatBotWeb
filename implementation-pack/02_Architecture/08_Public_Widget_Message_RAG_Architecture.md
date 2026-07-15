@@ -915,3 +915,9 @@ Still deferred:
 - Public RAG adapter and RAG Orchestrator invocation.
 - User/assistant message persistence for public message execution.
 - Output/citation sanitisation and public response schemas.
+
+## TASK-063B3 Implementation Note
+
+The approved implementation now exposes `POST /api/v1/widget/{public_key}/messages` and route-scoped `OPTIONS`. The route uses Public Access Gateway `message_send`, the existing public-session preparation/idempotency foundation, deterministic abuse and cost controls, and `PublicWidgetRAGAdapter` to call the tenant-scoped RAG Orchestrator.
+
+The response projection is intentionally provisional and plain-text only. TASK-063B4 remains responsible for the full Markdown/link/output sanitisation boundary.

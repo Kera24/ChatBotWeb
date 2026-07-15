@@ -258,3 +258,20 @@ Guardrails for future Codex sessions:
 - Public clients never choose model, provider, prompt, retrieval limit, context size, output token limit, timeout, or quota policy.
 - Security rejection marks the idempotency record failed and does not restore the already-consumed message slot.
 - Session blocking is terminal and should require an explicit strong block decision, not a weak single heuristic.
+
+## Public Widget Message Endpoint Guardrails
+
+TASK-063B3 implements the public widget message route:
+
+- `POST /api/v1/widget/{public_key}/messages`
+- Route-scoped `OPTIONS /api/v1/widget/{public_key}/messages`
+
+Guardrails for future Codex sessions:
+
+- Public message requests must pass through the Public Access Gateway in `message_send` mode.
+- A credential-bound anonymous public session and `Idempotency-Key` are mandatory for `POST`.
+- Public clients never choose tenant, conversation, model, provider, prompt, retrieval, context, output-token, cost, or quota controls.
+- The route invokes the existing RAG Orchestrator only through the dedicated public RAG adapter.
+- Completed idempotent duplicates return the stored safe response snapshot without another slot or RAG call.
+- The provisional TASK-063B3 response treats answers as bounded plain text; full Markdown/output sanitisation remains TASK-063B4.
+- Public responses must not expose internal tenant/session/conversation/message IDs, provider/model/prompt metadata, token usage, cost, execution IDs, chunk/document IDs, similarity scores, raw context, stack traces, or storage paths.

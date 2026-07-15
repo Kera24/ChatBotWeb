@@ -251,10 +251,10 @@ def test_rate_limited_and_redis_unavailable_fail_closed_before_session_creation(
     assert unavailable.json()["error"]["code"] == "temporarily_unavailable"
 
 
-def test_only_public_widget_session_route_exists_for_public_widget_surface(client: TestClient) -> None:
+def test_public_widget_routes_are_limited_to_approved_surface(client: TestClient) -> None:
     paths = {route.path for route in client.app.routes}
 
     assert "/api/v1/widget/{public_key}/sessions" in paths
-    assert "/api/v1/widget/{public_key}/messages" not in paths
+    assert "/api/v1/widget/{public_key}/messages" in paths
     assert "/api/v1/widget/{public_key}/config" in paths
     assert not any(path.startswith("/api/v1/public-access") for path in paths)

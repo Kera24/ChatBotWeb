@@ -415,11 +415,11 @@ def test_gateway_registries_are_isolated_across_tests():
         empty_registry.resolve("internal_test")
 
 
-def test_only_public_widget_session_route_is_added():
+def test_public_widget_routes_are_limited_to_approved_surface():
     app = create_app()
     paths = {route.path for route in app.routes}
 
     assert "/api/v1/widget/{public_key}/sessions" in paths
-    assert "/api/v1/widget/{public_key}/messages" not in paths
+    assert "/api/v1/widget/{public_key}/messages" in paths
     assert "/api/v1/widget/{public_key}/config" in paths
     assert not any(path.startswith("/api/v1/public-access") for path in paths)

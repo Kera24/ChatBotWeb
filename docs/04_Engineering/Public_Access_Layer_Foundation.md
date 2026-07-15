@@ -275,3 +275,18 @@ New modules:
 - `apps/api/app/access/messages/security.py`
 
 `PublicAccessGateway` can now run an injected security-preparation service after injected public-message preparation for internal `message_send` operations. The gateway still stops before retrieval, RAG, AI Core/provider execution, and public response generation.
+
+## TASK-063B3 Public Widget Message Endpoint Update
+
+TASK-063B3 adds the third public widget endpoint:
+
+```text
+POST /api/v1/widget/{public_key}/messages
+OPTIONS /api/v1/widget/{public_key}/messages
+```
+
+The route lives in `apps/api/app/api/v1/public_widget.py` and uses the `WidgetChannelAdapter` plus `PublicAccessGateway` in `message_send` mode. It requires a public session token and `Idempotency-Key`, validates Origin, applies `widget_message_send` rate limits, runs session/idempotency preparation, runs abuse and cost controls, and calls the existing RAG Orchestrator through `PublicWidgetRAGAdapter`.
+
+The public RAG adapter passes only server-resolved tenant, workspace, conversation, channel, message, and effective retrieval/context/output controls to the Orchestrator. The public response is a provisional bounded plain-text projection with safe citations. Full Markdown/link/output sanitisation remains TASK-063B4.
+
+The message response excludes tenant IDs, internal session/conversation/message IDs, chunk/document IDs, similarity scores, provider/model/prompt data, token usage, cost, execution IDs, raw context, stack traces, and storage paths.

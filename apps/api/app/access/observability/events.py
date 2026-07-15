@@ -70,6 +70,17 @@ SAFE_EVENT_TYPES = {
     "widget.message.cost_policy_invalid",
     "widget.message.security_preparation_completed",
     "widget.message.security_preparation_failed",
+    "widget.message.requested",
+    "widget.message.accepted",
+    "widget.message.rejected",
+    "widget.message.rate_limited",
+    "widget.message.origin_denied",
+    "widget.message.rag_started",
+    "widget.message.rag_completed",
+    "widget.message.rag_failed",
+    "widget.message.fallback",
+    "widget.message.duplicate",
+    "widget.message.response_projected",
 }
 
 

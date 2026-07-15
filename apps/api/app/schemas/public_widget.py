@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+﻿from pydantic import BaseModel, ConfigDict, Field
 
 
 class PublicWidgetSessionCreateRequest(BaseModel):
@@ -7,6 +7,15 @@ class PublicWidgetSessionCreateRequest(BaseModel):
     client_request_id: str | None = Field(default=None, max_length=120)
     metadata: dict[str, str | int | float | bool | None] | None = None
     requested_language: str | None = Field(default=None, max_length=16)
+
+
+class PublicWidgetMessageCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_token: str = Field(min_length=1, max_length=260)
+    message: str = Field(min_length=1, max_length=4000)
+    client_request_id: str | None = Field(default=None, max_length=120)
+    metadata: dict[str, str | int | float | bool | None] | None = None
 
 
 class PublicWidgetSessionCapabilities(BaseModel):
@@ -72,6 +81,26 @@ class PublicWidgetConfigurationResponse(BaseModel):
     response_schema_version: str
     published_at: str
     request_id: str
+
+
+class PublicWidgetCitationResponse(BaseModel):
+    citation_index: int
+    source_title: str
+    source_type: str
+    page_number: int | None = None
+    section_title: str | None = None
+    quoted_text: str | None = None
+
+
+class PublicWidgetMessageResponse(BaseModel):
+    response_id: str
+    answer: str
+    answer_state: str
+    citations: list[PublicWidgetCitationResponse]
+    remaining_messages: int
+    fallback_used: bool
+    request_id: str
+    response_schema_version: str
 
 
 class PublicWidgetErrorResponse(BaseModel):
