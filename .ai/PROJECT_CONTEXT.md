@@ -1,4 +1,4 @@
-﻿# Project Context
+# Project Context
 
 This is the first file every Codex session must read.
 
@@ -185,3 +185,16 @@ Guardrails for future Codex sessions:
 - Session validation occurs after credential resolution, tenant resolution, request validation, origin validation, and rate-limit checks.
 - No public session endpoint may be added before TASK-060A is reviewed and approved and a later implementation task explicitly authorises it.
 - Raw public session tokens and token secrets must never be logged, stored in plaintext, returned after creation, or included in audit/operational events.
+
+## Public widget session endpoint guardrails
+
+TASK-061A and ADR-0011 define the first public widget endpoint boundary for future implementation.
+
+Guardrails for future Codex sessions:
+
+- The first public endpoint is session creation only: `POST /api/v1/widget/{public_key}/sessions`.
+- Public session creation must use the Public Access Gateway in `session_creation` mode.
+- Public session creation must not create a conversation, accept a message, call retrieval, call AI Core, or invoke RAG.
+- No public route may accept tenant IDs, workspace IDs, conversation IDs, policy overrides, dashboard bearer tokens, or dashboard development headers.
+- Public widget routes use no cookies and require a validated `Origin`.
+- Public widget CORS must be dynamic, origin-validation-driven, and must not use wildcard origins or credentialed browser cookies.
