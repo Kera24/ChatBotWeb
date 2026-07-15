@@ -2,7 +2,7 @@
 
 Version: 0.2
 Status: Draft
-Last updated for: TASK-061B
+Last updated for: TASK-062B
 
 ## 1. Purpose
 
@@ -563,7 +563,7 @@ The following API areas remain planned but are not implemented:
 - Embedding generation endpoints.
 - Public RAG runtime endpoints.
 - Authenticated chat write endpoints beyond the internal dashboard-test RAG answer endpoint.
-- Public widget configuration, session, and message endpoints.
+- Public widget message endpoints.
 - Analytics dashboard endpoints.
 - Widget settings endpoints.
 - Production authentication and token/session handling.
@@ -660,6 +660,75 @@ Widget configuration upsert request example:
 
 The migration creates no credentials automatically. No workspace becomes public by default.
 
+
+## Public Widget Configuration API
+
+### GET /api/v1/widget/{public_key}/config
+
+Returns published, sanitised public widget configuration for an active website widget credential.
+
+Authentication: none. This route does not accept dashboard development headers or bearer tokens.
+
+Required HTTP context:
+
+- `Origin` header.
+- Server-derived client IP for rate limiting.
+- Optional `X-Request-ID`.
+
+Request body: none.
+
+Functional query parameters: none. Unsupported query parameters are rejected.
+
+Successful response: `200`.
+
+```json
+{
+  "widget": {
+    "bot_name": "Admissions",
+    "welcome_message": "Ask us about courses.",
+    "launcher_label": "Chat now",
+    "primary_colour": "#0f766e",
+    "secondary_colour": "#111827",
+    "logo_url": null,
+    "avatar_url": null,
+    "position": "bottom_right",
+    "theme_mode": "system",
+    "language": "en"
+  },
+  "behaviour": {
+    "suggested_questions": ["How do I apply?"],
+    "max_initial_suggestions": 1,
+    "show_citations": true,
+    "allow_conversation_history": false,
+    "session_required": true,
+    "messages_enabled": true
+  },
+  "privacy": {
+    "privacy_notice_text": null,
+    "privacy_notice_url": null,
+    "terms_url": null,
+    "fallback_contact_text": null
+  },
+  "capabilities": {
+    "can_create_session": true,
+    "can_send_messages": true,
+    "citations_enabled": true,
+    "conversation_history_enabled": false
+  },
+  "configuration_version": 1,
+  "response_schema_version": "1.0",
+  "published_at": "2026-07-15T00:00:00+00:00",
+  "request_id": "access_..."
+}
+```
+
+The response excludes organisation ID, workspace ID, credential database ID, internal config ID, allowed origins, policy profile, rate-limit values, retrieval/context/token limits, model/provider/prompt details, internal asset paths, metadata JSON, audit fields, secret/hash values, and environment.
+
+The route emits dynamic validated-Origin CORS headers, `Vary: Origin`, `ETag`, and `Cache-Control: public, max-age=60, stale-while-revalidate=30`. Matching `If-None-Match` returns `304 Not Modified` with no response body.
+
+### OPTIONS /api/v1/widget/{public_key}/config
+
+Route-scoped preflight. Credential and Origin are validated before CORS headers are emitted. Allowed methods are `GET, OPTIONS`; allowed headers are `If-None-Match, X-Request-ID`; browser credentials are disabled.
 ## Public Widget Session API
 
 ### POST /api/v1/widget/{public_key}/sessions

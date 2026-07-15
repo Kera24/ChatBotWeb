@@ -256,5 +256,5 @@ def test_only_public_widget_session_route_exists_for_public_widget_surface(clien
 
     assert "/api/v1/widget/{public_key}/sessions" in paths
     assert "/api/v1/widget/{public_key}/messages" not in paths
-    assert "/api/v1/widget/{public_key}/config" not in paths
+    assert "/api/v1/widget/{public_key}/config" in paths
     assert not any(path.startswith("/api/v1/public-access") for path in paths)

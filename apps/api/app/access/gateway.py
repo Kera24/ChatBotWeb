@@ -21,6 +21,7 @@ class DuplicateChannelError(ValueError):
 
 
 SessionCreationEnricher = Callable[[PublicAccessRequest, NormalisedAccessContext, object], dict[str, Any]]
+ConfigReadProjector = Callable[[PublicAccessRequest, NormalisedAccessContext, object, OriginValidationResult | None], dict[str, Any]]
 
 
 class ChannelRegistry:
@@ -60,6 +61,7 @@ class PublicAccessGateway:
         rate_limit_service: RateLimitService | None = None,
         public_session_service: PublicSessionService | None = None,
         session_creation_enricher: SessionCreationEnricher | None = None,
+        config_read_projector: ConfigReadProjector | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
@@ -69,6 +71,7 @@ class PublicAccessGateway:
         self.rate_limit_service = rate_limit_service
         self.public_session_service = public_session_service
         self.session_creation_enricher = session_creation_enricher
+        self.config_read_projector = config_read_projector
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -104,10 +107,12 @@ class PublicAccessGateway:
             self._emit("access.tenant.resolved", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="resolved")
             policy = self.policy_registry.resolve(context.policy_profile)
             session_operation = str(raw_request.get("session_operation") or "")
+            access_operation = str(raw_request.get("access_operation") or "")
             session_creation_data: dict[str, Any] = {}
             if session_operation == "session_creation" and self.session_creation_enricher is not None:
                 session_creation_data = self.session_creation_enricher(request, context, credential_record)
-            self._validate_limits(request, raw_request, policy.max_request_bytes, policy.max_message_characters, allow_empty_message=session_operation == "session_creation" or bool(raw_request.get("allow_empty_message")))
+            allow_empty_message = session_operation == "session_creation" or access_operation == "config_read" or bool(raw_request.get("allow_empty_message"))
+            self._validate_limits(request, raw_request, policy.max_request_bytes, policy.max_message_characters, allow_empty_message=allow_empty_message)
             origin_result: OriginValidationResult | None = None
             if self.origin_validation_service is not None:
                 origin_result = self.origin_validation_service.validate(
@@ -143,6 +148,28 @@ class PublicAccessGateway:
                         received_at=request.received_at,
                     )
                 )
+            if access_operation == "config_read":
+                if self.config_read_projector is None:
+                    raise_public_error("temporarily_unavailable")
+                projected = self.config_read_projector(request, context, credential_record, origin_result)
+                payload = dict(projected.get("payload", {}))
+                metadata: dict[str, str | int | float | bool | None] = {
+                    "channel": request.channel,
+                    "credential_id": credential_record.credential_id,
+                }
+                for key in ("etag", "configuration_version", "asset_omitted", "degraded_rate_limit"):
+                    if key in projected:
+                        value = projected[key]
+                        if isinstance(value, (str, int, float, bool)) or value is None:
+                            metadata[key] = value
+                response = PublicAccessResponse(
+                    request_id=request.request_id,
+                    trace_id=trace_id,
+                    status="config_read",
+                    payload=payload,
+                    metadata=metadata,
+                )
+                return ValidatedAccessResult(request=request, context=context, response=response)
             session_payload: dict[str, Any] = {}
             canonical_origin = origin_result.canonical_origin.serialised if origin_result and origin_result.canonical_origin else None
             if session_operation:

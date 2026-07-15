@@ -39,6 +39,15 @@ SAFE_EVENT_TYPES = {
     "widget.session.rate_limited",
     "widget.session.origin_denied",
     "widget.session.unavailable",
+    "widget.config.requested",
+    "widget.config.served",
+    "widget.config.not_modified",
+    "widget.config.rejected",
+    "widget.config.origin_denied",
+    "widget.config.rate_limited",
+    "widget.config.unavailable",
+    "widget.config.asset_omitted",
+    "widget.config.degraded_rate_limit",
 }
 
 

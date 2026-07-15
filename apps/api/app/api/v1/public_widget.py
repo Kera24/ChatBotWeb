@@ -4,7 +4,7 @@ import json
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -21,20 +21,25 @@ from app.access.origin_validation.repository import list_active_origins_for_cred
 from app.access.origin_validation.service import OriginValidationService
 from app.access.policies.registry import default_policy_registry
 from app.access.rate_limit.client_ip import extract_client_ip, parse_trusted_proxy_networks
+from app.access.rate_limit.local_fallback import LocalFallbackLimiter
 from app.access.rate_limit.redis_store import create_redis_rate_limit_store
 from app.access.rate_limit.service import RateLimitService
 from app.access.sessions.service import PublicSessionChecks, PublicSessionService
 from app.access.tenant_resolution.service import PublicTenantResolutionService, TenantResolutionChecks
+from app.access.widget_config.public_projection import project_public_widget_configuration, public_widget_config_etag
 from app.access.widget_config.repository import get_configuration_for_credential
 from app.api.deps import DbSession
 from app.core.config import settings
 from app.db.models import Organisation, PublicCredential, Workspace
-from app.schemas.public_widget import PublicWidgetSessionCreateRequest, PublicWidgetSessionCreateResponse
+from app.schemas.public_widget import PublicWidgetConfigurationResponse, PublicWidgetSessionCreateRequest, PublicWidgetSessionCreateResponse
 
 router = APIRouter(tags=["public-widget"])
 
 MAX_PUBLIC_WIDGET_SESSION_BODY_BYTES = 16 * 1024
-_ALLOWED_CORS_HEADERS = "Content-Type, X-Request-ID"
+_ALLOWED_SESSION_CORS_HEADERS = "Content-Type, X-Request-ID"
+_ALLOWED_CONFIG_CORS_HEADERS = "If-None-Match, X-Request-ID"
+_CONFIG_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=30"
+_ERROR_CACHE_CONTROL = "no-store"
 _FORBIDDEN_RESPONSE_CODES_AS_INVALID_WIDGET = {"invalid_credential", "disabled_credential", "expired_credential", "widget_not_published"}
 _ORIGIN_ERROR_CODES = {"origin_required", "origin_not_allowed", "malformed_origin", "insecure_origin", "unsupported_origin_scheme"}
 
@@ -97,7 +102,7 @@ def _event_sink(request: Request) -> InMemoryAccessEventSink:
     return InMemoryAccessEventSink()
 
 
-def _emit(event_sink: InMemoryAccessEventSink, event_type: str, *, request_id: str, trace_id: str = "unresolved", channel: str = "widget", credential_id: str | None = None, outcome: str | None = None, error_code: str | None = None, latency_ms: int | None = None, environment: str | None = None) -> None:
+def _emit(event_sink: InMemoryAccessEventSink, event_type: str, *, request_id: str, trace_id: str = "unresolved", channel: str = "widget", credential_id: str | None = None, outcome: str | None = None, error_code: str | None = None, latency_ms: int | None = None) -> None:
     event_sink.emit(
         AccessEvent(
             event_type=event_type,
@@ -112,14 +117,18 @@ def _emit(event_sink: InMemoryAccessEventSink, event_type: str, *, request_id: s
     )
 
 
-def _cors_headers(origin: str) -> dict[str, str]:
+def _cors_headers(origin: str, *, methods: str = "POST, OPTIONS", allowed_headers: str = _ALLOWED_SESSION_CORS_HEADERS) -> dict[str, str]:
     return {
         "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": _ALLOWED_CORS_HEADERS,
+        "Access-Control-Allow-Methods": methods,
+        "Access-Control-Allow-Headers": allowed_headers,
         "Access-Control-Allow-Credentials": "false",
         "Vary": "Origin",
     }
+
+
+def _config_cors_headers(origin: str) -> dict[str, str]:
+    return _cors_headers(origin, methods="GET, OPTIONS", allowed_headers=_ALLOWED_CONFIG_CORS_HEADERS)
 
 
 def _map_public_error(detail: PublicAccessErrorDetail) -> PublicAccessErrorDetail:
@@ -129,12 +138,14 @@ def _map_public_error(detail: PublicAccessErrorDetail) -> PublicAccessErrorDetai
         return error_detail("origin_not_allowed")
     if detail.code == "unsupported_origin_scheme":
         return error_detail("malformed_origin")
+    if detail.code == "unsafe_request":
+        return error_detail("invalid_request")
     return detail
 
 
-def _error_response(detail: PublicAccessErrorDetail, *, request_id: str, cors_origin: str | None = None) -> JSONResponse:
+def _error_response(detail: PublicAccessErrorDetail, *, request_id: str, cors_origin: str | None = None, cache_errors: bool = False) -> JSONResponse:
     mapped = _map_public_error(detail)
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = {"Cache-Control": _ERROR_CACHE_CONTROL} if not cache_errors else {}
     if mapped.retry_after_seconds is not None:
         headers["Retry-After"] = str(mapped.retry_after_seconds)
     if cors_origin and mapped.code not in {"origin_not_allowed", "origin_required", "malformed_origin"}:
@@ -173,6 +184,7 @@ def _rate_limit_service(request: Request, event_sink: InMemoryAccessEventSink) -
         identity_secret=settings.RATE_LIMIT_IDENTITY_SECRET,
         redis_prefix=settings.RATE_LIMIT_REDIS_PREFIX,
         event_sink=event_sink,
+        local_fallback=LocalFallbackLimiter(enabled=settings.RATE_LIMIT_LOCAL_FALLBACK_ENABLED),
     )
 
 
@@ -204,6 +216,31 @@ def _gateway(request: Request, db: Session, event_sink: InMemoryAccessEventSink)
             },
         }
 
+    def project_config_read(_request: PublicAccessRequest, context: NormalisedAccessContext, credential: object, _origin_result: object | None) -> dict[str, Any]:
+        record = credential
+        if not isinstance(record, CredentialRecord) or record.credential_type != "widget_public_key":
+            raise PublicAccessError(error_detail("invalid_widget"))
+        configuration = get_configuration_for_credential(
+            db,
+            organisation_id=context.organisation_id,
+            workspace_id=context.workspace_id,
+            credential_id=record.credential_id,
+        )
+        if configuration is None or configuration.status != "published" or configuration.published_at is None or int(configuration.configuration_version) <= 0:
+            raise PublicAccessError(error_detail("widget_not_published"))
+        payload, asset_omitted = project_public_widget_configuration(
+            configuration,
+            request_id=_request.request_id,
+            asset_base_url=settings.PUBLIC_WIDGET_ASSET_BASE_URL or None,
+        )
+        etag = public_widget_config_etag(payload)
+        return {
+            "payload": payload,
+            "etag": etag,
+            "configuration_version": int(configuration.configuration_version),
+            "asset_omitted": asset_omitted,
+        }
+
     return PublicAccessGateway(
         channel_registry=ChannelRegistry([WidgetChannelAdapter()]),
         tenant_resolution_service=PublicTenantResolutionService(
@@ -220,6 +257,7 @@ def _gateway(request: Request, db: Session, event_sink: InMemoryAccessEventSink)
         rate_limit_service=_rate_limit_service(request, event_sink),
         public_session_service=PublicSessionService(db=db, checks=_session_checks(db), event_sink=event_sink),
         session_creation_enricher=enrich_session_creation,
+        config_read_projector=project_config_read,
     )
 
 
@@ -243,6 +281,113 @@ def _raw_gateway_request(public_key: str, request: Request, body: dict[str, Any]
         "rate_limit_category": "widget_session_create",
         "session_operation": "session_creation",
     }
+
+
+def _raw_config_gateway_request(public_key: str, request: Request, request_id: str) -> dict[str, Any]:
+    return {
+        "request_id": request_id,
+        "channel": "widget",
+        "method": request.method,
+        "public_key": public_key,
+        "origin": request.headers.get("origin"),
+        "headers": _headers(request),
+        "body": {},
+        "query_params": dict(request.query_params),
+        "channel_metadata": {},
+        "client_ip": _client_ip(request),
+        "user_agent": _bounded_user_agent(request),
+        "rate_limit_category": "widget_config_read",
+        "access_operation": "config_read",
+        "allow_empty_message": True,
+    }
+
+
+def _handle_gateway_error(result, event_sink: InMemoryAccessEventSink, *, request_id: str, started: float, event_prefix: str) -> JSONResponse | None:
+    if result.response.safe_error is None:
+        return None
+    detail = _map_public_error(result.response.safe_error)
+    event_type = f"{event_prefix}.rejected"
+    if detail.code == "rate_limited":
+        event_type = f"{event_prefix}.rate_limited"
+    elif detail.code in _ORIGIN_ERROR_CODES:
+        event_type = f"{event_prefix}.origin_denied"
+    elif detail.code == "temporarily_unavailable":
+        event_type = f"{event_prefix}.unavailable"
+    _emit(event_sink, event_type, request_id=request_id, trace_id=result.response.trace_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+    return _error_response(detail, request_id=request_id)
+
+
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    if not if_none_match:
+        return False
+    values = [item.strip() for item in if_none_match.split(",")]
+    return "*" in values or etag in values
+
+
+@router.options("/widget/{public_key}/config")
+def public_widget_config_preflight(public_key: str, request: Request, db: DbSession) -> Response:
+    request_id = _request_id(request)
+    event_sink = _event_sink(request)
+    origin = request.headers.get("origin")
+    started = time.perf_counter()
+    _emit(event_sink, "widget.config.requested", request_id=request_id, outcome="preflight")
+    raw = _raw_config_gateway_request(public_key, request, request_id)
+    try:
+        result = _gateway(request, db, event_sink).validate_access(raw)
+    except Exception:
+        _emit(event_sink, "widget.config.unavailable", request_id=request_id, outcome="rejected", error_code="safe_internal_error", latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(error_detail("safe_internal_error"), request_id=request_id)
+    error = _handle_gateway_error(result, event_sink, request_id=request_id, started=started, event_prefix="widget.config")
+    if error is not None:
+        return error
+    if not origin:
+        return _error_response(error_detail("origin_required"), request_id=request_id)
+    headers = _config_cors_headers(origin)
+    headers["Cache-Control"] = _CONFIG_CACHE_CONTROL
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=headers)
+
+
+@router.get("/widget/{public_key}/config", response_model=PublicWidgetConfigurationResponse)
+def get_public_widget_config(public_key: str, request: Request, db: DbSession) -> JSONResponse | Response:
+    request_id = _request_id(request)
+    event_sink = _event_sink(request)
+    started = time.perf_counter()
+    _emit(event_sink, "widget.config.requested", request_id=request_id, outcome="requested")
+    if request.headers.get("content-length") not in {None, "0"}:
+        detail = error_detail("invalid_request")
+        _emit(event_sink, "widget.config.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(detail, request_id=request_id)
+    raw = _raw_config_gateway_request(public_key, request, request_id)
+    origin = request.headers.get("origin")
+    try:
+        result = _gateway(request, db, event_sink).validate_access(raw)
+        error = _handle_gateway_error(result, event_sink, request_id=request_id, started=started, event_prefix="widget.config")
+        if error is not None:
+            db.rollback()
+            return error
+        payload = WidgetChannelAdapter().format_config_response(result.response)
+        etag = str(result.response.metadata.get("etag") or public_widget_config_etag(payload))
+        headers = _config_cors_headers(origin or "")
+        headers["ETag"] = etag
+        headers["Cache-Control"] = _CONFIG_CACHE_CONTROL
+        if any(event.event_type == "rate_limit.degraded_local_fallback" and event.request_id == request_id for event in event_sink.events):
+            _emit(event_sink, "widget.config.degraded_rate_limit", request_id=request_id, trace_id=result.response.trace_id, outcome="degraded", latency_ms=int((time.perf_counter() - started) * 1000))
+        if _etag_matches(request.headers.get("if-none-match"), etag):
+            _emit(event_sink, "widget.config.not_modified", request_id=request_id, trace_id=result.response.trace_id, outcome="not_modified", latency_ms=int((time.perf_counter() - started) * 1000))
+            return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+        if bool(result.response.metadata.get("asset_omitted")):
+            _emit(event_sink, "widget.config.asset_omitted", request_id=request_id, trace_id=result.response.trace_id, outcome="omitted", latency_ms=int((time.perf_counter() - started) * 1000))
+        _emit(event_sink, "widget.config.served", request_id=request_id, trace_id=result.response.trace_id, outcome="served", latency_ms=int((time.perf_counter() - started) * 1000))
+        return JSONResponse(status_code=status.HTTP_200_OK, content=payload, headers=headers)
+    except PublicAccessError as exc:
+        db.rollback()
+        detail = _map_public_error(exc.detail)
+        _emit(event_sink, "widget.config.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(detail, request_id=request_id)
+    except Exception:
+        db.rollback()
+        _emit(event_sink, "widget.config.unavailable", request_id=request_id, outcome="rejected", error_code="safe_internal_error", latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(error_detail("safe_internal_error"), request_id=request_id)
 
 
 @router.options("/widget/{public_key}/sessions")

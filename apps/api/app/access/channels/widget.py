@@ -67,6 +67,15 @@ class WidgetChannelAdapter(PublicChannelAdapter):
             lowered = {str(key).lower() for key in headers}
             if DASHBOARD_PUBLIC_FORBIDDEN_HEADERS.intersection(lowered):
                 raise_public_error("invalid_request")
+        method = str(parsed_request.get("method") or "").upper()
+        access_operation = str(parsed_request.get("access_operation") or "")
+        if access_operation == "config_read":
+            if method not in {"GET", "OPTIONS"}:
+                raise_public_error("invalid_request")
+            if parsed_request.get("query_params"):
+                raise_public_error("invalid_request")
+            if parsed_request.get("body") not in ({}, None):
+                raise_public_error("invalid_request")
         body = parsed_request.get("body") or {}
         if not isinstance(body, dict):
             raise_public_error("invalid_request")
@@ -104,6 +113,9 @@ class WidgetChannelAdapter(PublicChannelAdapter):
             "capabilities": capabilities,
             "request_id": response.request_id,
         }
+
+    def format_config_response(self, response):
+        return dict(response.payload)
 
     def format_error(self, error: PublicAccessErrorDetail) -> dict[str, Any]:
         return {"error": error.to_public_dict()}

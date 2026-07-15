@@ -130,7 +130,7 @@ npm run verify
 
 ## Public Route Warning
 
-TASK-061B wires the first public route for widget session creation only. Future public widget config or message endpoints must be introduced by separate approved tasks and must continue to route through this boundary rather than directly into RAG Orchestrator or dashboard authentication.
+TASK-061B wires public widget session creation. TASK-062B adds public widget configuration reads. Future public widget message endpoints must be introduced by separate approved tasks and must continue to route through this boundary rather than directly into RAG Orchestrator or dashboard authentication.
 
 ## TASK-057B Credential Persistence Update
 
@@ -154,7 +154,7 @@ New implementation modules:
 
 `DatabaseCredentialRegistry` can resolve persisted credentials into the existing `CredentialRecord` contract. `InMemoryCredentialRegistry` remains available for isolated tests.
 
-The gateway behaviour is unchanged and no public route has been added. Runtime origin validation, Redis rate limiting, anonymous sessions, public config endpoint, public message endpoint, public RAG, and widget UI remain unimplemented.
+The gateway behaviour is unchanged and no public route has been added. Runtime origin validation, Redis rate limiting, anonymous sessions, public session creation, and public config reads are implemented. Public message endpoint, public RAG, and widget UI remain unimplemented.
 
 ## TASK-058B Origin Validation Update
 
@@ -221,6 +221,20 @@ POST /api/v1/widget/{public_key}/sessions
 OPTIONS /api/v1/widget/{public_key}/sessions
 ```
 
-The route lives in `apps/api/app/api/v1/public_widget.py` and uses the `WidgetChannelAdapter` plus `PublicAccessGateway` in `session_creation` mode. It creates anonymous public sessions only. It does not expose a public widget config endpoint, public message endpoint, conversation creation, RAG invocation, AI Core invocation, widget SDK/UI, or global CORS middleware.
+The session route lives in `apps/api/app/api/v1/public_widget.py` and uses the `WidgetChannelAdapter` plus `PublicAccessGateway` in `session_creation` mode. It creates anonymous public sessions only. It does not expose a public message endpoint, conversation creation, RAG invocation, AI Core invocation, widget SDK/UI, or global CORS middleware.
 
 Session creation now runs through credential resolution, tenant resolution, widget configuration eligibility, Origin validation, `widget_session_create` rate limiting, and `PublicSessionService` session creation. Dynamic CORS is route-scoped and echoes only the validated Origin.
+## TASK-062B Public Widget Configuration Endpoint Update
+
+TASK-062B adds the second public widget endpoint:
+
+```text
+GET /api/v1/widget/{public_key}/config
+OPTIONS /api/v1/widget/{public_key}/config
+```
+
+The route lives in `apps/api/app/api/v1/public_widget.py` and uses the `WidgetChannelAdapter` plus `PublicAccessGateway` in `config_read` mode. It returns only published, sanitised public widget configuration. It does not create sessions, conversations, messages, retrieval requests, RAG executions, AI Core executions, widget SDK/UI, or global CORS middleware.
+
+Config reads run through credential resolution, tenant resolution, Origin validation, `widget_config_read` rate limiting, published-configuration eligibility, safe public projection, ETag generation, and dynamic route-scoped CORS. The only implemented public widget routes are now config read, session creation, and their route-scoped OPTIONS handlers.
+
+The config response excludes tenant IDs, internal credential/config IDs, allowed origins, policy internals, provider/model/prompt details, retrieval/context/token limits, rate-limit rules, secret/hash fields, audit metadata, internal paths, and environment. Asset fields are projected only as safe HTTPS raster URLs or omitted.

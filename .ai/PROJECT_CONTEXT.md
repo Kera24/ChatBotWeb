@@ -1,4 +1,4 @@
-﻿# Project Context
+# Project Context
 
 This is the first file every Codex session must read.
 
@@ -200,7 +200,7 @@ Guardrails for future Codex sessions:
 - Public widget CORS must be dynamic, origin-validation-driven, and must not use wildcard origins or credentialed browser cookies.
 ## Public widget configuration endpoint guardrails
 
-TASK-062A and ADR-0012 define the public widget configuration delivery boundary for future implementation.
+TASK-062A, TASK-062B, and ADR-0012 define and implement the public widget configuration delivery boundary.
 
 Guardrails for future Codex sessions:
 
@@ -210,3 +210,12 @@ Guardrails for future Codex sessions:
 - Draft configuration is never publicly visible.
 - Public configuration must pass Origin validation and `widget_config_read` rate limiting.
 - Public widget configuration responses must not expose tenant IDs, internal credential/config IDs, allowed origins, policy internals, provider/model/prompt details, rate-limit rules, secret/hash fields, audit metadata, or internal asset paths.
+## Implemented public widget endpoints
+
+As of TASK-062B, the only implemented public widget endpoints are:
+
+- `GET /api/v1/widget/{public_key}/config`
+- `POST /api/v1/widget/{public_key}/sessions`
+- Route-scoped `OPTIONS` handlers for those paths
+
+No public widget message endpoint, public session validation endpoint, public RAG endpoint, conversation creation route, widget SDK/UI, or global CORS wildcard is implemented.

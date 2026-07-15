@@ -1,6 +1,6 @@
-﻿# Public Widget Configuration Endpoint Architecture
+# Public Widget Configuration Endpoint Architecture
 
-Status: Proposed architecture for TASK-062A
+Status: Implemented in TASK-062B
 Scope: Architecture and planning only. This document does not implement routes, schemas, CORS code, caching, widget SDK/UI, sessions, messages, RAG, or migrations.
 
 ## 1. Purpose
@@ -653,3 +653,8 @@ TASK-062A is complete when:
 - Threat and failure models are complete.
 - ADR-0012 records the decision.
 - No code or route is added.
+## 24. TASK-062B Implementation Result
+
+TASK-062B implemented the read-only public configuration endpoint using the Public Access Gateway `config_read` mode. The implementation includes route-scoped GET/OPTIONS handlers, safe public schemas, sanitised projection, asset URL omission/projection, dynamic validated-Origin CORS, `widget_config_read` rate limiting, ETag/conditional GET support, conservative cache headers, safe public error mapping, and tests.
+
+No public message endpoint, session validation endpoint, RAG invocation, conversation/message persistence, widget SDK/UI, asset upload/proxy streaming, Redis configuration cache, hard CDN integration, or migration was added.
