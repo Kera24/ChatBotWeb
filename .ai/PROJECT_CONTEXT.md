@@ -287,3 +287,17 @@ Guardrails for future Codex sessions:
 - Unsafe HTML, script/style/object/embed/svg content, JavaScript/data/file/blob/vbscript/ftp/protocol-relative links, system/developer instruction leakage, internal IDs, local/storage paths, database/Redis URLs, API-key-like values, stack traces, prompt/provider/model metadata, token/cost metadata, and unsupported citation markers must not reach public responses.
 - Completed duplicate requests return the stored sanitised snapshot unchanged.
 - Widget UI rendering must still sanitise defensively; backend sanitisation is not the only control.
+
+## Embeddable Widget SDK Guardrails
+
+TASK-064A and ADR-0014 define the future embeddable widget SDK boundary.
+
+Guardrails for future Codex sessions:
+
+- The loader SDK and visual widget are separate components.
+- The SDK owns bootstrap, iframe mounting, lifecycle, strict postMessage transport, and host-page controls only.
+- The platform-hosted iframe owns public config, session, and message API calls.
+- Public session tokens must never enter the host-page JavaScript context, iframe URL, postMessage payloads, telemetry, or host callbacks.
+- SDK/iframe communication uses a strict versioned postMessage protocol with exact origin/source validation.
+- MVP supports one widget instance per page.
+- No SDK implementation may begin before TASK-064A approval.
