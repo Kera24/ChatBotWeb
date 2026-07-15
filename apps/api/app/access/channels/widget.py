@@ -31,6 +31,13 @@ FORBIDDEN_PUBLIC_WIDGET_FIELDS = {
     "max_messages",
 }
 
+MESSAGE_OPERATION_ALLOWED_BODY_FIELDS = {
+    "session_token",
+    "message",
+    "client_request_id",
+    "metadata",
+}
+
 DASHBOARD_PUBLIC_FORBIDDEN_HEADERS = {
     "authorization",
     "x-development-user-email",
@@ -59,7 +66,11 @@ class WidgetChannelAdapter(PublicChannelAdapter):
         return str(origin).strip() if origin else None
 
     def extract_session_token(self, parsed_request: dict[str, Any]) -> str | None:
-        return None
+        if str(parsed_request.get("access_operation") or "") != "message_send":
+            return None
+        body = parsed_request.get("body") or {}
+        token = body.get("session_token") if isinstance(body, dict) else None
+        return str(token).strip() if token else None
 
     def validate_request_shape(self, parsed_request: dict[str, Any]) -> None:
         headers = parsed_request.get("headers", {})
@@ -76,10 +87,23 @@ class WidgetChannelAdapter(PublicChannelAdapter):
                 raise_public_error("invalid_request")
             if parsed_request.get("body") not in ({}, None):
                 raise_public_error("invalid_request")
+        elif access_operation == "message_send":
+            if method != "POST":
+                raise_public_error("invalid_request")
         body = parsed_request.get("body") or {}
         if not isinstance(body, dict):
             raise_public_error("invalid_request")
-        forbidden = FORBIDDEN_PUBLIC_WIDGET_FIELDS.intersection({str(key) for key in body})
+        if access_operation == "message_send":
+            extra = {str(key) for key in body} - MESSAGE_OPERATION_ALLOWED_BODY_FIELDS
+            if extra:
+                raise_public_error("invalid_request")
+            if not body.get("session_token"):
+                raise_public_error("invalid_session")
+            if "message" not in body:
+                raise_public_error("invalid_message")
+            forbidden = (FORBIDDEN_PUBLIC_WIDGET_FIELDS - {"message"}).intersection({str(key) for key in body})
+        else:
+            forbidden = FORBIDDEN_PUBLIC_WIDGET_FIELDS.intersection({str(key) for key in body})
         if forbidden:
             raise_public_error("invalid_request")
         metadata = body.get("metadata") or {}
@@ -97,7 +121,12 @@ class WidgetChannelAdapter(PublicChannelAdapter):
             raise_public_error("invalid_request")
 
     def normalise_message(self, parsed_request: dict[str, Any]) -> str:
-        return ""
+        if str(parsed_request.get("access_operation") or "") != "message_send":
+            return ""
+        body = parsed_request.get("body") or {}
+        if not isinstance(body, dict):
+            return ""
+        return str(body.get("message") or "")
 
     def format_response(self, response):
         payload = dict(response.payload)

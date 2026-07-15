@@ -232,3 +232,16 @@ Guardrails for future Codex sessions:
 - Public AI output and citations require a dedicated sanitisation boundary.
 - No public message route may be added before TASK-063A approval and a later implementation task explicitly authorises it.
 - Public message routes must not accept dashboard development headers, dashboard bearer tokens, tenant IDs, conversation IDs, model/provider/prompt overrides, retrieval limits, context limits, output limits, raw conversation history, file uploads, or arbitrary tools.
+
+## Public Message Preparation Guardrails
+
+TASK-063B1 adds internal public-message preparation and idempotency only.
+
+Guardrails for future Codex sessions:
+
+- The internal preparation foundation does not expose `POST /api/v1/widget/{public_key}/messages`.
+- Future public messages require an `Idempotency-Key`; plaintext idempotency keys must never be stored, logged, or emitted.
+- Message validation and session validation must pass before idempotency-owned work advances.
+- Completed, in-progress, conflicting, and invalid duplicate requests must not consume another session message slot.
+- Preparation may create and attach a tenant-scoped widget conversation, but it must not create user/assistant messages or call RAG.
+- Public clients still never choose tenant, conversation, model, provider, prompt, retrieval, context, token limits, or policy overrides.

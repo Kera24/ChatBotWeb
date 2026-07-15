@@ -1,10 +1,11 @@
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from collections.abc import Callable
 from typing import Any
 
 from app.access.channels.base import PublicChannelAdapter
 from app.access.contracts import NormalisedAccessContext, PublicAccessRequest, PublicAccessResponse
 from app.access.errors import PublicAccessError, error_detail, raise_public_error
+from app.access.messages.contracts import PublicMessageInput
 from app.access.observability.events import AccessEvent, InMemoryAccessEventSink
 from app.access.origin_validation.contracts import OriginValidationRequest, OriginValidationResult
 from app.access.origin_validation.service import OriginValidationService
@@ -62,6 +63,7 @@ class PublicAccessGateway:
         public_session_service: PublicSessionService | None = None,
         session_creation_enricher: SessionCreationEnricher | None = None,
         config_read_projector: ConfigReadProjector | None = None,
+        message_preparation_service: Any | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
@@ -72,6 +74,7 @@ class PublicAccessGateway:
         self.public_session_service = public_session_service
         self.session_creation_enricher = session_creation_enricher
         self.config_read_projector = config_read_projector
+        self.message_preparation_service = message_preparation_service
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -168,6 +171,58 @@ class PublicAccessGateway:
                     status="config_read",
                     payload=payload,
                     metadata=metadata,
+                )
+                return ValidatedAccessResult(request=request, context=context, response=response)
+            if access_operation == "message_send":
+                if self.message_preparation_service is None:
+                    raise_public_error("temporarily_unavailable")
+                if not request.public_session_token:
+                    raise_public_error("invalid_session")
+                raw_headers = raw_request.get("headers") or {}
+                header_key = None
+                if isinstance(raw_headers, dict):
+                    for header_name, header_value in raw_headers.items():
+                        if str(header_name).lower() == "idempotency-key":
+                            header_key = header_value
+                            break
+                body = raw_request.get("body") if isinstance(raw_request.get("body"), dict) else {}
+                idempotency_key = str(raw_request.get("idempotency_key") or header_key or "")
+                canonical_origin = origin_result.canonical_origin.serialised if origin_result and origin_result.canonical_origin else None
+                inactivity_timeout_seconds = int(raw_request.get("inactivity_timeout_seconds") or min(policy.session_lifetime_seconds, 1800))
+                prepared_result = self.message_preparation_service.prepare(
+                    PublicMessageInput(
+                        session_token=request.public_session_token,
+                        message=request.message,
+                        idempotency_key=idempotency_key,
+                        client_request_id=str(body.get("client_request_id")) if body.get("client_request_id") is not None else None,
+                        metadata=dict(body.get("metadata") or {}),
+                        request_id=request.request_id,
+                        trace_id=trace_id,
+                        received_at=request.received_at,
+                    ),
+                    organisation_id=context.organisation_id,
+                    workspace_id=context.workspace_id,
+                    credential_id=credential_record.credential_id,
+                    channel=request.channel,
+                    environment=credential_record.environment,
+                    policy_profile=policy.policy_key,
+                    canonical_origin=canonical_origin,
+                    max_messages=policy.max_messages_per_session,
+                    inactivity_timeout_seconds=inactivity_timeout_seconds,
+                )
+                payload: dict[str, Any] = {"idempotency_state": prepared_result.idempotency.state}
+                if prepared_result.prepared is not None:
+                    payload["prepared"] = asdict(prepared_result.prepared)
+                if prepared_result.idempotency.stored_response is not None:
+                    payload["stored_response"] = prepared_result.idempotency.stored_response
+                if prepared_result.idempotency.safe_error_code is not None:
+                    payload["safe_error_code"] = prepared_result.idempotency.safe_error_code
+                response = PublicAccessResponse(
+                    request_id=request.request_id,
+                    trace_id=trace_id,
+                    status="message_prepared",
+                    payload=payload,
+                    metadata={"channel": request.channel, "credential_id": credential_record.credential_id},
                 )
                 return ValidatedAccessResult(request=request, context=context, response=response)
             session_payload: dict[str, Any] = {}

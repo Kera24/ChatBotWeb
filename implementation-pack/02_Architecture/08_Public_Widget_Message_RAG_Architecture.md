@@ -870,3 +870,26 @@ Recommended implementation split:
 ## 32. Acceptance Criteria
 
 TASK-063A is complete when endpoint boundary, session validation, slot timing, conversation attachment, idempotency, abuse controls, cost ceilings, RAG adapter boundary, response/citation exclusions, output sanitisation, transaction/failure policy, CORS/rate limits, threat model, diagrams, ADR decision, and implementation-task split are documented, and no runtime code or route is added.
+
+## TASK-063B1 Implementation Note
+
+TASK-063B1 implements the internal message-preparation and idempotency foundation described by this architecture without exposing `POST /api/v1/widget/{public_key}/messages`.
+
+Implemented foundation:
+
+- `public_message_requests` persistence with tenant/session-safe uniqueness for `public_session_id + idempotency_key_hash`.
+- HMAC storage for `Idempotency-Key`; plaintext keys are not persisted or emitted.
+- Canonical request hashing over approved public inputs and the internal session reference.
+- Strict message and metadata validation.
+- Internal preparation contracts and service.
+- Atomic session slot consumption for new idempotency work only.
+- Lazy server-owned widget conversation creation and public-session attachment.
+- Internal `message_send` Public Access Gateway extension point.
+
+Still deferred:
+
+- Public message route and CORS handlers.
+- Abuse and cost controls.
+- Public RAG adapter and RAG Orchestrator invocation.
+- User/assistant message persistence for public message execution.
+- Output/citation sanitisation and public response schemas.

@@ -48,6 +48,17 @@ SAFE_EVENT_TYPES = {
     "widget.config.unavailable",
     "widget.config.asset_omitted",
     "widget.config.degraded_rate_limit",
+    "widget.message.preparation_started",
+    "widget.message.validation_rejected",
+    "widget.message.idempotency_new",
+    "widget.message.idempotency_duplicate",
+    "widget.message.idempotency_conflict",
+    "widget.message.request_in_progress",
+    "widget.message.slot_consumed",
+    "widget.message.conversation_created",
+    "widget.message.conversation_attached",
+    "widget.message.preparation_completed",
+    "widget.message.preparation_failed",
 }
 
 

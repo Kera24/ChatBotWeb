@@ -45,6 +45,7 @@ class PublicCredential(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     origins = relationship("CredentialAllowedOrigin", back_populates="credential", cascade="all, delete-orphan")
     widget_configuration = relationship("WidgetConfiguration", back_populates="credential", uselist=False, cascade="all, delete-orphan")
     public_sessions = relationship("PublicSession", back_populates="credential")
+    public_message_requests = relationship("PublicMessageRequest", back_populates="credential")
     parent_credential = relationship("PublicCredential", remote_side="PublicCredential.id")
 
 
@@ -156,3 +157,41 @@ class PublicSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     credential = relationship("PublicCredential", back_populates="public_sessions")
     origin = relationship("CredentialAllowedOrigin")
     conversation = relationship("ChatSession")
+    message_requests = relationship("PublicMessageRequest", back_populates="public_session")
+
+
+class PublicMessageRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "public_message_requests"
+    __table_args__ = (
+        UniqueConstraint("public_session_id", "idempotency_key_hash", name="uq_public_message_requests_session_key"),
+        CheckConstraint("status in ('received', 'processing', 'completed', 'failed')", name="ck_public_message_requests_status"),
+        Index("ix_public_message_requests_tenant_workspace", "organisation_id", "workspace_id"),
+        Index("ix_public_message_requests_credential", "credential_id"),
+        Index("ix_public_message_requests_session", "public_session_id"),
+        Index("ix_public_message_requests_status", "status"),
+        Index("ix_public_message_requests_expires_at", "expires_at"),
+        Index("ix_public_message_requests_deleted_at", "deleted_at"),
+    )
+
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    credential_id: Mapped[str] = mapped_column(String(36), ForeignKey("public_credentials.id"), nullable=False, index=True)
+    public_session_id: Mapped[str] = mapped_column(String(36), ForeignKey("public_sessions.id"), nullable=False, index=True)
+    idempotency_key_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="received", server_default="received")
+    user_message_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("chat_messages.id"), nullable=True)
+    assistant_message_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("chat_messages.id"), nullable=True)
+    response_snapshot_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    processing_started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    failed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    credential = relationship("PublicCredential", back_populates="public_message_requests")
+    public_session = relationship("PublicSession", back_populates="message_requests")
+    user_message = relationship("ChatMessage", foreign_keys=[user_message_id])
+    assistant_message = relationship("ChatMessage", foreign_keys=[assistant_message_id])

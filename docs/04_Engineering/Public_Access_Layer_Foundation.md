@@ -238,3 +238,23 @@ The route lives in `apps/api/app/api/v1/public_widget.py` and uses the `WidgetCh
 Config reads run through credential resolution, tenant resolution, Origin validation, `widget_config_read` rate limiting, published-configuration eligibility, safe public projection, ETag generation, and dynamic route-scoped CORS. The only implemented public widget routes are now config read, session creation, and their route-scoped OPTIONS handlers.
 
 The config response excludes tenant IDs, internal credential/config IDs, allowed origins, policy internals, provider/model/prompt details, retrieval/context/token limits, rate-limit rules, secret/hash fields, audit metadata, internal paths, and environment. Asset fields are projected only as safe HTTPS raster URLs or omitted.
+
+## TASK-063B1 Public Message Preparation And Idempotency Update
+
+TASK-063B1 adds the internal preparation foundation for future public widget messages while preserving the no-public-message-route boundary.
+
+New modules:
+
+- `apps/api/app/access/messages/contracts.py`
+- `apps/api/app/access/messages/validation.py`
+- `apps/api/app/access/messages/repository.py`
+- `apps/api/app/access/messages/idempotency.py`
+- `apps/api/app/access/messages/preparation.py`
+
+New database table:
+
+- `public_message_requests`
+
+`PublicAccessGateway` now has an internal `message_send` preparation extension point. The gateway extension is not exposed through FastAPI and remains behind explicit injection. Preparation validates the message, validates the anonymous public session, resolves idempotency, creates or attaches one tenant-scoped widget conversation, consumes one session message slot for new work, and returns an internal `PreparedPublicMessage` for future abuse, cost, and RAG stages.
+
+No public widget message route, public message HTTP schema, retrieval, RAG, AI Core/provider call, abuse service, cost-control service, output sanitiser, streaming, widget SDK/UI, or CORS change was added.
