@@ -795,3 +795,7 @@ OPTIONS /api/v1/widget/{public_key}/messages
 Creates one public widget message execution for a validated anonymous public session. `POST` requires `Content-Type: application/json`, `Origin`, and `Idempotency-Key`. The request body accepts only `session_token`, `message`, optional `client_request_id`, and bounded optional `metadata`.
 
 The endpoint returns a provisional public-safe answer response containing `response_id`, `answer`, `answer_state`, `citations`, `remaining_messages`, `fallback_used`, `request_id`, and `response_schema_version`. It does not expose tenant IDs, internal credential/session/conversation/message IDs, model/provider/prompt metadata, token usage, cost, execution IDs, retrieval scores, raw context, or storage paths.
+
+## Public Output Sanitisation
+
+Public widget message answers are sanitised before storage in idempotency response snapshots. The MVP response format is bounded plain text. Unsafe HTML, executable links, local/storage paths, internal IDs, prompt/provider/model metadata, token/cost metadata, stack traces, system/developer instruction leakage, unsafe citations, and unsupported citation markers are removed, redacted, downgraded, or replaced with fallback.

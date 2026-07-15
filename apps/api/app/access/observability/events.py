@@ -81,6 +81,18 @@ SAFE_EVENT_TYPES = {
     "widget.message.fallback",
     "widget.message.duplicate",
     "widget.message.response_projected",
+    "widget.message.output_sanitisation_started",
+    "widget.message.output_sanitised",
+    "widget.message.output_truncated",
+    "widget.message.unsafe_link_removed",
+    "widget.message.citation_removed",
+    "widget.message.citation_marker_rewritten",
+    "widget.message.internal_leakage_detected",
+    "widget.message.system_prompt_leakage_detected",
+    "widget.message.internal_leakage_detected",
+    "widget.message.system_prompt_leakage_detected",
+    "widget.message.output_replaced_with_fallback",
+    "widget.message.output_sanitisation_failed",
 }
 
 

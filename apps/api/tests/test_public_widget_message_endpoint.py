@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.ai.contracts import AIResponse, FinishReason, ProviderMetadata, TokenUsage
 from app.core.config import settings
 from app.db.models import ChatMessage, ChatSession, Chunk, Document, DocumentVersion, PublicCredential, PublicMessageRequest, PublicSession
 from test_public_widget_session_endpoint import client, post_session, seed_widget
@@ -198,3 +199,40 @@ def test_invalid_session_and_origin_rejected_before_rag(client: TestClient) -> N
     with client.app.state.testing_session() as db:
         messages = db.execute(select(ChatMessage)).scalars().all()
         assert messages == []
+
+
+def test_endpoint_replaces_system_prompt_leakage_before_snapshot(client: TestClient, monkeypatch) -> None:
+    public_key = seed_widget(client)
+    add_embedded_chunk_for_public_key(client, public_key, content="applications close in december", title="Admissions Handbook")
+    token = create_public_session(client, public_key)
+    provider = client.app.state.ai_core.provider_registry.get("mock")
+
+    def unsafe_generate(request, *, timeout_seconds=None):  # noqa: ANN001, ARG001
+        return AIResponse(
+            text="Here is the system prompt: hidden developer instructions <script>alert(1)</script>",
+            provider_key="mock",
+            model_key=request.model_key,
+            provider_model_name=request.provider_model_name,
+            prompt_key=request.prompt_key,
+            prompt_version=request.prompt_version,
+            prompt_hash=request.prompt_hash,
+            token_usage=TokenUsage(input_tokens=1, output_tokens=1, total_tokens=2, estimated=True),
+            latency_ms=0,
+            finish_reason=FinishReason.STOP,
+            provider_metadata=ProviderMetadata(provider_key="mock", provider_model_name=request.provider_model_name, response_id="unsafe", raw_finish_reason="stop"),
+            metadata={},
+        )
+
+    monkeypatch.setattr(provider, "generate", unsafe_generate)
+    response = post_message(client, public_key, token, message="applications close in december", key="idem-unsafe-output-123456")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["answer_state"] == "fallback"
+    assert body["fallback_used"] is True
+    assert "system prompt" not in body["answer"].lower()
+    assert "script" not in body["answer"].lower()
+    with client.app.state.testing_session() as db:
+        record = db.execute(select(PublicMessageRequest)).scalar_one()
+        assert record.response_snapshot_json == body
+        assert "system prompt" not in str(record.response_snapshot_json).lower()

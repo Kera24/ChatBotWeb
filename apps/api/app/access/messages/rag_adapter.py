@@ -1,35 +1,17 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import html
-import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any
 
-from app.ai.rag_orchestrator import RAGOrchestrationRequest, RAGOrchestrator, RAGOrchestratorError, RAGProviderExecutionError
 from app.access.errors import raise_public_error
 from app.access.messages.idempotency import PublicMessageIdempotencyService
+from app.access.messages.output import PublicOutputSanitisationRequest, PublicOutputSanitiser
 from app.access.messages.security import SecuredPublicMessage
 from app.access.observability.events import AccessEvent, InMemoryAccessEventSink
+from app.ai.rag_orchestrator import RAGOrchestrationRequest, RAGOrchestrator, RAGOrchestratorError, RAGProviderExecutionError
 
-_RESPONSE_SCHEMA_VERSION = "1.0"
-_MAX_ANSWER_CHARS = 4000
-_MAX_CITATIONS = 5
-_MAX_QUOTED_TEXT_CHARS = 500
-_TAG_RE = re.compile(r"<[^>]+>")
-
-
-@dataclass(frozen=True)
-class PublicRAGCitation:
-    citation_index: int
-    source_title: str
-    source_type: str
-    page_number: int | None = None
-    section_title: str | None = None
-    quoted_text: str | None = None
-
-    def to_dict(self) -> dict[str, object]:
-        return {key: value for key, value in asdict(self).items() if value is not None}
+_RESPONSE_SCHEMA_VERSION = "1.1"
 
 
 @dataclass(frozen=True)
@@ -43,10 +25,18 @@ class PublicRAGAdapterResult:
 
 
 class PublicWidgetRAGAdapter:
-    def __init__(self, *, orchestrator: RAGOrchestrator, idempotency_service: PublicMessageIdempotencyService, event_sink: InMemoryAccessEventSink | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        orchestrator: RAGOrchestrator,
+        idempotency_service: PublicMessageIdempotencyService,
+        event_sink: InMemoryAccessEventSink | None = None,
+        output_sanitiser: PublicOutputSanitiser | None = None,
+    ) -> None:
         self.orchestrator = orchestrator
         self.idempotency_service = idempotency_service
         self.event_sink = event_sink
+        self.output_sanitiser = output_sanitiser or PublicOutputSanitiser()
 
     def execute(self, secured: SecuredPublicMessage) -> PublicRAGAdapterResult:
         prepared = secured.prepared
@@ -80,15 +70,17 @@ class PublicWidgetRAGAdapter:
             raise_public_error("temporarily_unavailable")
 
         self._emit("widget.message.rag_completed", secured, outcome="completed")
-        public_response = project_public_rag_response(
-            answer=result.answer,
-            answer_state=result.answer_state,
-            citations=result.citations,
-            remaining_messages=prepared.remaining_messages,
-            fallback_used=result.fallback_used,
-            request_id=prepared.request_id,
-            response_id=_public_response_id(result.assistant_message_id, prepared.request_id),
-        )
+        sanitised = self._sanitise_result(secured, result)
+        public_response = {
+            "response_id": _public_response_id(result.assistant_message_id, prepared.request_id),
+            "answer": sanitised.safe_answer,
+            "answer_state": sanitised.answer_state,
+            "citations": [citation.to_dict() for citation in sanitised.safe_citations],
+            "remaining_messages": prepared.remaining_messages,
+            "fallback_used": sanitised.fallback_replaced or result.fallback_used or sanitised.answer_state == "fallback",
+            "request_id": prepared.request_id,
+            "response_schema_version": _RESPONSE_SCHEMA_VERSION,
+        }
         self.idempotency_service.mark_completed(
             record_id=prepared.idempotency_record_id,
             organisation_id=prepared.organisation_id,
@@ -102,16 +94,76 @@ class PublicWidgetRAGAdapter:
             user_message_id=result.user_message_id,
             assistant_message_id=result.assistant_message_id,
             execution_id=result.execution_id,
-            fallback_used=result.fallback_used,
+            fallback_used=public_response["fallback_used"] is True,
             internal_metadata={
-                "answer_state": result.answer_state,
+                "answer_state": sanitised.answer_state,
                 "retrieved_chunk_count": result.retrieved_chunk_count,
                 "token_total": result.token_usage.total_tokens,
                 "estimated_cost": str(result.estimated_cost),
+                "sanitiser_version": sanitised.decision_version,
+                "sanitisation_applied": sanitised.sanitisation_applied,
             },
         )
 
-    def _mark_failed(self, prepared, error_code: str) -> None:
+    def _sanitise_result(self, secured: SecuredPublicMessage, result):  # noqa: ANN001
+        prepared = secured.prepared
+        self._emit("widget.message.output_sanitisation_started", secured, outcome="started")
+        try:
+            sanitised = self.output_sanitiser.sanitise(
+                PublicOutputSanitisationRequest(
+                    answer=result.answer,
+                    answer_state=result.answer_state,
+                    authorised_citations=result.citations,
+                    fallback_used=result.fallback_used,
+                    policy_profile=prepared.policy_profile,
+                    request_id=prepared.request_id,
+                    trace_id=prepared.trace_id,
+                    known_internal_values=tuple(
+                        str(value)
+                        for value in (
+                            prepared.organisation_id,
+                            prepared.workspace_id,
+                            prepared.credential_id,
+                            prepared.public_session_id,
+                            prepared.conversation_id,
+                            prepared.idempotency_record_id,
+                            result.user_message_id,
+                            result.assistant_message_id,
+                            result.execution_id,
+                            result.provider_key,
+                            result.model_key,
+                            result.provider_model_name,
+                            result.prompt_key,
+                            result.prompt_version,
+                            result.prompt_hash,
+                        )
+                        if value
+                    ),
+                    internal_metadata={"execution_id": result.execution_id},
+                )
+            )
+        except Exception:
+            self._emit("widget.message.output_sanitisation_failed", secured, outcome="failed", error_code="safe_internal_error")
+            raise_public_error("safe_internal_error")
+        if sanitised.sanitisation_applied:
+            self._emit("widget.message.output_sanitised", secured, outcome="sanitised")
+        if "truncated" in sanitised.removed_content_categories:
+            self._emit("widget.message.output_truncated", secured, outcome="truncated")
+        if "unsafe_link" in sanitised.removed_content_categories:
+            self._emit("widget.message.unsafe_link_removed", secured, outcome="removed")
+        if sanitised.citation_validation_result.removed_count:
+            self._emit("widget.message.citation_removed", secured, outcome="removed")
+        if sanitised.citation_validation_result.marker_rewritten:
+            self._emit("widget.message.citation_marker_rewritten", secured, outcome="rewritten")
+        if sanitised.leakage_detected:
+            self._emit("widget.message.internal_leakage_detected", secured, outcome="detected")
+        if "system_prompt_leakage" in sanitised.removed_content_categories:
+            self._emit("widget.message.system_prompt_leakage_detected", secured, outcome="detected")
+        if sanitised.fallback_replaced:
+            self._emit("widget.message.output_replaced_with_fallback", secured, outcome="fallback")
+        return sanitised
+
+    def _mark_failed(self, prepared, error_code: str) -> None:  # noqa: ANN001
         self.idempotency_service.mark_failed(
             record_id=prepared.idempotency_record_id,
             organisation_id=prepared.organisation_id,
@@ -134,67 +186,6 @@ class PublicWidgetRAGAdapter:
                 error_code=error_code,
             )
         )
-
-
-def project_public_rag_response(*, answer: str, answer_state: str, citations: list[Any], remaining_messages: int, fallback_used: bool, request_id: str, response_id: str) -> dict[str, Any]:
-    safe_answer = _plain_text(answer, max_chars=_MAX_ANSWER_CHARS)
-    safe_state = _public_answer_state(answer_state, fallback_used=fallback_used)
-    safe_citations = [] if fallback_used or safe_state in {"fallback", "temporarily_unavailable"} else project_public_citations(citations)
-    return {
-        "response_id": response_id,
-        "answer": safe_answer,
-        "answer_state": safe_state,
-        "citations": [citation.to_dict() for citation in safe_citations],
-        "remaining_messages": remaining_messages,
-        "fallback_used": bool(fallback_used),
-        "request_id": request_id,
-        "response_schema_version": _RESPONSE_SCHEMA_VERSION,
-    }
-
-
-def project_public_citations(citations: list[Any]) -> list[PublicRAGCitation]:
-    seen: set[tuple[object, ...]] = set()
-    projected: list[PublicRAGCitation] = []
-    for citation in sorted(citations, key=lambda item: getattr(item, "citation_index", 0)):
-        key = (
-            getattr(citation, "source_title", None),
-            getattr(citation, "source_type", None),
-            getattr(citation, "page_number", None),
-            getattr(citation, "section_title", None),
-            getattr(citation, "quoted_text", None),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        projected.append(
-            PublicRAGCitation(
-                citation_index=len(projected) + 1,
-                source_title=_plain_text(str(getattr(citation, "source_title", "Source")), max_chars=200),
-                source_type=_plain_text(str(getattr(citation, "source_type", "document")), max_chars=80),
-                page_number=getattr(citation, "page_number", None),
-                section_title=_plain_text(str(getattr(citation, "section_title")), max_chars=200) if getattr(citation, "section_title", None) else None,
-                quoted_text=_plain_text(str(getattr(citation, "quoted_text")), max_chars=_MAX_QUOTED_TEXT_CHARS) if getattr(citation, "quoted_text", None) else None,
-            )
-        )
-        if len(projected) >= _MAX_CITATIONS:
-            break
-    return projected
-
-
-def _plain_text(value: str, *, max_chars: int) -> str:
-    stripped = _TAG_RE.sub("", value)
-    escaped = html.escape(stripped, quote=False)
-    return escaped[:max_chars]
-
-
-def _public_answer_state(answer_state: str, *, fallback_used: bool) -> str:
-    if fallback_used or answer_state == "fallback":
-        return "fallback"
-    if answer_state == "low_confidence":
-        return "low_confidence"
-    if answer_state == "answered":
-        return "answered"
-    return "temporarily_unavailable"
 
 
 def _public_response_id(assistant_message_id: str, request_id: str) -> str:

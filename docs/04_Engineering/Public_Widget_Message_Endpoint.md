@@ -87,3 +87,8 @@ Citations are projected from authorised RAG citations only. They are ordered, de
 ## Explicit Limitations
 
 Full Markdown/link sanitisation, rich output safety, streaming, widget UI, file uploads, tools, public conversation history, feedback, and analytics remain future work. TASK-063B4 owns the full output sanitisation boundary.
+## TASK-063B4 Output Sanitisation Update
+
+TASK-063B4 replaces the provisional plain-text projection with `PublicOutputSanitiser`. Public widget message responses now pass through parser-backed HTML stripping, strict HTTPS link validation, leakage redaction, citation validation, marker rewriting, answer length limits, and severe leakage fallback replacement before idempotency response snapshots are stored.
+
+The current response format remains bounded plain text. Full rich Markdown rendering remains unavailable until explicitly approved through this boundary.

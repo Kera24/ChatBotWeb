@@ -275,3 +275,15 @@ Guardrails for future Codex sessions:
 - Completed idempotent duplicates return the stored safe response snapshot without another slot or RAG call.
 - The provisional TASK-063B3 response treats answers as bounded plain text; full Markdown/output sanitisation remains TASK-063B4.
 - Public responses must not expose internal tenant/session/conversation/message IDs, provider/model/prompt metadata, token usage, cost, execution IDs, chunk/document IDs, similarity scores, raw context, stack traces, or storage paths.
+
+## Public Output Sanitisation Guardrails
+
+TASK-063B4 adds the public output sanitisation boundary for widget message responses.
+
+Guardrails for future Codex sessions:
+
+- Public widget message answers must pass through `PublicOutputSanitiser` before idempotency snapshots are completed.
+- The current public output format is bounded plain text; restricted Markdown may be added only through the sanitisation boundary.
+- Unsafe HTML, script/style/object/embed/svg content, JavaScript/data/file/blob/vbscript/ftp/protocol-relative links, system/developer instruction leakage, internal IDs, local/storage paths, database/Redis URLs, API-key-like values, stack traces, prompt/provider/model metadata, token/cost metadata, and unsupported citation markers must not reach public responses.
+- Completed duplicate requests return the stored sanitised snapshot unchanged.
+- Widget UI rendering must still sanitise defensively; backend sanitisation is not the only control.

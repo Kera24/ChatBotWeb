@@ -921,3 +921,7 @@ Still deferred:
 The approved implementation now exposes `POST /api/v1/widget/{public_key}/messages` and route-scoped `OPTIONS`. The route uses Public Access Gateway `message_send`, the existing public-session preparation/idempotency foundation, deterministic abuse and cost controls, and `PublicWidgetRAGAdapter` to call the tenant-scoped RAG Orchestrator.
 
 The response projection is intentionally provisional and plain-text only. TASK-063B4 remains responsible for the full Markdown/link/output sanitisation boundary.
+
+## TASK-063B4 Implementation Note
+
+The public message RAG boundary now includes a dedicated output sanitisation stage. The RAG adapter passes Orchestrator answers and authorised citations into `PublicOutputSanitiser` before public projection and idempotency completion. The current public answer format remains plain text; restricted Markdown remains a future path through the same boundary.

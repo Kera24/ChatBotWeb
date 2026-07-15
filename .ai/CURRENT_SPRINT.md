@@ -1,26 +1,24 @@
 # Current Sprint
 
 Current phase: Sprint 3C - Public Channels
-Current task: TASK-063B3 - Public RAG Adapter and Message Route
+Current task: TASK-063B4 - Public Output Sanitisation and Security Hardening
 
 ## Active Objective
 
-Implement the public widget message route and the dedicated public RAG adapter that connects the secured Public Access message pipeline to the tenant-scoped RAG Orchestrator.
+Replace the provisional public widget message projection with a dedicated output-sanitisation and citation-validation boundary.
 
 ## Guardrails
 
-- `POST /api/v1/widget/{public_key}/messages` must use the Public Access Gateway in `message_send` mode.
-- Public clients must provide a valid public session token and `Idempotency-Key`.
-- Public clients never choose tenant, conversation, model, provider, prompt, retrieval, context, output-token, or cost settings.
-- The route must not expose internal tenant/session/conversation/message/provider/prompt/retrieval metadata.
-- Full Markdown/link/output sanitisation remains TASK-063B4.
+- Preserve existing public config/session/message endpoints and security stages.
+- Public answers must pass through the output sanitiser before response snapshots are stored.
+- Public output must not expose unsafe HTML, executable links, internal IDs, storage paths, prompt/provider metadata, token/cost metadata, stack traces, or system/developer instructions.
+- Full widget UI, streaming, file uploads, tools, new providers, public history, and analytics remain out of scope.
 
 ## Definition Of Done
 
-- Planning task file exists.
-- Public route and strict schema exist.
-- Gateway invokes preparation, abuse/cost controls, and the public RAG adapter.
-- Idempotency completes with public-safe snapshots.
-- Provisional response/citation projection is safe and tested.
-- Docs are updated.
+- Output sanitisation package exists.
+- Public RAG adapter stores only sanitised snapshots.
+- XSS/link/leakage/citation tests pass.
+- Endpoint integration test proves unsafe output is replaced before snapshot storage.
+- Documentation is updated.
 - Verification commands pass or failures are reported.
