@@ -245,3 +245,16 @@ Guardrails for future Codex sessions:
 - Completed, in-progress, conflicting, and invalid duplicate requests must not consume another session message slot.
 - Preparation may create and attach a tenant-scoped widget conversation, but it must not create user/assistant messages or call RAG.
 - Public clients still never choose tenant, conversation, model, provider, prompt, retrieval, context, token limits, or policy overrides.
+
+## Public Message Abuse And Cost Guardrails
+
+TASK-063B2 adds internal abuse-screening and cost-protection only.
+
+Guardrails for future Codex sessions:
+
+- No public message route exists yet.
+- Public message security preparation must run before future retrieval/RAG/provider execution.
+- Deterministic abuse rules must not emit raw messages, raw URLs, session tokens, idempotency keys, public keys, or Origins.
+- Public clients never choose model, provider, prompt, retrieval limit, context size, output token limit, timeout, or quota policy.
+- Security rejection marks the idempotency record failed and does not restore the already-consumed message slot.
+- Session blocking is terminal and should require an explicit strong block decision, not a weak single heuristic.

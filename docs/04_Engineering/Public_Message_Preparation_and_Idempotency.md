@@ -101,3 +101,11 @@ python -m pytest tests/test_public_message_preparation.py
 ```
 
 The normal unit suite must not require Docker.
+
+## TASK-063B2 Security Preparation Update
+
+TASK-063B2 adds the internal abuse-screening and cost-protection layer that runs after TASK-063B1 preparation and before any future retrieval/RAG/provider execution.
+
+The layer evaluates `PreparedPublicMessage`, applies deterministic abuse rules, resolves server-owned cost ceilings, checks the AI model registry, evaluates optional quota snapshots, and returns `SecuredPublicMessage`. Security rejection marks the idempotency record failed and leaves the already-consumed TASK-063B1 message slot intact. Duplicate retries with the same idempotency key therefore converge on the stable failed idempotency state and do not consume another slot.
+
+No public message route, public HTTP schema, RAG adapter, retrieval call, provider execution, user/assistant message persistence, output sanitiser, streaming, widget SDK/UI, billing, or quota table was added.

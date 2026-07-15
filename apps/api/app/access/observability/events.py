@@ -59,6 +59,17 @@ SAFE_EVENT_TYPES = {
     "widget.message.conversation_attached",
     "widget.message.preparation_completed",
     "widget.message.preparation_failed",
+    "widget.message.abuse_check_started",
+    "widget.message.abuse_allowed",
+    "widget.message.abuse_restricted",
+    "widget.message.abuse_rejected",
+    "widget.message.session_blocked",
+    "widget.message.cost_check_started",
+    "widget.message.cost_allowed",
+    "widget.message.quota_denied",
+    "widget.message.cost_policy_invalid",
+    "widget.message.security_preparation_completed",
+    "widget.message.security_preparation_failed",
 }
 
 

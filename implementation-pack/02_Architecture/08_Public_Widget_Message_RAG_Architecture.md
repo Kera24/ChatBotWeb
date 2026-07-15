@@ -893,3 +893,25 @@ Still deferred:
 - Public RAG adapter and RAG Orchestrator invocation.
 - User/assistant message persistence for public message execution.
 - Output/citation sanitisation and public response schemas.
+
+## TASK-063B2 Implementation Note
+
+TASK-063B2 implements the internal abuse and cost-control foundation described by this architecture.
+
+Implemented:
+
+- Deterministic abuse-screening contracts, rule catalogue, and service.
+- Repeated request detection using recent `public_message_requests.request_hash` values for the public session.
+- Cost-control contracts, policy projection, local token estimation, model/pricing resolution, and optional usage/quota abstraction.
+- `SecuredPublicMessage` orchestration that combines abuse restrictions with cost ceilings.
+- Idempotency failure marking for abuse/quota/model rejection after preparation.
+- Optional explicit session blocking through `PublicSessionService` for block decisions.
+- Internal `message_send` gateway handoff from preparation to security when explicitly injected.
+
+Still deferred:
+
+- Public message route and CORS handlers.
+- External moderation or semantic abuse detection.
+- Public RAG adapter and RAG Orchestrator invocation.
+- User/assistant message persistence for public message execution.
+- Output/citation sanitisation and public response schemas.

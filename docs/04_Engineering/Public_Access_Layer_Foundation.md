@@ -258,3 +258,20 @@ New database table:
 `PublicAccessGateway` now has an internal `message_send` preparation extension point. The gateway extension is not exposed through FastAPI and remains behind explicit injection. Preparation validates the message, validates the anonymous public session, resolves idempotency, creates or attaches one tenant-scoped widget conversation, consumes one session message slot for new work, and returns an internal `PreparedPublicMessage` for future abuse, cost, and RAG stages.
 
 No public widget message route, public message HTTP schema, retrieval, RAG, AI Core/provider call, abuse service, cost-control service, output sanitiser, streaming, widget SDK/UI, or CORS change was added.
+
+## TASK-063B2 Public Message Abuse And Cost Controls Update
+
+TASK-063B2 adds the internal security-preparation foundation for future public widget messages while preserving the no-public-message-route boundary.
+
+New modules:
+
+- `apps/api/app/access/messages/abuse/contracts.py`
+- `apps/api/app/access/messages/abuse/rules.py`
+- `apps/api/app/access/messages/abuse/service.py`
+- `apps/api/app/access/messages/cost_control/contracts.py`
+- `apps/api/app/access/messages/cost_control/policies.py`
+- `apps/api/app/access/messages/cost_control/service.py`
+- `apps/api/app/access/messages/cost_control/usage.py`
+- `apps/api/app/access/messages/security.py`
+
+`PublicAccessGateway` can now run an injected security-preparation service after injected public-message preparation for internal `message_send` operations. The gateway still stops before retrieval, RAG, AI Core/provider execution, and public response generation.

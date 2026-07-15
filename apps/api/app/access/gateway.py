@@ -64,6 +64,7 @@ class PublicAccessGateway:
         session_creation_enricher: SessionCreationEnricher | None = None,
         config_read_projector: ConfigReadProjector | None = None,
         message_preparation_service: Any | None = None,
+        message_security_service: Any | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
@@ -75,6 +76,7 @@ class PublicAccessGateway:
         self.session_creation_enricher = session_creation_enricher
         self.config_read_projector = config_read_projector
         self.message_preparation_service = message_preparation_service
+        self.message_security_service = message_security_service
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -211,8 +213,13 @@ class PublicAccessGateway:
                     inactivity_timeout_seconds=inactivity_timeout_seconds,
                 )
                 payload: dict[str, Any] = {"idempotency_state": prepared_result.idempotency.state}
+                status = "message_prepared"
                 if prepared_result.prepared is not None:
                     payload["prepared"] = asdict(prepared_result.prepared)
+                    if self.message_security_service is not None:
+                        secured = self.message_security_service.secure(prepared_result.prepared, access_policy=policy)
+                        payload["secured"] = secured.to_dict()
+                        status = "message_secured"
                 if prepared_result.idempotency.stored_response is not None:
                     payload["stored_response"] = prepared_result.idempotency.stored_response
                 if prepared_result.idempotency.safe_error_code is not None:
@@ -220,7 +227,7 @@ class PublicAccessGateway:
                 response = PublicAccessResponse(
                     request_id=request.request_id,
                     trace_id=trace_id,
-                    status="message_prepared",
+                    status=status,
                     payload=payload,
                     metadata={"channel": request.channel, "credential_id": credential_record.credential_id},
                 )

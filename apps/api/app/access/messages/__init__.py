@@ -1,7 +1,9 @@
-__all__ = [
+﻿__all__ = [
     "IdempotencyResolution",
     "PreparedPublicMessage",
     "PublicMessageIdempotencyService",
     "PublicMessageInput",
     "PublicMessagePreparationService",
+    "PublicMessageSecurityService",
+    "SecuredPublicMessage",
 ]
