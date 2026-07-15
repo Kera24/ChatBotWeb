@@ -1,8 +1,8 @@
 # Public Widget Session Endpoint Architecture
 
 Version: 0.1
-Status: Proposed architecture for TASK-061A
-Scope: Architecture and planning only. No public route, schemas, CORS middleware, RAG call, widget SDK/UI, or migration is implemented by this document.
+Status: Implemented by TASK-061B
+Scope: TASK-061B implements only the public widget session creation endpoint. Public config, public message, RAG, conversation creation, widget SDK/UI, and migrations remain out of scope.
 
 ## 1. Purpose
 
@@ -357,7 +357,7 @@ Enumeration policy:
 
 ## 12. CORS Architecture
 
-CORS is required for browser widget use but must not be implemented in TASK-061A.
+CORS is required for browser widget use. TASK-061B implements route-scoped dynamic CORS for the session endpoint only.
 
 Requirements:
 
@@ -769,3 +769,22 @@ TASK-061A is complete when:
 - ADR-0011 records the route design.
 - No code/public route is added.
 
+
+## 25. TASK-061B Implementation Status
+
+TASK-061B implements this architecture as the only public widget endpoint currently exposed:
+
+```text
+POST /api/v1/widget/{public_key}/sessions
+OPTIONS /api/v1/widget/{public_key}/sessions
+```
+
+Implementation files:
+
+- `apps/api/app/api/v1/public_widget.py`
+- `apps/api/app/access/channels/widget.py`
+- `apps/api/app/schemas/public_widget.py`
+- `apps/api/tests/test_public_widget_session_endpoint.py`
+- `docs/04_Engineering/Public_Widget_Session_Endpoint.md`
+
+The implementation keeps the public route separate from dashboard APIs, uses the Public Access Gateway in `session_creation` mode, performs route-scoped dynamic CORS, requires published widget configuration, uses `widget_session_create` rate limits, and returns only the approved session capability response. No public message/config route, RAG call, conversation creation, widget SDK/UI, cookie-backed session, global wildcard CORS, hard idempotency store, or migration is added.

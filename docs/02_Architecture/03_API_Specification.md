@@ -2,13 +2,13 @@
 
 Version: 0.2
 Status: Draft
-Last updated for: TASK-057B
+Last updated for: TASK-061B
 
 ## 1. Purpose
 
 Define the currently implemented REST API surface for the ChatBotWeb / Yoranix AI Platform foundation.
 
-This specification documents only endpoints that exist in the application today. Planned upload, storage, ingestion, retrieval, RAG, chat runtime, analytics, and widget APIs are explicitly marked as not implemented.
+This specification documents only endpoints that exist in the application today. Planned upload, storage, ingestion, retrieval, RAG, chat runtime, analytics, and unimplemented widget APIs are explicitly marked as not implemented.
 
 ## 2. API style
 
@@ -36,6 +36,7 @@ Implemented API base paths:
 /api/v1/admin
 /api/v1/orgs
 /api/v1/workspaces
+/api/v1/widget
 ```
 
 Planned but not implemented API base paths:
@@ -43,7 +44,6 @@ Planned but not implemented API base paths:
 ```text
 /api/v1/knowledge
 /api/v1/chat
-/api/v1/widget
 /api/v1/analytics
 ```
 
@@ -78,7 +78,8 @@ Current role gates:
 
 Routes nested under `/api/v1/orgs/{organisation_id}` receive tenant context from the `organisation_id` path parameter.
 
-Workspace-scoped routes under `/api/v1/workspaces/{workspace_id}` require an `organisation_id` query parameter:
+Workspace-scoped routes under `/api/v1/workspaces
+/api/v1/workspaces/{workspace_id}` require an `organisation_id` query parameter:
 
 ```text
 ?organisation_id={organisation_id}
@@ -172,7 +173,8 @@ Response data fields include:
 
 Conflict behaviour: returns `409` when the workspace slug already exists for the organisation.
 
-### GET /api/v1/workspaces/{workspace_id}?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}?organisation_id={organisation_id}
 
 Returns one workspace by ID within the supplied organisation.
 
@@ -184,7 +186,8 @@ Tenant requirement: `organisation_id` query parameter is required.
 
 Document APIs currently manage metadata records only. They do not upload files, persist object storage assets, extract text, chunk content, create embeddings, or run ingestion pipelines.
 
-### GET /api/v1/workspaces/{workspace_id}/documents?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents?organisation_id={organisation_id}
 
 Lists document metadata records for a workspace.
 
@@ -192,7 +195,8 @@ Required role: workspace/document viewer.
 
 Tenant requirement: `organisation_id` query parameter is required.
 
-### POST /api/v1/workspaces/{workspace_id}/documents?organisation_id={organisation_id}
+### POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents?organisation_id={organisation_id}
 
 Creates a document metadata record for a workspace.
 
@@ -233,7 +237,8 @@ Response data fields include:
 - `created_at`
 - `updated_at`
 
-### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents/{document_id}?organisation_id={organisation_id}
 
 Returns one document metadata record by ID within a workspace.
 
@@ -245,7 +250,8 @@ Tenant requirement: `organisation_id` query parameter is required.
 
 Document version APIs currently read existing metadata only. Version creation and file processing are not implemented as public endpoints.
 
-### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions?organisation_id={organisation_id}
 
 Lists document versions for a document.
 
@@ -253,7 +259,8 @@ Required role: workspace/document viewer.
 
 Tenant requirement: `organisation_id` query parameter is required.
 
-### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}?organisation_id={organisation_id}
 
 Returns one document version by ID within a document.
 
@@ -284,7 +291,8 @@ Response data fields include:
 
 Chunk APIs currently read chunk metadata and stored chunk content only. They do not create chunks, generate embeddings, or perform retrieval.
 
-### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/chunks?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/chunks?organisation_id={organisation_id}
 
 Lists chunks for a document version.
 
@@ -292,7 +300,8 @@ Required role: workspace/document viewer.
 
 Tenant requirement: `organisation_id` query parameter is required.
 
-### GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/chunks/{chunk_id}?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/chunks/{chunk_id}?organisation_id={organisation_id}
 
 Returns one chunk by ID within a document version.
 
@@ -333,7 +342,8 @@ Response data fields include:
 
 Lifecycle transition APIs update document and document-version statuses and create audit events for successful transitions.
 
-### POST /api/v1/workspaces/{workspace_id}/documents/{document_id}/transition?organisation_id={organisation_id}
+### POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents/{document_id}/transition?organisation_id={organisation_id}
 
 Transitions a document status.
 
@@ -357,7 +367,8 @@ Allowed document transitions:
 
 Response metadata includes `previous_status` and `new_status`.
 
-### POST /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/transition?organisation_id={organisation_id}
+### POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/transition?organisation_id={organisation_id}
 
 Transitions a document version processing status.
 
@@ -399,7 +410,8 @@ Query parameters:
 
 - `limit`: optional result cap. Values are bounded to `1..500`. Default is `100`.
 
-### GET /api/v1/workspaces/{workspace_id}/audit-events?organisation_id={organisation_id}&limit=100
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/audit-events?organisation_id={organisation_id}&limit=100
 
 Lists audit events for a workspace.
 
@@ -432,7 +444,8 @@ Response data fields include:
 
 Conversation history APIs expose read-only dashboard access to tenant-scoped conversations created by internal RAG flows. They are not public widget endpoints.
 
-### GET /api/v1/workspaces/{workspace_id}/conversations?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/conversations?organisation_id={organisation_id}
 
 Lists conversation summaries for a workspace.
 
@@ -464,7 +477,8 @@ Response data fields include:
 - `last_message_preview`
 - `metadata`
 
-### GET /api/v1/workspaces/{workspace_id}/conversations/{conversation_id}?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}?organisation_id={organisation_id}
 
 Returns one conversation by ID within the supplied organisation/workspace, with ordered messages and citations attached to assistant messages.
 
@@ -491,7 +505,8 @@ A separate message-list endpoint is not implemented for MVP because conversation
 
 Unanswered review APIs expose dashboard access to assistant answers that need human review. Review candidates are derived from existing assistant messages where `answer_state` is `fallback`, `failed`, or `low_confidence`.
 
-### GET /api/v1/workspaces/{workspace_id}/review/unanswered?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/review/unanswered?organisation_id={organisation_id}
 
 Lists review items for a workspace.
 
@@ -509,13 +524,15 @@ Optional query parameters:
 
 Response items include the conversation ID, assistant message ID, preceding user question, assistant answer, answer state, error code, channel, conversation status, model/provider/prompt identity, citation count, safe citations, created time, estimated cost, latency, review status, reviewer note, and review timestamps.
 
-### GET /api/v1/workspaces/{workspace_id}/review/unanswered/{assistant_message_id}?organisation_id={organisation_id}
+### GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/review/unanswered/{assistant_message_id}?organisation_id={organisation_id}
 
 Returns one review item by assistant message ID with tenant-safe conversation context and citations. Cross-tenant or missing items return a safe `404`.
 
 Required role: workspace/document viewer.
 
-### PATCH /api/v1/workspaces/{workspace_id}/review/unanswered/{assistant_message_id}?organisation_id={organisation_id}
+### PATCH /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/review/unanswered/{assistant_message_id}?organisation_id={organisation_id}
 
 Updates review status and optional reviewer note.
 
@@ -556,38 +573,54 @@ The following API areas remain planned but are not implemented:
 1. Every protected route uses the development-only auth placeholder until production auth exists.
 2. Every tenant-scoped route validates organisation membership or `super_admin` role.
 3. Every workspace-scoped route validates the workspace belongs to the supplied organisation.
-4. Workspace-scoped routes under `/api/v1/workspaces/{workspace_id}` require `organisation_id` as a query parameter.
+4. Workspace-scoped routes under `/api/v1/workspaces
+/api/v1/workspaces/{workspace_id}` require `organisation_id` as a query parameter.
 5. Successful lifecycle transitions and review status changes create tenant-scoped audit events.
 6. Upload, public chat, RAG, and widget routes must not be documented as available until implemented.
 
 ## TASK-057B Update - Public Credentials and Widget Configuration Admin APIs
 
-Implemented authenticated dashboard/admin endpoints under `/api/v1/workspaces/{workspace_id}`. These are not public widget endpoints and still require development dashboard authentication and organisation membership.
+Implemented authenticated dashboard/admin endpoints under `/api/v1/workspaces
+/api/v1/workspaces/{workspace_id}`. These are not public widget endpoints and still require development dashboard authentication and organisation membership.
 
 Required role: `org_owner` or `client_admin`. `viewer`, `contributor`, and non-members are denied.
 
 Credential management:
 
-- `GET /api/v1/workspaces/{workspace_id}/public-credentials?organisation_id={organisation_id}`
-- `POST /api/v1/workspaces/{workspace_id}/public-credentials?organisation_id={organisation_id}`
-- `GET /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}?organisation_id={organisation_id}`
-- `PATCH /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}?organisation_id={organisation_id}`
-- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/activate?organisation_id={organisation_id}`
-- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/disable?organisation_id={organisation_id}`
-- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/revoke?organisation_id={organisation_id}`
-- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/rotate?organisation_id={organisation_id}`
+- `GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials?organisation_id={organisation_id}`
+- `GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}?organisation_id={organisation_id}`
+- `PATCH /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/activate?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/disable?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/revoke?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/rotate?organisation_id={organisation_id}`
 
 Allowed origins:
 
-- `GET /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins?organisation_id={organisation_id}`
-- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins?organisation_id={organisation_id}`
-- `DELETE /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins/{origin_id}?organisation_id={organisation_id}`
+- `GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins?organisation_id={organisation_id}`
+- `DELETE /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/origins/{origin_id}?organisation_id={organisation_id}`
 
 Widget configuration:
 
-- `GET /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config?organisation_id={organisation_id}`
-- `PUT /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config?organisation_id={organisation_id}`
-- `POST /api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config/publish?organisation_id={organisation_id}`
+- `GET /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config?organisation_id={organisation_id}`
+- `PUT /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config?organisation_id={organisation_id}`
+- `POST /api/v1/workspaces
+/api/v1/workspaces/{workspace_id}/public-credentials/{credential_id}/widget-config/publish?organisation_id={organisation_id}`
 
 Credential create request example:
 
@@ -626,3 +659,59 @@ Widget configuration upsert request example:
 ```
 
 The migration creates no credentials automatically. No workspace becomes public by default.
+
+## Public Widget Session API
+
+### POST /api/v1/widget/{public_key}/sessions
+
+Creates an anonymous public session for an active published website widget credential.
+
+Authentication: none. This route does not accept dashboard development headers or bearer tokens.
+
+Required HTTP context:
+
+- `Origin` header.
+- JSON content type when a body is sent.
+- Server-derived client IP for rate limiting.
+
+Request body may be empty:
+
+```json
+{}
+```
+
+Allowed optional fields:
+
+- `client_request_id`
+- `metadata`
+- `requested_language`
+
+The route rejects organisation IDs, workspace IDs, credential IDs, conversation IDs, session IDs, messages, PII fields, Origin/IP body fields, model/provider/prompt keys, policy overrides, timeout overrides, and limit overrides.
+
+Successful response: `201`.
+
+```json
+{
+  "session_token": "pss_dev_<token_id>.<secret>",
+  "expires_at": "2026-07-15T00:30:00+00:00",
+  "absolute_expires_at": "2026-07-16T00:00:00+00:00",
+  "inactivity_timeout_seconds": 1800,
+  "max_messages": 30,
+  "remaining_messages": 30,
+  "configuration_version": 1,
+  "capabilities": {
+    "can_send_messages": true,
+    "conversation_history_enabled": true,
+    "citations_enabled": true
+  },
+  "request_id": "access_..."
+}
+```
+
+The route does not create a conversation, accept a chat message, call retrieval, call RAG, call AI Core, set cookies, or expose widget branding/configuration details beyond the listed capabilities.
+
+### OPTIONS /api/v1/widget/{public_key}/sessions
+
+Handles route-scoped CORS preflight. The response allows CORS only after credential and Origin validation. It never returns wildcard Origin and sets `Access-Control-Allow-Credentials: false`.
+
+No other public widget route is implemented.

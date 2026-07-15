@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -415,11 +415,13 @@ def test_gateway_registries_are_isolated_across_tests():
         empty_registry.resolve("internal_test")
 
 
-def test_no_public_widget_or_public_access_route_is_added():
+def test_only_public_widget_session_route_is_added():
     app = create_app()
     paths = {route.path for route in app.routes}
 
-    assert not any(path.startswith("/api/v1/widget") for path in paths)
+    assert "/api/v1/widget/{public_key}/sessions" in paths
+    assert "/api/v1/widget/{public_key}/messages" not in paths
+    assert "/api/v1/widget/{public_key}/config" not in paths
     assert not any(path.startswith("/api/v1/public-access") for path in paths)
 
 

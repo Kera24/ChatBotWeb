@@ -33,6 +33,12 @@ SAFE_EVENT_TYPES = {
     "public_session.message_limit_reached",
     "public_session.conversation_attached",
     "public_session.credential_invalidated",
+    "widget.session.requested",
+    "widget.session.created",
+    "widget.session.rejected",
+    "widget.session.rate_limited",
+    "widget.session.origin_denied",
+    "widget.session.unavailable",
 }
 
 

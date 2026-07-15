@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from collections.abc import Callable
 from typing import Any
 
 from app.access.channels.base import PublicChannelAdapter
@@ -17,6 +18,9 @@ from app.access.tenant_resolution.service import PublicTenantResolutionService
 
 class DuplicateChannelError(ValueError):
     pass
+
+
+SessionCreationEnricher = Callable[[PublicAccessRequest, NormalisedAccessContext, object], dict[str, Any]]
 
 
 class ChannelRegistry:
@@ -55,6 +59,7 @@ class PublicAccessGateway:
         origin_validation_service: OriginValidationService | None = None,
         rate_limit_service: RateLimitService | None = None,
         public_session_service: PublicSessionService | None = None,
+        session_creation_enricher: SessionCreationEnricher | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
@@ -63,6 +68,7 @@ class PublicAccessGateway:
         self.origin_validation_service = origin_validation_service
         self.rate_limit_service = rate_limit_service
         self.public_session_service = public_session_service
+        self.session_creation_enricher = session_creation_enricher
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -97,7 +103,11 @@ class PublicAccessGateway:
             self._emit("access.credential.resolved", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="resolved")
             self._emit("access.tenant.resolved", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="resolved")
             policy = self.policy_registry.resolve(context.policy_profile)
-            self._validate_limits(request, raw_request, policy.max_request_bytes, policy.max_message_characters)
+            session_operation = str(raw_request.get("session_operation") or "")
+            session_creation_data: dict[str, Any] = {}
+            if session_operation == "session_creation" and self.session_creation_enricher is not None:
+                session_creation_data = self.session_creation_enricher(request, context, credential_record)
+            self._validate_limits(request, raw_request, policy.max_request_bytes, policy.max_message_characters, allow_empty_message=session_operation == "session_creation" or bool(raw_request.get("allow_empty_message")))
             origin_result: OriginValidationResult | None = None
             if self.origin_validation_service is not None:
                 origin_result = self.origin_validation_service.validate(
@@ -115,7 +125,7 @@ class PublicAccessGateway:
                         trace_id=trace_id,
                     )
                 )
-            if self.rate_limit_service is not None:
+            if self.rate_limit_service is not None and not bool(raw_request.get("skip_rate_limit")):
                 self.rate_limit_service.enforce(
                     RateLimitRequest(
                         request_id=request.request_id,
@@ -134,7 +144,6 @@ class PublicAccessGateway:
                     )
                 )
             session_payload: dict[str, Any] = {}
-            session_operation = str(raw_request.get("session_operation") or "")
             canonical_origin = origin_result.canonical_origin.serialised if origin_result and origin_result.canonical_origin else None
             if session_operation:
                 if self.public_session_service is None:
@@ -154,17 +163,19 @@ class PublicAccessGateway:
                             inactivity_timeout_seconds=inactivity_timeout_seconds,
                             absolute_lifetime_seconds=policy.session_lifetime_seconds,
                             max_messages=policy.max_messages_per_session,
-                            metadata={"gateway_operation": "session_creation"},
+                            metadata={"gateway_operation": "session_creation", **dict(session_creation_data.get("session_metadata", {}))},
                             request_id=request.request_id,
                             trace_id=trace_id,
                             received_at=request.received_at,
                         )
                     )
+                    payload = created.to_dict()
+                    payload.update(dict(session_creation_data.get("response_payload", {})))
                     response = PublicAccessResponse(
                         request_id=request.request_id,
                         trace_id=trace_id,
                         status="session_created",
-                        payload=created.to_dict(),
+                        payload=payload,
                         metadata={"channel": request.channel, "credential_id": credential_record.credential_id},
                     )
                     return ValidatedAccessResult(request=request, context=context, response=response)
@@ -236,10 +247,10 @@ class PublicAccessGateway:
                 response=response,
             )
 
-    def _validate_limits(self, request: PublicAccessRequest, raw_request: dict[str, Any], max_request_bytes: int, max_message_characters: int) -> None:
+    def _validate_limits(self, request: PublicAccessRequest, raw_request: dict[str, Any], max_request_bytes: int, max_message_characters: int, *, allow_empty_message: bool = False) -> None:
         if len(str(raw_request).encode("utf-8")) > max_request_bytes:
             raise_public_error("request_too_large")
-        if not request.message.strip():
+        if not allow_empty_message and not request.message.strip():
             raise_public_error("unsafe_request")
         if len(request.message) > max_message_characters:
             raise_public_error("message_too_large")

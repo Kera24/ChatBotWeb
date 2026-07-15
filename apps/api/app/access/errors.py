@@ -51,6 +51,9 @@ def raise_public_error(code: str, retry_after_seconds: int | None = None) -> Non
 
 
 ERROR_CATALOG: dict[str, PublicAccessErrorDetail] = {
+    "invalid_widget": PublicAccessErrorDetail("invalid_widget", "The widget is not available.", False, 404),
+    "widget_not_published": PublicAccessErrorDetail("widget_not_published", "The widget is not available.", False, 404),
+    "invalid_request": PublicAccessErrorDetail("invalid_request", "The request could not be accepted.", False, 400),
     "invalid_credential": PublicAccessErrorDetail("invalid_credential", "The public access credential is not valid.", False, 401),
     "disabled_credential": PublicAccessErrorDetail("disabled_credential", "This public access credential is disabled.", False, 403),
     "expired_credential": PublicAccessErrorDetail("expired_credential", "This public access credential has expired.", False, 401),

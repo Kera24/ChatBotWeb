@@ -1,4 +1,4 @@
-﻿from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
 VALID_CREDENTIAL_TYPES = {"widget_public_key", "partner_api_key", "channel_installation", "future_webhook", "webhook_secret"}
@@ -38,7 +38,11 @@ class CredentialRecord:
     def is_expired(self, now: datetime | None = None) -> bool:
         if self.expires_at is None:
             return False
-        return self.expires_at <= (now or datetime.now(timezone.utc))
+        expires_at = self.expires_at if self.expires_at.tzinfo else self.expires_at.replace(tzinfo=timezone.utc)
+        compare_at = now or datetime.now(timezone.utc)
+        if compare_at.tzinfo is None:
+            compare_at = compare_at.replace(tzinfo=timezone.utc)
+        return expires_at <= compare_at
 
     def public_dict(self) -> dict[str, object]:
         data = asdict(self)
