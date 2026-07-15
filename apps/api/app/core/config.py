@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 from os import getenv
 
 
@@ -26,6 +26,10 @@ class Settings:
     RATE_LIMIT_REDIS_PREFIX: str = getenv("RATE_LIMIT_REDIS_PREFIX", "rate")
     RATE_LIMIT_REDIS_TIMEOUT_SECONDS: float = float(getenv("RATE_LIMIT_REDIS_TIMEOUT_SECONDS", "0.2"))
     RATE_LIMIT_LOCAL_FALLBACK_ENABLED: bool = getenv("RATE_LIMIT_LOCAL_FALLBACK_ENABLED", "false").lower() in {"1", "true", "yes"}
+    PUBLIC_SESSION_TOKEN_HASH_SECRET: str = getenv("PUBLIC_SESSION_TOKEN_HASH_SECRET", "dev-public-session-token-secret-change-me")
+    PUBLIC_SESSION_TOKEN_VERSION: str = getenv("PUBLIC_SESSION_TOKEN_VERSION", "v1")
+    PUBLIC_SESSION_TOKEN_ID_BYTES: int = _get_int("PUBLIC_SESSION_TOKEN_ID_BYTES", 16)
+    PUBLIC_SESSION_SECRET_BYTES: int = _get_int("PUBLIC_SESSION_SECRET_BYTES", 32)
     TRUSTED_PROXY_NETWORKS: str = getenv("TRUSTED_PROXY_NETWORKS", "")
     LOCAL_UPLOAD_ROOT: str = getenv("LOCAL_UPLOAD_ROOT", "./local_uploads")
     MAX_UPLOAD_BYTES: int = _get_int("MAX_UPLOAD_BYTES", 10 * 1024 * 1024)

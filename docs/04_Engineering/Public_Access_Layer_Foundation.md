@@ -191,3 +191,23 @@ New modules:
 `PublicAccessGateway` now accepts an optional injected `RateLimitService`. When injected, rate limiting runs after credential, tenant, policy, request-size, and origin checks. The gateway still stops before anonymous sessions, abuse detection, cost enforcement, RAG orchestration, and response generation.
 
 No public endpoint, anonymous session, quota persistence, billing path, CORS middleware, widget SDK/UI, or RAG call was added.
+
+## TASK-060B Anonymous Public Sessions Update
+
+TASK-060B adds the persistent anonymous public-session foundation while preserving the no-public-route boundary.
+
+New modules:
+
+- `apps/api/app/access/sessions/contracts.py`
+- `apps/api/app/access/sessions/tokens.py`
+- `apps/api/app/access/sessions/repository.py`
+- `apps/api/app/access/sessions/service.py`
+- `apps/api/app/access/sessions/dependencies.py`
+
+New database table:
+
+- `public_sessions`
+
+`PublicAccessGateway` now accepts an optional injected `PublicSessionService`. The session stage runs only for explicit `session_creation` or `session_validation` operations after credential/tenant/policy resolution, origin validation, and rate limiting. Session validation may optionally consume one message slot and still stops before RAG.
+
+No public session endpoint, public message endpoint, public configuration endpoint, Redis session cache, CORS middleware, widget SDK/UI, conversation creation, or RAG invocation was added.

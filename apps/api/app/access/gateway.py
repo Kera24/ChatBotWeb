@@ -1,15 +1,17 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from app.access.channels.base import PublicChannelAdapter
 from app.access.contracts import NormalisedAccessContext, PublicAccessRequest, PublicAccessResponse
 from app.access.errors import PublicAccessError, error_detail, raise_public_error
 from app.access.observability.events import AccessEvent, InMemoryAccessEventSink
-from app.access.origin_validation.contracts import OriginValidationRequest
+from app.access.origin_validation.contracts import OriginValidationRequest, OriginValidationResult
 from app.access.origin_validation.service import OriginValidationService
 from app.access.policies.registry import AccessPolicyRegistry
 from app.access.rate_limit.contracts import RateLimitRequest
 from app.access.rate_limit.service import RateLimitService
+from app.access.sessions.contracts import CreatePublicSessionCommand, ValidatePublicSessionCommand
+from app.access.sessions.service import PublicSessionService
 from app.access.tenant_resolution.service import PublicTenantResolutionService
 
 
@@ -52,6 +54,7 @@ class PublicAccessGateway:
         event_sink: InMemoryAccessEventSink,
         origin_validation_service: OriginValidationService | None = None,
         rate_limit_service: RateLimitService | None = None,
+        public_session_service: PublicSessionService | None = None,
     ) -> None:
         self.channel_registry = channel_registry
         self.tenant_resolution_service = tenant_resolution_service
@@ -59,6 +62,7 @@ class PublicAccessGateway:
         self.event_sink = event_sink
         self.origin_validation_service = origin_validation_service
         self.rate_limit_service = rate_limit_service
+        self.public_session_service = public_session_service
 
     def validate(self, raw_request: dict[str, Any]) -> PublicAccessResponse:
         return self.validate_access(raw_request).response
@@ -94,8 +98,9 @@ class PublicAccessGateway:
             self._emit("access.tenant.resolved", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="resolved")
             policy = self.policy_registry.resolve(context.policy_profile)
             self._validate_limits(request, raw_request, policy.max_request_bytes, policy.max_message_characters)
+            origin_result: OriginValidationResult | None = None
             if self.origin_validation_service is not None:
-                self.origin_validation_service.validate(
+                origin_result = self.origin_validation_service.validate(
                     OriginValidationRequest(
                         credential_id=credential_record.credential_id,
                         credential_environment=credential_record.environment,
@@ -128,12 +133,83 @@ class PublicAccessGateway:
                         received_at=request.received_at,
                     )
                 )
+            session_payload: dict[str, Any] = {}
+            session_operation = str(raw_request.get("session_operation") or "")
+            canonical_origin = origin_result.canonical_origin.serialised if origin_result and origin_result.canonical_origin else None
+            if session_operation:
+                if self.public_session_service is None:
+                    raise_public_error("temporarily_unavailable")
+                inactivity_timeout_seconds = int(raw_request.get("inactivity_timeout_seconds") or min(policy.session_lifetime_seconds, 1800))
+                if session_operation == "session_creation":
+                    created = self.public_session_service.create_session(
+                        CreatePublicSessionCommand(
+                            organisation_id=context.organisation_id,
+                            workspace_id=context.workspace_id,
+                            credential_id=credential_record.credential_id,
+                            channel=request.channel,
+                            environment=credential_record.environment,
+                            policy_profile=policy.policy_key,
+                            origin_id=origin_result.matched_origin_id if origin_result else None,
+                            canonical_origin=canonical_origin,
+                            inactivity_timeout_seconds=inactivity_timeout_seconds,
+                            absolute_lifetime_seconds=policy.session_lifetime_seconds,
+                            max_messages=policy.max_messages_per_session,
+                            metadata={"gateway_operation": "session_creation"},
+                            request_id=request.request_id,
+                            trace_id=trace_id,
+                            received_at=request.received_at,
+                        )
+                    )
+                    response = PublicAccessResponse(
+                        request_id=request.request_id,
+                        trace_id=trace_id,
+                        status="session_created",
+                        payload=created.to_dict(),
+                        metadata={"channel": request.channel, "credential_id": credential_record.credential_id},
+                    )
+                    return ValidatedAccessResult(request=request, context=context, response=response)
+                if session_operation != "session_validation":
+                    raise_public_error("unsafe_request")
+                if not request.public_session_token:
+                    raise_public_error("invalid_session")
+                validated_session = self.public_session_service.validate_session(
+                    ValidatePublicSessionCommand(
+                        public_session_token=request.public_session_token,
+                        organisation_id=context.organisation_id,
+                        workspace_id=context.workspace_id,
+                        credential_id=credential_record.credential_id,
+                        channel=request.channel,
+                        environment=credential_record.environment,
+                        policy_profile=policy.policy_key,
+                        canonical_origin=canonical_origin,
+                        received_at=request.received_at,
+                        request_id=request.request_id,
+                        trace_id=trace_id,
+                    ),
+                    max_messages=policy.max_messages_per_session,
+                    inactivity_timeout_seconds=inactivity_timeout_seconds,
+                )
+                context = replace(context, session_id=validated_session.internal_session_id, rate_limit_identity=validated_session.rate_limit_identity)
+                session_payload = {
+                    "remaining_messages": validated_session.remaining_messages,
+                    "expires_at": validated_session.expires_at.isoformat(),
+                    "absolute_expires_at": validated_session.absolute_expires_at.isoformat(),
+                }
+                if bool(raw_request.get("consume_message_slot")):
+                    consumed = self.public_session_service.consume_message_slot(
+                        validated_session,
+                        max_messages=policy.max_messages_per_session,
+                        inactivity_timeout_seconds=inactivity_timeout_seconds,
+                    )
+                    session_payload["remaining_messages"] = consumed.remaining_messages
             self._emit("access.request.validated", request_id=request.request_id, trace_id=trace_id, channel=request.channel, credential_id=credential_record.credential_id, outcome="validated")
+            payload = {"message": request.message}
+            payload.update(session_payload)
             response = PublicAccessResponse(
                 request_id=request.request_id,
                 trace_id=trace_id,
                 status="validated",
-                payload={"message": request.message},
+                payload=payload,
                 metadata={"channel": request.channel, "credential_id": credential_record.credential_id},
             )
             return ValidatedAccessResult(request=request, context=context, response=response)

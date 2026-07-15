@@ -869,3 +869,24 @@ TASK-060A is complete when:
 - Threat model and diagrams are complete.
 - ADR-0010 records the decision.
 - No runtime code or public endpoint is added.
+
+## 32. TASK-060B Implementation Note
+
+Implemented module paths:
+
+```text
+apps/api/app/access/sessions/
+  __init__.py
+  contracts.py
+  errors.py
+  tokens.py
+  repository.py
+  service.py
+  dependencies.py
+```
+
+TASK-060B implements the PostgreSQL-backed `public_sessions` schema, opaque `pss_<environment>_<token_id>.<secret>` tokens, keyed-HMAC secret verification, tenant/credential/channel/environment/policy/origin binding, lifecycle transitions, inactivity and absolute expiry, atomic message-slot consumption, lazy conversation attachment, safe errors/events, and optional Public Access Gateway session-stage integration.
+
+The gateway integration is explicitly operation-based: `session_creation` creates a session and stops before RAG; `session_validation` validates a token, optionally consumes a message slot, returns an internal validated context, and stops before RAG.
+
+No public endpoint, Redis session cache, CORS middleware, widget SDK/UI, conversation creation from public requests, cleanup scheduler, or RAG invocation is implemented by TASK-060B.

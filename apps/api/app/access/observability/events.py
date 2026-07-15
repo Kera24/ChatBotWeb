@@ -1,4 +1,4 @@
-﻿from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
 SAFE_EVENT_TYPES = {
@@ -22,6 +22,17 @@ SAFE_EVENT_TYPES = {
     "rate_limit.degraded_local_fallback",
     "rate_limit.invalid_policy",
     "rate_limit.emergency_mode",
+    "public_session.created",
+    "public_session.validated",
+    "public_session.expired",
+    "public_session.rejected",
+    "public_session.revoked",
+    "public_session.blocked",
+    "public_session.completed",
+    "public_session.origin_mismatch",
+    "public_session.message_limit_reached",
+    "public_session.conversation_attached",
+    "public_session.credential_invalidated",
 }
 
 

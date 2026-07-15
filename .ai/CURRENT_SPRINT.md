@@ -1,7 +1,7 @@
-﻿# Current Sprint
+# Current Sprint
 
 Current phase: Sprint 3B - Public Access Foundation
-Current task: TASK-060A - Anonymous Public Session Architecture
+Current task: TASK-060B - Anonymous Public Session Implementation
 
 Source sprint plan:
 
@@ -39,7 +39,7 @@ Source sprint plan:
 
 ## Sprint goal
 
-Continue the Public Access Foundation by designing anonymous public sessions before any widget session, widget message, or public RAG endpoint is exposed.
+Continue the Public Access Foundation by implementing the internal anonymous public-session foundation before any widget session, widget message, or public RAG endpoint is exposed.
 
 ## Active priorities
 
@@ -47,11 +47,11 @@ Continue the Public Access Foundation by designing anonymous public sessions bef
 2. Ensure public session tokens never contain trusted tenant IDs or raw conversation IDs.
 3. Bind future public sessions to credential, organisation, workspace, channel, environment, policy, and validated origin context.
 4. Preserve credential, origin-validation, distributed rate-limiting, RAG Orchestrator, AI Core, and tenant-isolation boundaries.
-5. Keep TASK-060A strictly architecture and planning only.
+5. Keep TASK-060B strictly limited to internal session model, token, repository/service, gateway-stage, tests, and docs.
 
 ## Guardrails
 
-- Do not implement SQLAlchemy models, Alembic migrations, token generation, hashing code, session repositories/services, gateway session validation, public session endpoints, Redis session cache, widget code, RAG calls, cleanup jobs, or CORS changes in TASK-060A.
+- Do not implement public session endpoints, public message endpoints, public config endpoints, Redis session cache, widget code, RAG calls, cleanup jobs, or CORS changes in TASK-060B.
 - Public session tokens must not contain trusted tenant IDs.
 - Widget message requests must validate a credential-bound public session.
 - Browsers must not submit trusted conversation IDs for public widget message processing.
@@ -60,7 +60,7 @@ Continue the Public Access Foundation by designing anonymous public sessions bef
 - No public session endpoint may be added before TASK-060A is reviewed and approved and a later implementation task explicitly authorises it.
 - Do not let public traffic reuse dashboard authentication, development headers, or dashboard tenant parameters.
 
-## Definition of done for TASK-060A
+## Definition of done for TASK-060B
 
 - Token model is selected.
 - Persistent session schema is defined.
@@ -76,4 +76,4 @@ Continue the Public Access Foundation by designing anonymous public sessions bef
 
 ## Next recommended task
 
-TASK-060B should implement only the approved public session model, token service, repository/service foundation, and tests. Public widget message endpoints must wait until a later approved public API task wires credential resolution, origin validation, rate limiting, session validation, and RAG orchestration together.
+TASK-061A should define the public widget session endpoint architecture before any route is exposed. Public widget message endpoints must wait until a later approved public API task wires credential resolution, origin validation, rate limiting, session validation, and RAG orchestration together.

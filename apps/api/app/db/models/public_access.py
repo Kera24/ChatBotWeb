@@ -1,6 +1,6 @@
-﻿from datetime import datetime
+from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -44,6 +44,7 @@ class PublicCredential(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     origins = relationship("CredentialAllowedOrigin", back_populates="credential", cascade="all, delete-orphan")
     widget_configuration = relationship("WidgetConfiguration", back_populates="credential", uselist=False, cascade="all, delete-orphan")
+    public_sessions = relationship("PublicSession", back_populates="credential")
     parent_credential = relationship("PublicCredential", remote_side="PublicCredential.id")
 
 
@@ -111,3 +112,47 @@ class WidgetConfiguration(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     published_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     credential = relationship("PublicCredential", back_populates="widget_configuration")
+
+
+class PublicSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "public_sessions"
+    __table_args__ = (
+        UniqueConstraint("public_token_id", name="uq_public_sessions_public_token_id"),
+        CheckConstraint("status in ('active', 'completed', 'expired', 'revoked', 'blocked')", name="ck_public_sessions_status"),
+        CheckConstraint("message_count >= 0", name="ck_public_sessions_message_count_nonnegative"),
+        Index("ix_public_sessions_tenant_workspace", "organisation_id", "workspace_id"),
+        Index("ix_public_sessions_tenant_credential", "organisation_id", "workspace_id", "credential_id"),
+        Index("ix_public_sessions_credential_status", "credential_id", "status"),
+        Index("ix_public_sessions_status_expires_at", "status", "expires_at"),
+        Index("ix_public_sessions_last_activity_at", "last_activity_at"),
+        Index("ix_public_sessions_conversation_id", "conversation_id"),
+        Index("ix_public_sessions_deleted_at", "deleted_at"),
+    )
+
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    credential_id: Mapped[str] = mapped_column(String(36), ForeignKey("public_credentials.id"), nullable=False, index=True)
+    channel: Mapped[str] = mapped_column(String(80), nullable=False)
+    environment: Mapped[str] = mapped_column(String(40), nullable=False)
+    public_token_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    token_secret_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    token_hash_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="active", server_default="active")
+    policy_profile: Mapped[str] = mapped_column(String(80), nullable=False)
+    origin_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("credential_allowed_origins.id"), nullable=True)
+    canonical_origin_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    conversation_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("chat_sessions.id"), nullable=True)
+    anonymous_user_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    message_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_activity_at: Mapped[datetime] = mapped_column(nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    absolute_expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    blocked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    credential = relationship("PublicCredential", back_populates="public_sessions")
+    origin = relationship("CredentialAllowedOrigin")
+    conversation = relationship("ChatSession")

@@ -1,4 +1,4 @@
-﻿from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass
 
 
 @dataclass(frozen=True)
@@ -61,6 +61,13 @@ ERROR_CATALOG: dict[str, PublicAccessErrorDetail] = {
     "unsupported_origin_scheme": PublicAccessErrorDetail("unsupported_origin_scheme", "The request origin scheme is not supported.", False, 400),
     "invalid_session": PublicAccessErrorDetail("invalid_session", "The public access session is not valid.", False, 401),
     "expired_session": PublicAccessErrorDetail("expired_session", "The public access session has expired.", False, 401),
+    "revoked_session": PublicAccessErrorDetail("revoked_session", "The public access session is not valid.", False, 401),
+    "blocked_session": PublicAccessErrorDetail("blocked_session", "The public access session is not valid.", False, 403),
+    "completed_session": PublicAccessErrorDetail("completed_session", "The public access session has ended.", False, 401),
+    "session_limit_reached": PublicAccessErrorDetail("session_limit_reached", "The public access session limit has been reached.", False, 429),
+    "session_origin_mismatch": PublicAccessErrorDetail("session_origin_mismatch", "The public access session is not valid for this site.", False, 401),
+    "session_credential_mismatch": PublicAccessErrorDetail("session_credential_mismatch", "The public access session is not valid.", False, 401),
+    "session_channel_mismatch": PublicAccessErrorDetail("session_channel_mismatch", "The public access session is not valid.", False, 401),
     "request_too_large": PublicAccessErrorDetail("request_too_large", "The request is too large.", False, 413),
     "message_too_large": PublicAccessErrorDetail("message_too_large", "The message is too large.", False, 413),
     "rate_limited": PublicAccessErrorDetail("rate_limited", "Too many requests. Try again later.", True, 429),
