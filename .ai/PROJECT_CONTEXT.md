@@ -219,3 +219,16 @@ As of TASK-062B, the only implemented public widget endpoints are:
 - Route-scoped `OPTIONS` handlers for those paths
 
 No public widget message endpoint, public session validation endpoint, public RAG endpoint, conversation creation route, widget SDK/UI, or global CORS wildcard is implemented.
+## Public widget message and RAG guardrails
+
+TASK-063A and ADR-0013 define the future public widget message/RAG boundary.
+
+Guardrails for future Codex sessions:
+
+- Public messages require a validated credential-bound anonymous session.
+- Public clients never choose tenant, conversation, model, provider, prompt, retrieval, context, or token limits.
+- Public message processing uses Public Access Gateway before the RAG Orchestrator.
+- Message slots are consumed immediately before expensive RAG processing.
+- Public AI output and citations require a dedicated sanitisation boundary.
+- No public message route may be added before TASK-063A approval and a later implementation task explicitly authorises it.
+- Public message routes must not accept dashboard development headers, dashboard bearer tokens, tenant IDs, conversation IDs, model/provider/prompt overrides, retrieval limits, context limits, output limits, raw conversation history, file uploads, or arbitrary tools.
