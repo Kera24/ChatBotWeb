@@ -162,3 +162,11 @@ npm run widget:build
 The SDK package now also exports a pure iframe URL builder, recommended iframe attributes, protocol validators, and an internal SDK-side handshake controller. The iframe app consumes the same shared protocol definitions, validates `parent_origin`, checks `document.referrer` where available, rejects wildcard target origins, and renders only loading/ready/unavailable status text.
 
 Still out of scope: public API calls, session storage, visual widget UI, launcher, chat panel, final global lifecycle API, and telemetry.
+
+## Widget SDK Lifecycle Runtime
+
+TASK-064B3 adds the public browser lifecycle API, one-instance runtime, iframe mounting, and command acknowledgement handling.
+
+See `docs/04_Engineering/Widget_SDK_Lifecycle_and_Mounting.md` for API details and `examples/widget-host/index.html` for a local smoke host.
+
+The SDK still does not call public backend APIs, store session tokens, render the final widget UI, or send messages.

@@ -156,3 +156,17 @@ npm run verify
 ## Current Exclusions
 
 This task does not implement public config/session/message API calls, session storage, visual widget UI, launcher, chat panel, final global SDK lifecycle API, telemetry, backend changes, CDN deployment, or SRI generation.
+
+## Lifecycle Runtime
+
+The SDK package now includes runtime modules under `packages/widget-sdk/src/runtime` for one-instance lifecycle, DOM mounting, public API exposure, events, readiness, visibility, focus, resize, and debug foundations.
+
+The IIFE bundle installs `window.YoranixWidget` only when it can do so without overwriting an unrelated global. Auto-init reads approved `data-*` attributes from the current script.
+
+No public backend API clients, session storage, visual widget UI, or telemetry are included.
+
+## B3 Runtime Integration
+
+TASK-064B3 integrates the shell with the SDK runtime. The iframe shell now acknowledges `open`, `close`, `destroy`, and `host_visibility_changed` lifecycle messages, emits bounded placeholder `resize_request` messages, and updates only neutral accessible status text.
+
+The shell still does not call public APIs, use storage, render chat content, or implement final widget UI.

@@ -140,3 +140,20 @@ npm run widget:build
 ```
 
 It does not call public APIs, store sessions, render chat UI, or expose the final `window.YoranixWidget` API.
+
+## Widget SDK Lifecycle Runtime
+
+TASK-064B3 adds lifecycle and mounting support to `packages/widget-sdk` plus a local smoke host under `examples/widget-host`.
+
+Additional root commands remain:
+
+```bash
+npm run widget-sdk:test
+npm run widget-sdk:lint
+npm run widget-sdk:build
+npm run widget:test
+npm run widget:lint
+npm run widget:build
+```
+
+The browser bundle now installs `window.YoranixWidget` when safe and supports the approved lifecycle methods. It still does not call public APIs, store sessions, render the final widget UI, or send messages.

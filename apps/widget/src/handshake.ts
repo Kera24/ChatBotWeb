@@ -19,6 +19,10 @@ export type IframeHandshakeOptions = {
   parentWindow: ParentWindowPort;
   selfWindow: Window;
   onReady?: (payload: InitialisePayload) => void;
+  onOpen?: () => void;
+  onClose?: () => void;
+  onDestroy?: () => void;
+  onVisibilityChanged?: (visible: boolean) => void;
   onError?: (error: SafeProtocolError) => void;
 };
 
@@ -40,6 +44,7 @@ export class IframeHandshakeController {
     if (this.lifecycle.state !== "destroyed") {
       this.lifecycle.transition("destroyed");
     }
+    this.options.onDestroy?.();
   }
 
   private readonly handleMessage = (event: MessageEvent): void => {
@@ -77,6 +82,12 @@ export class IframeHandshakeController {
       this.destroy();
       return;
     }
+    if (envelope.type === "host_visibility_changed") {
+      const payload = envelope.payload as { visible?: unknown };
+      if (typeof payload.visible === "boolean") {
+        this.options.onVisibilityChanged?.(payload.visible);
+      }
+    }
   };
 
   private handleInitialise(payload: unknown): void {
@@ -95,13 +106,19 @@ export class IframeHandshakeController {
     this.initialised = true;
     this.lifecycle.transition(payload.initialOpen ? "ready_open" : "ready_closed");
     this.post("widget_ready", { state: this.lifecycle.state });
+    this.postResizeForState();
     this.options.onReady?.(payload);
+    if (payload.initialOpen) {
+      this.options.onOpen?.();
+    }
   }
 
   private handleOpen(): void {
     if (this.lifecycle.state === "ready_closed") {
       this.lifecycle.transition("ready_open");
       this.post("widget_state_changed", { state: this.lifecycle.state });
+      this.postResizeForState();
+      this.options.onOpen?.();
     }
   }
 
@@ -109,11 +126,23 @@ export class IframeHandshakeController {
     if (this.lifecycle.state === "ready_open") {
       this.lifecycle.transition("ready_closed");
       this.post("widget_state_changed", { state: this.lifecycle.state });
+      this.postResizeForState();
+      this.options.onClose?.();
     }
   }
 
-  private post<TPayload>(type: "iframe_ready" | "widget_ready" | "widget_state_changed", payload: TPayload): void {
+  private post<TPayload>(type: "iframe_ready" | "widget_ready" | "widget_state_changed" | "resize_request", payload: TPayload): void {
     sendToParent(this.options.parentWindow, createProtocolEnvelope(type, WIDGET_PROTOCOL_SOURCE_IFRAME, payload), this.options.parentOrigin);
+  }
+
+  private postResizeForState(): void {
+    if (this.lifecycle.state === "ready_open") {
+      this.post("resize_request", { width: 380, height: 640 });
+      return;
+    }
+    if (this.lifecycle.state === "ready_closed") {
+      this.post("resize_request", { width: 72, height: 72 });
+    }
   }
 
   private reportError(error: SafeProtocolError): void {

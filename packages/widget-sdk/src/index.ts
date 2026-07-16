@@ -14,6 +14,7 @@ export type { SDKHandshakeControllerOptions, SDKHandshakeState } from "./handsha
 export { buildWidgetIframeUrl, normaliseOrigin, RECOMMENDED_IFRAME_ATTRIBUTES } from "./iframe";
 export type { BuiltIframeUrl } from "./iframe";
 export * from "./protocol";
+export * from "./runtime";
 export {
   BUILD_MODE,
   PUBLIC_CONFIG_SCHEMA_VERSION,
@@ -22,3 +23,7 @@ export {
   SDK_VERSION,
   WIDGET_PROTOCOL_VERSION,
 } from "./version";
+
+import { autoInstallGlobalAPI } from "./runtime/public-api";
+
+autoInstallGlobalAPI();

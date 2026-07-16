@@ -324,3 +324,15 @@ Guardrails for future Codex sessions:
 - The iframe URL may include only the public widget key, parent origin, and bounded version hints. It must never include session tokens, tenant IDs, conversations, messages, or secrets.
 - `iframe_ready`, `initialise`, and `widget_ready` use exact target origins; wildcard `targetOrigin` is rejected.
 - The iframe shell does not call public APIs, use sessionStorage, render the visual widget, collect telemetry, or store public session tokens.
+
+## Widget SDK Lifecycle And Mounting Guardrails
+
+TASK-064B3 adds the browser-facing SDK runtime and `window.YoranixWidget` public API.
+
+Guardrails for future Codex sessions:
+
+- The SDK can now mount one iframe shell and expose `init`, `open`, `close`, `toggle`, `destroy`, readiness, state, and event APIs.
+- The SDK still does not call public backend APIs, store sessions, render the visual chat UI, send messages, collect telemetry, or expose public session tokens.
+- Public API errors and events must remain safe projections without stack traces, tenant IDs, session tokens, messages, raw public API responses, or internal controller objects.
+- `open`, `close`, and `toggle` rely on validated iframe acknowledgements before mutating public open/closed state.
+- One widget instance per page remains the MVP policy.

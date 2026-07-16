@@ -7,7 +7,12 @@ export type WidgetSDKErrorCode =
   | "duplicate_initialisation"
   | "sdk_not_ready"
   | "iframe_load_failed"
+  | "mount_failed"
+  | "handshake_timeout"
   | "protocol_mismatch"
+  | "command_timeout"
+  | "invalid_state"
+  | "dom_unavailable"
   | "destroyed"
   | "unsupported_browser"
   | "safe_internal_error";
@@ -23,7 +28,12 @@ const SAFE_MESSAGES: Record<WidgetSDKErrorCode, string> = {
   duplicate_initialisation: "The widget has already been initialised.",
   sdk_not_ready: "The widget SDK is not ready yet.",
   iframe_load_failed: "The widget could not be loaded.",
+  mount_failed: "The widget could not be mounted.",
+  handshake_timeout: "The widget handshake timed out.",
   protocol_mismatch: "The widget version is not compatible with this SDK.",
+  command_timeout: "The widget command timed out.",
+  invalid_state: "The widget is not ready for that operation.",
+  dom_unavailable: "The page is not ready for the widget yet.",
   destroyed: "The widget SDK has been destroyed.",
   unsupported_browser: "This browser is not supported by the widget SDK.",
   safe_internal_error: "The widget SDK could not complete the operation.",

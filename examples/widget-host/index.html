@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yoranix Widget SDK Smoke Host</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 32px;
+        line-height: 1.5;
+      }
+      button {
+        margin: 4px;
+        padding: 8px 12px;
+      }
+      code {
+        background: #f2f4f7;
+        padding: 2px 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Widget SDK Smoke Host</h1>
+    <p>This fixture uses a fake development widget key and makes no backend API calls.</p>
+    <p>Build the SDK and serve this page from a local static server, then load the SDK IIFE manually or with a script tag.</p>
+    <div>
+      <button type="button" id="init">Init</button>
+      <button type="button" id="open">Open</button>
+      <button type="button" id="close">Close</button>
+      <button type="button" id="toggle">Toggle</button>
+      <button type="button" id="destroy">Destroy</button>
+    </div>
+    <pre id="status">Waiting for SDK...</pre>
+    <script>
+      const status = document.getElementById("status");
+      const config = {
+        widgetKey: "wpk_dev_1234567890abcdef",
+        environment: "development",
+        iframeHost: "http://localhost:4301"
+      };
+      function log(message) { status.textContent = message; }
+      document.getElementById("init").onclick = () => window.YoranixWidget?.init(config).then(() => log("ready"), (error) => log(JSON.stringify(error)));
+      document.getElementById("open").onclick = () => window.YoranixWidget?.open().catch((error) => log(JSON.stringify(error)));
+      document.getElementById("close").onclick = () => window.YoranixWidget?.close().catch((error) => log(JSON.stringify(error)));
+      document.getElementById("toggle").onclick = () => window.YoranixWidget?.toggle().catch((error) => log(JSON.stringify(error)));
+      document.getElementById("destroy").onclick = () => window.YoranixWidget?.destroy().then(() => log("destroyed"));
+    </script>
+  </body>
+</html>
