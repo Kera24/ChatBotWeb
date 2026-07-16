@@ -1,7 +1,12 @@
-import { defineConfig } from "vitest/config";
+﻿import { defineConfig } from "vitest/config";
 import { resolve } from "node:path";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  define: {
+    "import.meta.env.VITE_WIDGET_TEST_API_HOST": JSON.stringify(
+      mode === "test" ? "http://127.0.0.1:4300" : "",
+    ),
+  },
   resolve: {
     alias: {
       "@yoranix/widget-sdk": resolve(__dirname, "../../packages/widget-sdk/src/index.ts"),
@@ -25,4 +30,4 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
   },
-});
+}));

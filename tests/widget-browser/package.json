@@ -1,0 +1,16 @@
+{
+  "name": "@yoranix/widget-browser-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test --project=chromium",
+    "test:chromium": "playwright test --project=chromium",
+    "test:extended": "playwright test",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "latest",
+    "typescript": "latest"
+  }
+}

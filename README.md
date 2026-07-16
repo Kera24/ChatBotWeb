@@ -163,3 +163,7 @@ The browser bundle now installs `window.YoranixWidget` when safe and supports th
 `apps/widget` now contains the iframe-owned public API client and session storage foundation. It loads public configuration after handshake, caches config with ETag support, stores anonymous session tokens only in iframe-origin `sessionStorage` or memory fallback, and has an internal message service for future UI integration.
 
 The host SDK cannot send messages itself and never receives a public session token.
+
+## Widget Browser Security Tests
+
+TASK-064B5 adds Playwright browser tests under `tests/widget-browser`. The required Chromium suite is part of `npm run verify`; the extended Firefox/WebKit suite is available with `npm run widget:e2e:extended`.

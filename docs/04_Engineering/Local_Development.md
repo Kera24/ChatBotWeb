@@ -327,3 +327,15 @@ The widget iframe app now owns public config/session/message API calls and sessi
 Additional reference:
 
 - `docs/04_Engineering/Widget_Iframe_API_Client_and_Session_Storage.md`
+
+## Widget Browser Tests
+
+The repository includes Playwright browser integration/security tests for the embeddable widget.
+
+```bash
+npm run widget:e2e:install
+npm run widget:e2e:chromium
+npm run widget:e2e:extended
+```
+
+`npm run verify` runs the Chromium suite and then rebuilds the production widget artifact. The tests use fake widget keys and local mock endpoints only.

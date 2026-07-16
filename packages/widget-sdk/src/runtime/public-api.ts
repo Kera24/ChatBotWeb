@@ -42,7 +42,7 @@ export function createPublicAPI(windowRef: Window & typeof globalThis = window, 
     protocolVersion: WIDGET_PROTOCOL_VERSION,
     async init(config: WidgetSDKConfig = readConfigFromCurrentScript(documentRef)) {
       const signature = safeConfigSignature(config);
-      if (runtimeSlot.controller && runtimeSlot.controller.getState() !== "destroyed") {
+      if (runtimeSlot.controller && runtimeSlot.controller.getState() !== "destroyed" && runtimeSlot.configSignature) {
         if (runtimeSlot.configSignature === signature) {
           return runtimeSlot.controller.whenReady();
         }

@@ -787,3 +787,8 @@ Future tasks:
 ## 31. Acceptance Criteria
 
 TASK-064A is complete when SDK/UI boundaries, iframe delivery, token isolation, API-call ownership, postMessage protocol, lifecycle/failure behavior, CSP, accessibility, versioning, performance, threat model, diagrams, ADR, and implementation split are documented, and no runtime code is added.
+## Browser Test Foundation
+
+TASK-064B5 adds a Playwright browser integration/security foundation for the widget SDK and iframe.
+
+The browser tests use real built SDK and iframe artifacts with separate host, widget, and mock API origins. Chromium is required in normal verification; Firefox/WebKit remain an explicit extended suite. Test-only iframe hooks are compiled only in Vite `test` mode and must never become host SDK APIs.

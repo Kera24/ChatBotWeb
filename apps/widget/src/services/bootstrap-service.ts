@@ -22,11 +22,12 @@ export type BootstrapServiceOptions = Readonly<{
   fetchImpl?: FetchLike;
   configStorage?: ConfigCacheStorage;
   stateStore?: WidgetStateStore;
+  apiHostOverride?: string;
 }>;
 
 export class WidgetBootstrapService {
   async bootstrap(options: BootstrapServiceOptions): Promise<WidgetRuntimeServices> {
-    const environment = resolveWidgetApiEnvironment(options.payload.environment);
+    const environment = resolveWidgetApiEnvironment(options.payload.environment, options.apiHostOverride);
     const apiClient = new PublicWidgetApiClient({
       apiBaseUrl: environment.apiHost,
       widgetKey: options.payload.widgetKey,

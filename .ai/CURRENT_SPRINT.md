@@ -1,25 +1,22 @@
 # Current Sprint
 
 Current phase: Sprint 3D - Embeddable Widget
-Current task: TASK-064B4 - Widget Iframe API Client and Session Storage
+Current task: TASK-064B5 - Widget Browser Integration and Security Tests
 
 ## Active Objective
 
-Implement iframe-owned public config, session, and message API foundations with token-isolated session storage and internal state/services for the future widget UI.
+Create browser-level integration and security tests for the embeddable widget loader, iframe shell, postMessage boundary, iframe-owned API calls, token isolation, storage, lifecycle, CORS/CSP, and hostile-host scenarios.
 
 ## Guardrails
 
-- Public config/session/message API calls must stay inside `apps/widget`.
-- Public session tokens must not enter the host page, SDK runtime state, iframe URL, postMessage payloads, logs, telemetry, or public state snapshots.
-- Do not implement the final launcher, chat panel, message list, composer, rich message rendering, conversation-history UI, lead capture, telemetry, React, backend changes, or host-page `sendMessage` API.
-- Config loads after handshake and before `widget_ready`; config load must not create a session.
-- Current session strategy is first-message creation, not page-load or open creation.
+- Do not implement the final launcher, chat panel, composer, message thread, rich citations, visual branding system, conversation-history UI, lead capture, telemetry, analytics, streaming, new backend endpoints, or host-page `sendMessage` API.
+- Browser tests may use test-mode iframe hooks only when compiled with Vite `test` mode.
+- Test hooks must not expose session tokens or become production host APIs.
+- Production verification must rebuild the normal widget artifact after test-mode e2e runs.
 
 ## Definition Of Done
 
-- Iframe API client validates public config/session/message responses.
-- Config cache uses iframe-origin storage with ETag/304 support and safe corruption handling.
-- Session storage uses `sessionStorage` with memory fallback and stores only approved fields.
-- Message service uses secure idempotency keys and bounded retry without exposing tokens.
-- Token-free state snapshots are available for future UI work.
-- Tests cover API ownership, config cache, session storage, lazy session creation, idempotency, and postMessage token isolation.
+- Chromium browser tests run real built SDK and iframe artifacts across separate local origins.
+- Token isolation, postMessage validation, storage, CORS, CSP, sandbox, lifecycle, responsive, focus, accessibility shell, and safe logging checks are covered.
+- Root scripts and CI install and run required Chromium browser tests.
+- Extended Firefox/WebKit command is documented separately.

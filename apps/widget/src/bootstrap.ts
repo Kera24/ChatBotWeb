@@ -17,6 +17,7 @@ import "./style.css";
 export type BootstrapWidgetShellOptions = Readonly<{
   fetchImpl?: FetchLike;
   configStorage?: ConfigCacheStorage;
+  apiHostOverride?: string;
   onRuntimeReady?: (runtime: WidgetRuntimeServices) => void;
 }>;
 
@@ -67,7 +68,9 @@ export function bootstrapWidgetShell(documentRef: Document = document, windowRef
           windowRef,
           fetchImpl: options.fetchImpl,
           configStorage: options.configStorage,
+          apiHostOverride: options.apiHostOverride ?? getTestApiHostOverride(),
         });
+        installTestHarness(windowRef, runtime);
         options.onRuntimeReady?.(runtime);
       },
       onReady: () => setShellReady(root),
@@ -83,4 +86,21 @@ export function bootstrapWidgetShell(documentRef: Document = document, windowRef
   } catch {
     setShellFailed(root);
   }
+}
+function getTestApiHostOverride(): string | undefined {
+  if (import.meta.env.MODE === "production") return undefined;
+  return import.meta.env.VITE_WIDGET_TEST_API_HOST;
+}
+
+function installTestHarness(windowRef: Window, runtime: WidgetRuntimeServices): void {
+  if (import.meta.env.MODE !== "test") return;
+  Object.defineProperty(windowRef, "__yoranixWidgetTestHarness", {
+    configurable: true,
+    enumerable: false,
+    value: Object.freeze({
+      state: () => runtime.stateStore.snapshot(),
+      sendMessage: (message: string) => runtime.messageService.sendMessage(message),
+      destroySensitiveMemory: () => runtime.sessionService.destroyInMemory(),
+    }),
+  });
 }

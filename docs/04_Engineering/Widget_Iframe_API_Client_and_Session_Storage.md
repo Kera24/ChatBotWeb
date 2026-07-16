@@ -129,3 +129,8 @@ npm run widget:lint
 npm run widget:build
 npm run verify
 ```
+## Browser Integration Security Tests
+
+TASK-064B5 adds Playwright browser tests under `tests/widget-browser` using separate local host, widget, and mock API origins. The required Chromium suite is included in `npm run verify`; Firefox and WebKit are available through `npm run widget:e2e:extended`.
+
+The suite validates real built SDK and iframe artifacts, token isolation, postMessage origin/source checks, iframe-owned API calls, storage reuse, CORS assumptions, CSP/sandbox attributes, lifecycle, focus, responsive bounds, and safe logging.

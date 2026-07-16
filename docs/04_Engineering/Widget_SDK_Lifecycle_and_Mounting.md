@@ -152,3 +152,7 @@ TASK-064B4 adds iframe-owned public API access inside `apps/widget`.
 The iframe now loads validated public configuration after the secure handshake, caches it with ETag support, restores anonymous sessions from iframe-origin `sessionStorage`, falls back to memory storage when needed, and exposes internal services for first-message session creation and idempotent message sends.
 
 The host SDK still does not call public APIs, store sessions, send messages, or receive public session tokens. The final visual chat interface is still not implemented.
+
+## Browser Security Test Harness
+
+TASK-064B5 adds a Playwright suite that serves built SDK and iframe artifacts across separate local origins. The iframe includes a test-only harness only in Vite `test` mode so Playwright can call the internal message service before the visual composer exists. The harness is not a host SDK API and does not use postMessage for messages or tokens.

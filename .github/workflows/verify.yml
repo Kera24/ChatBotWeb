@@ -29,6 +29,7 @@ jobs:
             apps/web/package-lock.json
             apps/widget/package-lock.json
             packages/widget-sdk/package-lock.json
+            tests/widget-browser/package-lock.json
 
       - name: Install API dependencies
         run: npm run api:install
@@ -41,6 +42,12 @@ jobs:
 
       - name: Install widget app dependencies
         run: npm run widget:install
+
+      - name: Install widget browser test dependencies
+        run: npm --prefix tests/widget-browser install
+
+      - name: Install Playwright Chromium
+        run: npm --prefix tests/widget-browser run install:browsers
 
       - name: Run verification
         run: npm run verify

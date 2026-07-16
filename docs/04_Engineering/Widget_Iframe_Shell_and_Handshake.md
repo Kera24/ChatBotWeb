@@ -176,3 +176,7 @@ The shell still does not call public APIs, use storage, render chat content, or 
 TASK-064B4 moves `widget_ready` behind public configuration loading. The iframe still sends `iframe_ready` immediately after bootstrap, but it sends `widget_ready` only after config has been fetched or revalidated from a safe cache.
 
 No session token, public config payload, message, answer, citation, or API error body is sent to the loader through postMessage.
+
+## Browser Handshake Verification
+
+TASK-064B5 verifies the handshake in Chromium with real browser postMessage, exact target origins, forged-message rejection, malformed iframe message handling, and no wildcard `targetOrigin` usage.
