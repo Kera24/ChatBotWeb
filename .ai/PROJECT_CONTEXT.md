@@ -301,3 +301,14 @@ Guardrails for future Codex sessions:
 - SDK/iframe communication uses a strict versioned postMessage protocol with exact origin/source validation.
 - MVP supports one widget instance per page.
 - No SDK implementation may begin before TASK-064A approval.
+
+## Widget SDK Package Foundation
+
+TASK-064B1 adds `packages/widget-sdk` as a private standalone TypeScript package for the future embeddable loader.
+
+Guardrails for future Codex sessions:
+
+- The package currently defines build, config validation, environment resolution, version constants, and SDK error contracts only.
+- It does not mount an iframe, call public APIs, use postMessage, store sessions, expose the final `window.YoranixWidget` lifecycle API, or render widget UI.
+- The package must remain separate from the visual widget app and must not depend on React.
+- Production configuration must not allow arbitrary SDK/API/iframe host overrides.

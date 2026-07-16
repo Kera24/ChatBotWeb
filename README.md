@@ -110,3 +110,18 @@ Every feature must answer three questions:
 3. Can clients manage it without developer involvement?
 
 If the answer is no, redesign the feature.
+
+## Widget SDK Foundation
+
+The repository includes `packages/widget-sdk`, a private TypeScript package foundation for the future embeddable Yoranix widget loader. It currently provides typed configuration validation, environment resolution, version constants, safe SDK error contracts, ESM/IIFE builds, declarations, and tests.
+
+It does not yet mount an iframe, call public APIs, store sessions, expose `window.YoranixWidget`, implement postMessage, or render widget UI.
+
+Root commands:
+
+```bash
+npm run widget-sdk:install
+npm run widget-sdk:test
+npm run widget-sdk:lint
+npm run widget-sdk:build
+```

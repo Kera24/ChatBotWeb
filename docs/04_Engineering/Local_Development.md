@@ -285,3 +285,20 @@ Do not add without a new approved task:
 - Object storage
 - Widget runtime
 - Production deployment configuration
+
+## Widget SDK Foundation
+
+The repository includes a standalone SDK package foundation at `packages/widget-sdk`.
+
+Root commands:
+
+```bash
+npm run widget-sdk:install
+npm run widget-sdk:test
+npm run widget-sdk:lint
+npm run widget-sdk:build
+```
+
+`npm run verify` includes the SDK test, lint, and build steps after API and web verification.
+
+The SDK package currently defines configuration validation, environment resolution, version constants, and safe error contracts only. It does not mount an iframe, call public APIs, store sessions, expose the final global lifecycle API, or render widget UI.

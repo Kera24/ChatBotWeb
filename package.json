@@ -9,9 +9,13 @@
     "api:db:upgrade": "cd apps/api && python -m alembic upgrade head",
     "web:install": "npm --prefix apps/web install",
     "web:dev": "npm --prefix apps/web run dev",
+    "web:test": "npm --prefix apps/web run test:run",
     "web:lint": "npm --prefix apps/web run lint",
     "web:build": "npm --prefix apps/web run build",
-    "verify": "docker compose config && npm run api:test && npm run web:test && npm run web:lint && npm run web:build",
-    "web:test": "npm --prefix apps/web run test:run"
+    "widget-sdk:install": "npm --prefix packages/widget-sdk install",
+    "widget-sdk:test": "npm --prefix packages/widget-sdk run test",
+    "widget-sdk:lint": "npm --prefix packages/widget-sdk run lint",
+    "widget-sdk:build": "npm --prefix packages/widget-sdk run build",
+    "verify": "docker compose config && npm run api:test && npm run web:test && npm run web:lint && npm run web:build && npm run widget-sdk:test && npm run widget-sdk:lint && npm run widget-sdk:build"
   }
 }

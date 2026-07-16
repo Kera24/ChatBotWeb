@@ -1,25 +1,25 @@
 # Current Sprint
 
 Current phase: Sprint 3D - Embeddable Widget
-Current task: TASK-064A - Embeddable Widget SDK Architecture
+Current task: TASK-064B1 - Widget SDK Package and Build Foundation
 
 ## Active Objective
 
-Design the embeddable browser SDK and iframe delivery architecture for the future Yoranix website-chat widget.
+Create the standalone TypeScript SDK package and build/test foundation for the embeddable Yoranix widget loader.
 
 ## Guardrails
 
-- Architecture and planning only.
-- Do not implement SDK packages, iframe pages, widget UI, build config, backend endpoints, analytics, public history, or package publishing.
-- Loader SDK and visual widget are separate components.
-- Iframe owns public config/session/message API calls.
-- Public session tokens must never enter host-page JavaScript context.
-- SDK/iframe communication must use strict versioned postMessage contracts.
+- Do not mount an iframe.
+- Do not call public APIs.
+- Do not implement postMessage, lifecycle runtime, global init/open/close APIs, session storage, widget UI, telemetry, backend changes, or publishing.
+- Keep the SDK package React-free and dependency-light.
+- Public configuration must not accept tenant IDs, session tokens, AI overrides, Origin overrides, security-policy overrides, or arbitrary production hosts.
 
 ## Definition Of Done
 
-- Planning task exists.
-- Architecture document exists.
-- ADR-0014 exists.
-- SDK/UI boundaries, lifecycle, postMessage, session storage, iframe sandbox, CSP, accessibility, versioning, performance, threat/failure models, diagrams, and implementation split are documented.
-- `git diff --check` passes.
+- `packages/widget-sdk` package exists.
+- ESM/IIFE/declaration builds work.
+- Typed config, environment, version, and error contracts exist.
+- SDK tests/lint/build run from root scripts.
+- Root verify and CI include SDK checks.
+- Documentation is updated.

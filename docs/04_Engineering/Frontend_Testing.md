@@ -84,3 +84,17 @@ Large automated accessibility platforms are outside this task; they can be added
 ## Out Of Scope
 
 The current testing foundation does not add product behaviour, production authentication, analytics, public widget testing, real backend calls, browser E2E tests, or visual regression tests.
+
+## Widget SDK Testing
+
+The embeddable widget SDK foundation lives in `packages/widget-sdk` and uses Vitest for unit/build smoke tests.
+
+Commands from the repository root:
+
+```bash
+npm run widget-sdk:test
+npm run widget-sdk:lint
+npm run widget-sdk:build
+```
+
+SDK tests do not call backend APIs, require Docker, or start a browser server. The test command builds first so generated ESM, IIFE, declaration files, source maps, and size budgets are verified.

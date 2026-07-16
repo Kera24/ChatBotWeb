@@ -25,13 +25,18 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            packages/widget-sdk/package-lock.json
 
       - name: Install API dependencies
         run: npm run api:install
 
       - name: Install web dependencies
         run: npm run web:install
+
+      - name: Install widget SDK dependencies
+        run: npm run widget-sdk:install
 
       - name: Run verification
         run: npm run verify
