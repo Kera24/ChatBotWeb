@@ -1,26 +1,25 @@
 # Current Sprint
 
 Current phase: Sprint 3D - Embeddable Widget
-Current task: TASK-064B3 - SDK Lifecycle, Iframe Mounting, and Public Browser API
+Current task: TASK-064B4 - Widget Iframe API Client and Session Storage
 
 ## Active Objective
 
-Implement the browser-facing Widget SDK lifecycle, iframe mounting, one-instance runtime, and public JavaScript API over the existing secure iframe shell.
+Implement iframe-owned public config, session, and message API foundations with token-isolated session storage and internal state/services for the future widget UI.
 
 ## Guardrails
 
-- Do not call public config/session/message APIs.
-- Do not store session tokens or use browser storage.
-- Do not implement the visual launcher, chat panel, message list, composer, or final widget UI.
-- Do not add telemetry, backend changes, CDN deployment, npm publishing, React, streaming, or Markdown rendering.
-- Keep public API callbacks and errors safe: no stack traces, tenant IDs, session tokens, messages, or raw internal controller objects.
+- Public config/session/message API calls must stay inside `apps/widget`.
+- Public session tokens must not enter the host page, SDK runtime state, iframe URL, postMessage payloads, logs, telemetry, or public state snapshots.
+- Do not implement the final launcher, chat panel, message list, composer, rich message rendering, conversation-history UI, lead capture, telemetry, React, backend changes, or host-page `sendMessage` API.
+- Config loads after handshake and before `widget_ready`; config load must not create a session.
+- Current session strategy is first-message creation, not page-load or open creation.
 
 ## Definition Of Done
 
-- `window.YoranixWidget` and ESM exports expose the approved public API.
-- Script-tag auto-init reads only approved `data-*` attributes.
-- One-instance runtime mounts one container and one iframe.
-- Runtime completes B2 handshake with exact origin/source validation.
-- Open/close/toggle use validated `widget_state_changed` acknowledgements.
-- Focus, resize, visibility, debug, event, and destroy foundations are covered by tests.
-- Documentation and smoke harness are updated.
+- Iframe API client validates public config/session/message responses.
+- Config cache uses iframe-origin storage with ETag/304 support and safe corruption handling.
+- Session storage uses `sessionStorage` with memory fallback and stores only approved fields.
+- Message service uses secure idempotency keys and bounded retry without exposing tokens.
+- Token-free state snapshots are available for future UI work.
+- Tests cover API ownership, config cache, session storage, lazy session creation, idempotency, and postMessage token isolation.

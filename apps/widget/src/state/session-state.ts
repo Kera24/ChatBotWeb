@@ -1,0 +1,1 @@
+export type SessionLifecycleState = "none" | "creating" | "active" | "expired" | "invalid" | "rate_limited" | "unavailable";

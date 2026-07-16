@@ -144,3 +144,11 @@ Serve `examples/widget-host/index.html` with any static file server and load the
 ## Current Exclusions
 
 No public config/session/message API clients, session storage, final launcher styling, chat UI, message composer, telemetry, backend changes, CDN publishing, npm publishing, streaming, or Markdown rendering are implemented in this task.
+
+## Widget Iframe API Client And Session Storage
+
+TASK-064B4 adds iframe-owned public API access inside `apps/widget`.
+
+The iframe now loads validated public configuration after the secure handshake, caches it with ETag support, restores anonymous sessions from iframe-origin `sessionStorage`, falls back to memory storage when needed, and exposes internal services for first-message session creation and idempotent message sends.
+
+The host SDK still does not call public APIs, store sessions, send messages, or receive public session tokens. The final visual chat interface is still not implemented.

@@ -319,3 +319,11 @@ npm run widget:build
 `npm run verify` includes widget app tests, lint, and build after API, web, and SDK checks.
 
 The widget app does not call public APIs, store sessions, render chat UI, or expose the final global SDK lifecycle API.
+
+## Widget Iframe API Client
+
+The widget iframe app now owns public config/session/message API calls and session storage. Session tokens remain inside the iframe origin and are not exposed through the SDK runtime or postMessage.
+
+Additional reference:
+
+- `docs/04_Engineering/Widget_Iframe_API_Client_and_Session_Storage.md`

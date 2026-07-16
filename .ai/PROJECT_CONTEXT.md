@@ -336,3 +336,15 @@ Guardrails for future Codex sessions:
 - Public API errors and events must remain safe projections without stack traces, tenant IDs, session tokens, messages, raw public API responses, or internal controller objects.
 - `open`, `close`, and `toggle` rely on validated iframe acknowledgements before mutating public open/closed state.
 - One widget instance per page remains the MVP policy.
+
+## Widget Iframe API Client Guardrails
+
+TASK-064B4 adds iframe-owned public API clients and session storage.
+
+Guardrails for future Codex sessions:
+
+- Only `apps/widget` may call public widget config, session, and message endpoints.
+- Session tokens remain inside iframe-origin `sessionStorage` or memory fallback and must never enter SDK runtime state, iframe URLs, postMessage payloads, host callbacks, logs, telemetry, or public state snapshots.
+- `widget_ready` is sent only after validated public config is loaded or revalidated from cache.
+- Opening the current non-visual shell does not create a session; sessions are created lazily on first internal message send.
+- The host SDK still has no `sendMessage` API and no final chat UI exists yet.

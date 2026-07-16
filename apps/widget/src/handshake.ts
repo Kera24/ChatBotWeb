@@ -18,6 +18,7 @@ export type IframeHandshakeOptions = {
   parentOrigin: string;
   parentWindow: ParentWindowPort;
   selfWindow: Window;
+  onInitialise?: (payload: InitialisePayload) => void | Promise<void>;
   onReady?: (payload: InitialisePayload) => void;
   onOpen?: () => void;
   onClose?: () => void;
@@ -67,7 +68,7 @@ export class IframeHandshakeController {
     }
     this.recentMessages.remember(envelope.messageId);
     if (envelope.type === "initialise") {
-      this.handleInitialise(envelope.payload);
+      void this.handleInitialise(envelope.payload);
       return;
     }
     if (envelope.type === "open") {
@@ -90,7 +91,7 @@ export class IframeHandshakeController {
     }
   };
 
-  private handleInitialise(payload: unknown): void {
+  private async handleInitialise(payload: unknown): Promise<void> {
     if (this.initialised) {
       this.reportError(createSafeProtocolError("duplicate_initialise", "handshake"));
       return;
@@ -105,6 +106,15 @@ export class IframeHandshakeController {
     }
     this.initialised = true;
     this.lifecycle.transition(payload.initialOpen ? "ready_open" : "ready_closed");
+    try {
+      await this.options.onInitialise?.(payload);
+    } catch {
+      this.reportError(createSafeProtocolError("safe_internal_error", "handshake"));
+      return;
+    }
+    if (this.lifecycle.state === "failed" || this.lifecycle.state === "destroyed") {
+      return;
+    }
     this.post("widget_ready", { state: this.lifecycle.state });
     this.postResizeForState();
     this.options.onReady?.(payload);

@@ -170,3 +170,9 @@ No public backend API clients, session storage, visual widget UI, or telemetry a
 TASK-064B3 integrates the shell with the SDK runtime. The iframe shell now acknowledges `open`, `close`, `destroy`, and `host_visibility_changed` lifecycle messages, emits bounded placeholder `resize_request` messages, and updates only neutral accessible status text.
 
 The shell still does not call public APIs, use storage, render chat content, or implement final widget UI.
+
+## API Bootstrap Update
+
+TASK-064B4 moves `widget_ready` behind public configuration loading. The iframe still sends `iframe_ready` immediately after bootstrap, but it sends `widget_ready` only after config has been fetched or revalidated from a safe cache.
+
+No session token, public config payload, message, answer, citation, or API error body is sent to the loader through postMessage.
