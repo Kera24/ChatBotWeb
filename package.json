@@ -16,6 +16,10 @@
     "widget-sdk:test": "npm --prefix packages/widget-sdk run test",
     "widget-sdk:lint": "npm --prefix packages/widget-sdk run lint",
     "widget-sdk:build": "npm --prefix packages/widget-sdk run build",
-    "verify": "docker compose config && npm run api:test && npm run web:test && npm run web:lint && npm run web:build && npm run widget-sdk:test && npm run widget-sdk:lint && npm run widget-sdk:build"
+    "widget:install": "npm --prefix apps/widget install",
+    "widget:test": "npm --prefix apps/widget run test",
+    "widget:lint": "npm --prefix apps/widget run lint",
+    "widget:build": "npm --prefix apps/widget run build",
+    "verify": "docker compose config && npm run api:test && npm run web:test && npm run web:lint && npm run web:build && npm run widget-sdk:test && npm run widget-sdk:lint && npm run widget-sdk:build && npm run widget:test && npm run widget:lint && npm run widget:build"
   }
 }

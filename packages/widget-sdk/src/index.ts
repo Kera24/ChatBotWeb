@@ -9,6 +9,11 @@ export type { ResolvedWidgetEnvironment, WidgetEnvironment } from "./environment
 export { isWidgetEnvironment, normaliseHostUrl, resolveWidgetEnvironment } from "./environment";
 export type { WidgetSDKErrorCode, WidgetSDKErrorPhase, WidgetSDKErrorPublic } from "./errors";
 export { createSDKError, WidgetSDKError } from "./errors";
+export { buildInitialisePayload, SDKHandshakeController } from "./handshake";
+export type { SDKHandshakeControllerOptions, SDKHandshakeState } from "./handshake";
+export { buildWidgetIframeUrl, normaliseOrigin, RECOMMENDED_IFRAME_ATTRIBUTES } from "./iframe";
+export type { BuiltIframeUrl } from "./iframe";
+export * from "./protocol";
 export {
   BUILD_MODE,
   PUBLIC_CONFIG_SCHEMA_VERSION,

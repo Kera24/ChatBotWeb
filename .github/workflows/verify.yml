@@ -27,6 +27,7 @@ jobs:
           cache: npm
           cache-dependency-path: |
             apps/web/package-lock.json
+            apps/widget/package-lock.json
             packages/widget-sdk/package-lock.json
 
       - name: Install API dependencies
@@ -37,6 +38,9 @@ jobs:
 
       - name: Install widget SDK dependencies
         run: npm run widget-sdk:install
+
+      - name: Install widget app dependencies
+        run: npm run widget:install
 
       - name: Run verification
         run: npm run verify

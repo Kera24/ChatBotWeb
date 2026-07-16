@@ -302,3 +302,20 @@ npm run widget-sdk:build
 `npm run verify` includes the SDK test, lint, and build steps after API and web verification.
 
 The SDK package currently defines configuration validation, environment resolution, version constants, and safe error contracts only. It does not mount an iframe, call public APIs, store sessions, expose the final global lifecycle API, or render widget UI.
+
+## Widget Iframe Shell
+
+The repository includes a dedicated iframe shell app at `apps/widget` for the future embeddable widget. It is separate from the dashboard web app and currently implements only bootstrap, parent-origin validation, shared postMessage protocol validation, and neutral loading/ready/unavailable shell states.
+
+Root commands:
+
+```bash
+npm run widget:install
+npm run widget:test
+npm run widget:lint
+npm run widget:build
+```
+
+`npm run verify` includes widget app tests, lint, and build after API, web, and SDK checks.
+
+The widget app does not call public APIs, store sessions, render chat UI, or expose the final global SDK lifecycle API.

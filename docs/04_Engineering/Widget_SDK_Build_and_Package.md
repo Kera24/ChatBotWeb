@@ -146,3 +146,19 @@ Tests make no network calls, do not require Docker, and do not mutate global bro
 ## Current Non-Functional Status
 
 This package is a build and type foundation only. It does not yet provide an installable customer loader, iframe runtime, postMessage protocol implementation, public API client, session storage, telemetry, or visual UI.
+## Iframe Shell And Handshake Foundation
+
+TASK-064B2 adds a dedicated non-visual iframe app at `apps/widget` and shared protocol modules under `packages/widget-sdk/src/protocol`.
+
+Root commands:
+
+```bash
+npm run widget:install
+npm run widget:test
+npm run widget:lint
+npm run widget:build
+```
+
+The SDK package now also exports a pure iframe URL builder, recommended iframe attributes, protocol validators, and an internal SDK-side handshake controller. The iframe app consumes the same shared protocol definitions, validates `parent_origin`, checks `document.referrer` where available, rejects wildcard target origins, and renders only loading/ready/unavailable status text.
+
+Still out of scope: public API calls, session storage, visual widget UI, launcher, chat panel, final global lifecycle API, and telemetry.

@@ -312,3 +312,15 @@ Guardrails for future Codex sessions:
 - It does not mount an iframe, call public APIs, use postMessage, store sessions, expose the final `window.YoranixWidget` lifecycle API, or render widget UI.
 - The package must remain separate from the visual widget app and must not depend on React.
 - Production configuration must not allow arbitrary SDK/API/iframe host overrides.
+
+## Widget Iframe Shell Guardrails
+
+TASK-064B2 adds `apps/widget` as the dedicated iframe shell and adds shared protocol contracts under `packages/widget-sdk/src/protocol`.
+
+Guardrails for future Codex sessions:
+
+- The iframe shell currently performs bootstrap, parent-origin validation, strict postMessage envelope validation, and placeholder lifecycle state changes only.
+- The SDK includes a pure iframe URL builder and SDK-side handshake controller, but it still does not mount the iframe or expose the final global lifecycle API.
+- The iframe URL may include only the public widget key, parent origin, and bounded version hints. It must never include session tokens, tenant IDs, conversations, messages, or secrets.
+- `iframe_ready`, `initialise`, and `widget_ready` use exact target origins; wildcard `targetOrigin` is rejected.
+- The iframe shell does not call public APIs, use sessionStorage, render the visual widget, collect telemetry, or store public session tokens.

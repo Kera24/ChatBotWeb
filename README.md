@@ -125,3 +125,18 @@ npm run widget-sdk:test
 npm run widget-sdk:lint
 npm run widget-sdk:build
 ```
+
+## Widget Iframe Shell
+
+The repository includes `apps/widget`, a dedicated Vite TypeScript iframe shell for the future embeddable widget. It consumes shared protocol contracts from `packages/widget-sdk`, validates the parent-origin bootstrap, performs the initial secure postMessage handshake, and renders only neutral loading/ready/unavailable states.
+
+Root commands:
+
+```bash
+npm run widget:install
+npm run widget:test
+npm run widget:lint
+npm run widget:build
+```
+
+It does not call public APIs, store sessions, render chat UI, or expose the final `window.YoranixWidget` API.

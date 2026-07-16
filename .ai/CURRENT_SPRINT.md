@@ -1,25 +1,27 @@
 # Current Sprint
 
 Current phase: Sprint 3D - Embeddable Widget
-Current task: TASK-064B1 - Widget SDK Package and Build Foundation
+Current task: TASK-064B2 - Iframe Shell and Secure Handshake
 
 ## Active Objective
 
-Create the standalone TypeScript SDK package and build/test foundation for the embeddable Yoranix widget loader.
+Implement the non-visual iframe shell, strict versioned postMessage contracts, secure bootstrap handshake, iframe-origin validation, parent-origin validation, and lifecycle-ready communication foundation.
 
 ## Guardrails
 
-- Do not mount an iframe.
-- Do not call public APIs.
-- Do not implement postMessage, lifecycle runtime, global init/open/close APIs, session storage, widget UI, telemetry, backend changes, or publishing.
-- Keep the SDK package React-free and dependency-light.
-- Public configuration must not accept tenant IDs, session tokens, AI overrides, Origin overrides, security-policy overrides, or arbitrary production hosts.
+- Do not call public config/session/message APIs.
+- Do not store session tokens or use browser storage.
+- Do not implement the visual launcher, chat panel, message list, composer, or final widget UI.
+- Do not expose the final `window.YoranixWidget` lifecycle API.
+- Do not add telemetry, backend changes, CDN deployment, SRI generation, or React.
+- Keep postMessage payloads free of session tokens, tenant IDs, API credentials, raw backend responses, and message content.
 
 ## Definition Of Done
 
-- `packages/widget-sdk` package exists.
-- ESM/IIFE/declaration builds work.
-- Typed config, environment, version, and error contracts exist.
-- SDK tests/lint/build run from root scripts.
-- Root verify and CI include SDK checks.
+- `apps/widget` exists as a dedicated Vite TypeScript iframe app.
+- Shared protocol contracts live in the SDK package and are consumed by the iframe app.
+- SDK-side iframe URL builder and handshake controller validate origin, source, version, type, payload size, timeout, and destroy behavior.
+- Iframe shell validates parent origin using URL parameter, referrer, and incoming message origin.
+- Minimal accessible shell renders loading/ready/unavailable states only.
+- Root verify and CI include widget app checks.
 - Documentation is updated.
