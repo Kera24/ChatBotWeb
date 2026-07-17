@@ -1,4 +1,4 @@
-﻿# Widget UI Interaction Architecture
+# Widget UI Interaction Architecture
 
 Status: Proposed architecture for TASK-065A
 Scope: Architecture, product design, UX, interaction, accessibility, and planning only. No widget components, styles, animations, SDK changes, backend changes, or assets are implemented by this document.
@@ -510,3 +510,7 @@ TASK-065A is complete when UI/SDK/backend boundaries, user journeys, component a
 The iframe widget app now has a Preact rendering foundation for the visual shell. Implemented scope is limited to design tokens, contrast utilities, customer-brand token mapping, launcher/panel/header/viewport/footer structure, safe asset boundary, shell accessibility foundations, and browser/unit coverage.
 
 Still deferred: full welcome state, suggested questions, messages, composer, citations, privacy content, final focus trap, visual regression, telemetry, Markdown rendering, and backend changes.
+
+## TASK-065B2 Implementation Note
+
+The iframe widget now implements the B2 welcome and conversation presentation layer: configured welcome copy, suggested questions as the only visual send mechanism, in-memory message thread, user/assistant states, fallback/low-confidence labels, preparation state, safe retryable failure presentation, and foundational scrolling/live-region behavior. Composer, citation disclosure, and full recovery flows remain deferred.

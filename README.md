@@ -176,3 +176,7 @@ TASK-065B1 adds the Preact-based iframe visual shell and design-token foundation
 npm run widget:test
 npm run widget:e2e:chromium
 ```
+
+### Widget TASK-065B2
+
+The widget iframe now includes the welcome and in-memory conversation presentation layer. Suggested questions can send through the iframe-owned API client; free-text composer and citation disclosure are still deferred.

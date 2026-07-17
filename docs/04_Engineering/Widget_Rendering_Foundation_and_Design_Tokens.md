@@ -140,3 +140,7 @@ Added/updated tests cover:
 ## Current Exclusions
 
 Welcome, suggestions, messages, composer, citations, privacy content, full focus trap, final responsive polish, visual regression, telemetry, Markdown, lead capture, and backend changes remain deferred.
+
+## TASK-065B2 Note
+
+The iframe visual layer now includes a configured welcome state, suggested-question direct send, in-memory conversation presentation, user/assistant message states, fallback and low-confidence labels, retryable failure presentation, and foundational scrolling/live-region behavior. Free-text composer, citation disclosure, full recovery workflows, and Markdown rendering remain deferred.

@@ -1,12 +1,14 @@
-import type { InitialisePayload } from "@yoranix/widget-sdk";
+﻿import type { InitialisePayload } from "@yoranix/widget-sdk";
 import { PublicWidgetApiClient, type FetchLike } from "../api/client";
 import { resolveWidgetApiEnvironment, WidgetConfigCache, type ConfigCacheStorage } from "../api/config";
 import { WidgetApiError, toWidgetApiError } from "../api/errors";
 import { createSessionStore } from "../storage";
 import type { SessionStore } from "../storage/session-store";
+import { ConversationStore } from "../state/conversation-state";
 import { WidgetStateStore } from "../state/widget-state";
-import { SessionService } from "./session-service";
+import { ConversationOrchestrator } from "./conversation-orchestrator";
 import { MessageService } from "./message-service";
+import { SessionService } from "./session-service";
 
 export type WidgetRuntimeServices = Readonly<{
   apiClient: PublicWidgetApiClient;
@@ -14,6 +16,8 @@ export type WidgetRuntimeServices = Readonly<{
   sessionStore: SessionStore;
   sessionService: SessionService;
   messageService: MessageService;
+  conversationStore: ConversationStore;
+  conversationOrchestrator: ConversationOrchestrator;
 }>;
 
 export type BootstrapServiceOptions = Readonly<{
@@ -64,7 +68,13 @@ export class WidgetBootstrapService {
       const sessionService = new SessionService({ apiClient, sessionStore, stateStore, configurationVersion: config.configuration_version });
       sessionService.restoreStoredSession();
       const messageService = new MessageService({ apiClient, sessionService, stateStore });
-      return Object.freeze({ apiClient, stateStore, sessionStore, sessionService, messageService });
+      const conversationStore = new ConversationStore();
+      const conversationOrchestrator = new ConversationOrchestrator({
+        conversationStore,
+        messageService,
+        configProvider: () => stateStore.snapshot().config.data,
+      });
+      return Object.freeze({ apiClient, stateStore, sessionStore, sessionService, messageService, conversationStore, conversationOrchestrator });
     } catch (error) {
       const safe = toWidgetApiError(error, "configuration");
       stateStore.update({ bootstrapStatus: "unavailable", config: { status: "unavailable" }, lastError: safe.toSafeShape() });

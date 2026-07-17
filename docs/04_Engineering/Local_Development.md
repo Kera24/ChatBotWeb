@@ -351,3 +351,10 @@ npm run widget:test
 npm run widget:build
 npm run widget:e2e:chromium
 ```
+
+## Widget B2 Conversation Shell
+
+Run
+pm run widget:dev from the root equivalent via
+pm --prefix apps/widget run dev for the iframe app, or use
+pm run widget:e2e:chromium to exercise the loader, iframe, mock API, suggested-question send flow, and token-isolation checks.

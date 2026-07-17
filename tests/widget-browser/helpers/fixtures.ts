@@ -1,4 +1,4 @@
-import { test as base, expect, type Page, type Frame } from "@playwright/test";
+﻿import { test as base, expect, type Page, type Frame } from "@playwright/test";
 import { startWidgetBrowserServers, SESSION_TOKEN, HOST_ORIGIN, WIDGET_ORIGIN, API_ORIGIN } from "../servers/test-servers";
 
 type Fixtures = {
@@ -71,6 +71,12 @@ export async function getHarnessState(frame: Frame) {
   });
 }
 
+export async function getHarnessConversation(frame: Frame) {
+  return frame.evaluate(() => {
+    const harness = (window as unknown as { __yoranixWidgetTestHarness: { conversation(): unknown } }).__yoranixWidgetTestHarness;
+    return harness.conversation();
+  });
+}
 export async function parentPostMessages(page: Page) {
   return page.evaluate(() => (window as unknown as { __yoranixPostMessages?: Array<{ targetOrigin: string; text: string }> }).__yoranixPostMessages ?? []);
 }

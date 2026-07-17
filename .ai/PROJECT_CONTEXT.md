@@ -374,3 +374,12 @@ Guardrails for future Codex sessions:
 - Current shell scope is launcher, panel, header, status, viewport, footer, tokens, and theme/branding validation only.
 - Welcome, suggestions, messages, composer, citations, privacy content, final focus trap, Markdown rendering, telemetry, and lead capture remain deferred.
 - Customer colours must pass token validation/contrast rules or fall back to platform-safe tokens.
+
+## TASK-065B2 Update
+
+- The widget iframe now has an in-memory conversation store for current runtime messages only.
+- Suggested questions are the only implemented visual send mechanism; the free-text composer remains deferred to TASK-065B3.
+- User messages, assistant answers, fallback, low-confidence, preparation, failed, retryable failure, and safe system-notice presentation are implemented inside the iframe.
+- Backend answers are rendered as safe plain text only. No Markdown, raw HTML, or auto-linkification is enabled.
+- Citation data may remain inside iframe conversation entries, but citation disclosure is deferred to TASK-065B3.
+- Messages, answers, citations, session tokens, idempotency keys, tenant IDs, provider/model metadata, and raw backend errors must never cross to the host SDK.

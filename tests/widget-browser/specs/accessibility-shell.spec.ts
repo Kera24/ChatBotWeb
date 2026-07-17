@@ -7,8 +7,8 @@ test("iframe shell exposes accessible structural semantics", async ({ instrument
   await expect(frame.getByRole("button", { name: "Chat" })).toBeVisible();
   await page.evaluate(() => window.YoranixWidget.open());
   await expect(frame.getByRole("dialog", { name: "Yoranix" })).toBeVisible();
-  await expect(frame.getByRole("heading", { name: "Yoranix" })).toBeVisible();
-  await expect(frame.getByText("AI assistant")).toBeVisible();
+  await expect(frame.getByRole("heading", { name: "Yoranix", exact: true })).toBeVisible();
+  await expect(frame.getByText("AI assistant", { exact: true })).toBeVisible();
   await expect(frame.getByRole("region", { name: "Chat conversation" })).toBeVisible();
   await expect(page.locator("#yoranix-widget-iframe")).toHaveAttribute("title", "Yoranix chat widget");
 });

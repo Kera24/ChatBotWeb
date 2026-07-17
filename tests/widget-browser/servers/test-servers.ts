@@ -9,6 +9,10 @@ export const API_ORIGIN = "http://127.0.0.1:4300";
 export const WIDGET_KEY = "wpk_dev_1234567890abcdef";
 export const DARK_WIDGET_KEY = "wpk_dev_darktheme0000000";
 export const INVALID_COLOUR_WIDGET_KEY = "wpk_dev_invalidcolor0000";
+export const FALLBACK_WIDGET_KEY = "wpk_dev_fallback00000000";
+export const LOW_CONFIDENCE_WIDGET_KEY = "wpk_dev_lowconfidence000";
+export const MALICIOUS_WIDGET_KEY = "wpk_dev_malicious0000000";
+export const SLOW_WIDGET_KEY = "wpk_dev_slowmessage00000";
 export const SESSION_TOKEN = "pss_dev_abcdefghijklmnop.abcdefghijklmnopqrstuvwx";
 
 const repoRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
@@ -66,6 +70,10 @@ function handleHost(request: IncomingMessage, response: ServerResponse): void {
     html(response, hostPage({ mode: "normal", widgetKey: INVALID_COLOUR_WIDGET_KEY }));
     return;
   }
+  if (url.pathname === "/fallback") { html(response, hostPage({ mode: "normal", widgetKey: FALLBACK_WIDGET_KEY })); return; }
+  if (url.pathname === "/low-confidence") { html(response, hostPage({ mode: "normal", widgetKey: LOW_CONFIDENCE_WIDGET_KEY })); return; }
+  if (url.pathname === "/malicious") { html(response, hostPage({ mode: "normal", widgetKey: MALICIOUS_WIDGET_KEY })); return; }
+  if (url.pathname === "/slow") { html(response, hostPage({ mode: "normal", widgetKey: SLOW_WIDGET_KEY })); return; }
   if (url.pathname === "/blocked-frame") {
     response.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'unsafe-inline' ${WIDGET_ORIGIN}; frame-src 'none'; style-src 'self' 'unsafe-inline'`);
     html(response, hostPage({ mode: "normal", widgetKey: WIDGET_KEY }));
@@ -162,7 +170,12 @@ function handleApi(request: IncomingMessage, response: ServerResponse, requests:
         json(response, 404, { code: "invalid_session", message: "Invalid session", retryable: false });
         return;
       }
-      json(response, 200, messageResponse());
+      const payload = messageResponse(url.pathname);
+      if (url.pathname.includes(SLOW_WIDGET_KEY)) {
+        setTimeout(() => json(response, 200, payload), 160);
+        return;
+      }
+      json(response, 200, payload);
       return;
     }
     json(response, 404, { code: "invalid_widget", message: "Widget unavailable", retryable: false });
@@ -198,7 +211,16 @@ function sessionResponse() {
   };
 }
 
-function messageResponse() {
+function messageResponse(pathname: string) {
+  if (pathname.includes(FALLBACK_WIDGET_KEY)) {
+    return { response_id: "resp_fallback", answer: "I could not find this in the available information.", answer_state: "fallback", citations: [], remaining_messages: 18, session_expires_at: "2099-07-16T01:10:00.000Z", fallback_used: true, request_id: "req_message", response_schema_version: "1.0" };
+  }
+  if (pathname.includes(LOW_CONFIDENCE_WIDGET_KEY)) {
+    return { response_id: "resp_low", answer: "This may help, but please verify it against the available sources.", answer_state: "low_confidence", citations: [], remaining_messages: 18, session_expires_at: "2099-07-16T01:10:00.000Z", fallback_used: false, request_id: "req_message", response_schema_version: "1.0" };
+  }
+  if (pathname.includes(MALICIOUS_WIDGET_KEY)) {
+    return { response_id: "resp_malicious", answer: "<script>alert(1)</script>\n<img src=x onerror=alert(1)>\n[a](javascript:alert(1))", answer_state: "answered", citations: [], remaining_messages: 18, session_expires_at: "2099-07-16T01:10:00.000Z", fallback_used: false, request_id: "req_message", response_schema_version: "1.0" };
+  }
   return {
     response_id: "resp_1",
     answer: "Safe answer",
@@ -211,7 +233,6 @@ function messageResponse() {
     response_schema_version: "1.0",
   };
 }
-
 function file(response: ServerResponse, path: string): void {
   if (!existsSync(path) || !statSync(path).isFile()) {
     text(response, 404, `missing ${path}`);

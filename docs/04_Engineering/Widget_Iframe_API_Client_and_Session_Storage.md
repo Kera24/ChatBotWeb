@@ -140,3 +140,7 @@ The suite validates real built SDK and iframe artifacts, token isolation, postMe
 TASK-065B1 adds Preact rendering inside the iframe application only. The SDK remains framework-free. The current shell renders launcher, panel, header, status, viewport, and footer structure, but not welcome content, suggestions, messages, composer, citations, or privacy content.
 
 The Preact layer consumes safe state snapshots only. Session tokens remain in iframe storage/service internals and are not passed through component props, rendered DOM, postMessage, or host callbacks.
+
+## TASK-065B2 Note
+
+The visual layer now calls the existing iframe-owned message service only through a UI orchestration adapter for configured suggested questions. The session token remains private to iframe services/storage and is not passed into Preact props, DOM, postMessage, or host SDK state.

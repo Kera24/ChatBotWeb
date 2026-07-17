@@ -67,3 +67,7 @@ Playwright keeps traces and screenshots only on failure. Test data uses fake pub
 ## TASK-065B1 Browser Coverage
 
 The browser suite now validates the structural Preact shell, including launcher accessibility, panel semantics, dark configuration tokens, invalid-colour response fail-closed behavior, viewport bounds, and continued token isolation.
+
+## TASK-065B2 Browser Coverage
+
+Browser tests now cover real loader-to-iframe welcome rendering, suggested-question sends, lazy session creation, duplicate activation prevention, fallback and low-confidence labels, malicious answer text rendered inertly, and iframe-memory-only conversation behavior across close/reopen and iframe reload.

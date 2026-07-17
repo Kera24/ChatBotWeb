@@ -1,4 +1,4 @@
-﻿import { resolveParentOriginFromBootstrap } from "./parent-origin";
+import { resolveParentOriginFromBootstrap } from "./parent-origin";
 import { startIframeHandshake, type IframeHandshakeController } from "./handshake";
 import { WidgetBootstrapService, type WidgetRuntimeServices } from "./services/bootstrap-service";
 import type { FetchLike } from "./api/client";
@@ -44,6 +44,7 @@ export function bootstrapWidgetShell(documentRef: Document = document, windowRef
         const configLanguage = runtime.stateStore.snapshot().config.data?.widget.language;
         setDocumentLanguage(documentRef, configLanguage ?? payload.localeHint);
         ui.attachStore(runtime.stateStore);
+        ui.attachConversation(runtime.conversationStore, runtime.conversationOrchestrator);
         installTestHarness(windowRef, runtime);
         options.onRuntimeReady?.(runtime);
       },
@@ -51,6 +52,7 @@ export function bootstrapWidgetShell(documentRef: Document = document, windowRef
       onOpen: () => ui.setShellState("open"),
       onClose: () => ui.setShellState("closed"),
       onDestroy: () => {
+        runtime?.conversationStore.clear();
         runtime?.sessionService.destroyInMemory();
         runtime?.stateStore.destroy();
         ui.destroy();
@@ -79,6 +81,8 @@ function installTestHarness(windowRef: Window, runtime: WidgetRuntimeServices): 
     enumerable: false,
     value: Object.freeze({
       state: () => runtime.stateStore.snapshot(),
+      submitSuggestion: (id: string) => runtime.conversationOrchestrator.submitSuggestedQuestion(id),
+      conversation: () => runtime.conversationStore.snapshot(),
       sendMessage: (message: string) => runtime.messageService.sendMessage(message),
       destroySensitiveMemory: () => runtime.sessionService.destroyInMemory(),
     }),
