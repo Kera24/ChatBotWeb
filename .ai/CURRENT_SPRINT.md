@@ -1,22 +1,23 @@
-# Current Sprint
+﻿# Current Sprint
 
-Current phase: Sprint 3D - Embeddable Widget
-Current task: TASK-064B5 - Widget Browser Integration and Security Tests
+Current phase: Sprint 3E - Widget Experience
+Current task: TASK-065A - Widget UI and Interaction Architecture
 
 ## Active Objective
 
-Create browser-level integration and security tests for the embeddable widget loader, iframe shell, postMessage boundary, iframe-owned API calls, token isolation, storage, lifecycle, CORS/CSP, and hostile-host scenarios.
+Design the complete visual, interaction, accessibility, responsive, and implementation architecture for the embeddable Yoranix website-chat widget before any visual UI implementation begins.
 
 ## Guardrails
 
-- Do not implement the final launcher, chat panel, composer, message thread, rich citations, visual branding system, conversation-history UI, lead capture, telemetry, analytics, streaming, new backend endpoints, or host-page `sendMessage` API.
-- Browser tests may use test-mode iframe hooks only when compiled with Vite `test` mode.
-- Test hooks must not expose session tokens or become production host APIs.
-- Production verification must rebuild the normal widget artifact after test-mode e2e runs.
+- Do not implement Preact/React/framework dependencies, widget components, CSS, launcher, panel, composer, message thread, citation disclosure, animations, visual assets, backend changes, SDK changes, telemetry, lead capture, public history, or Markdown rendering in TASK-065A.
+- The loader SDK remains framework-free.
+- Public config/session/message API calls remain iframe-owned.
+- Public session tokens must never enter host-page JavaScript, iframe URLs, postMessage, logs, telemetry, or public state snapshots.
+- Backend public message output is currently sanitised plain text plus safe citations; the UI must render defensively and not assume Markdown.
+- Widget UI implementation must be split across TASK-065B1 through TASK-065B4.
 
 ## Definition Of Done
 
-- Chromium browser tests run real built SDK and iframe artifacts across separate local origins.
-- Token isolation, postMessage validation, storage, CORS, CSP, sandbox, lifecycle, responsive, focus, accessibility shell, and safe logging checks are covered.
-- Root scripts and CI install and run required Chromium browser tests.
-- Extended Firefox/WebKit command is documented separately.
+- UI/SDK/backend boundaries are explicit.
+- User journeys, component hierarchy, design-token mapping, accessibility/focus model, responsive/motion system, message/citation/composer/error states, testing strategy, threat/failure models, diagrams, ADR, and implementation split are documented.
+- No runtime UI code or dependency changes are added.

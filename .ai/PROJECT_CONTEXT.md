@@ -348,3 +348,17 @@ Guardrails for future Codex sessions:
 - `widget_ready` is sent only after validated public config is loaded or revalidated from cache.
 - Opening the current non-visual shell does not create a session; sessions are created lazily on first internal message send.
 - The host SDK still has no `sendMessage` API and no final chat UI exists yet.
+
+## Widget UI Experience Guardrails
+
+TASK-065A and ADR-0015 define the visual widget UI and interaction architecture.
+
+Guardrails for future Codex sessions:
+
+- Widget UI implementation requires TASK-065A approval.
+- The backend currently supplies sanitised plain-text answers and safe citations; the UI must render answers and configured text as text, not raw HTML.
+- Customer branding maps through validated design tokens only. Brand colours must pass contrast checks or fall back to accessible platform tokens.
+- The visual widget must meet WCAG 2.2 AA, including keyboard operation, focus trap/restore, live regions, contrast, reduced motion, and forced-colours support.
+- The loader SDK remains framework-free even if the iframe UI adopts Preact.
+- UI implementation must remain split across `TASK-065B1` through `TASK-065B4`.
+- UI code must not expose session tokens, messages, answers, citations, raw config, or backend errors to the host page or postMessage boundary.
