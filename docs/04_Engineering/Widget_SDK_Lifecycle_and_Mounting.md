@@ -156,3 +156,9 @@ The host SDK still does not call public APIs, store sessions, send messages, or 
 ## Browser Security Test Harness
 
 TASK-064B5 adds a Playwright suite that serves built SDK and iframe artifacts across separate local origins. The iframe includes a test-only harness only in Vite `test` mode so Playwright can call the internal message service before the visual composer exists. The harness is not a host SDK API and does not use postMessage for messages or tokens.
+
+## Visual Shell Foundation
+
+TASK-065B1 moves the iframe from a text placeholder to a structural Preact shell. The SDK lifecycle and mounting contract is unchanged: the loader remains framework-free, owns the iframe container, and still treats validated iframe state acknowledgements as authoritative.
+
+The iframe visual shell can request open/close through the existing protocol path, and the SDK continues to enforce bounded resize behavior.

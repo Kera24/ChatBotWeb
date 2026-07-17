@@ -362,3 +362,15 @@ Guardrails for future Codex sessions:
 - The loader SDK remains framework-free even if the iframe UI adopts Preact.
 - UI implementation must remain split across `TASK-065B1` through `TASK-065B4`.
 - UI code must not expose session tokens, messages, answers, citations, raw config, or backend errors to the host page or postMessage boundary.
+
+## Widget Rendering Foundation Guardrails
+
+TASK-065B1 adds Preact only inside `apps/widget` for the iframe visual shell.
+
+Guardrails for future Codex sessions:
+
+- The loader SDK remains framework-free and must not gain Preact/React dependencies.
+- Preact components consume safe widget state snapshots only; session tokens must not enter component props, context, DOM, postMessage, debug output, or host callbacks.
+- Current shell scope is launcher, panel, header, status, viewport, footer, tokens, and theme/branding validation only.
+- Welcome, suggestions, messages, composer, citations, privacy content, final focus trap, Markdown rendering, telemetry, and lead capture remain deferred.
+- Customer colours must pass token validation/contrast rules or fall back to platform-safe tokens.

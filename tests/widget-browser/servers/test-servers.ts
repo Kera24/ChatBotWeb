@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+﻿import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +7,8 @@ export const HOST_ORIGIN = "http://127.0.0.1:4100";
 export const WIDGET_ORIGIN = "http://127.0.0.1:4200";
 export const API_ORIGIN = "http://127.0.0.1:4300";
 export const WIDGET_KEY = "wpk_dev_1234567890abcdef";
+export const DARK_WIDGET_KEY = "wpk_dev_darktheme0000000";
+export const INVALID_COLOUR_WIDGET_KEY = "wpk_dev_invalidcolor0000";
 export const SESSION_TOKEN = "pss_dev_abcdefghijklmnop.abcdefghijklmnopqrstuvwx";
 
 const repoRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
@@ -44,27 +46,35 @@ export async function startWidgetBrowserServers() {
 function handleHost(request: IncomingMessage, response: ServerResponse): void {
   const url = new URL(request.url ?? "/", HOST_ORIGIN);
   if (url.pathname === "/normal" || url.pathname === "/") {
-    html(response, hostPage({ mode: "normal" }));
+    html(response, hostPage({ mode: "normal", widgetKey: WIDGET_KEY }));
     return;
   }
   if (url.pathname === "/duplicate") {
-    html(response, hostPage({ mode: "duplicate" }));
+    html(response, hostPage({ mode: "duplicate", widgetKey: WIDGET_KEY }));
     return;
   }
   if (url.pathname === "/csp") {
     response.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'unsafe-inline' ${WIDGET_ORIGIN}; frame-src ${WIDGET_ORIGIN}; connect-src 'none'; style-src 'self' 'unsafe-inline'`);
-    html(response, hostPage({ mode: "normal" }));
+    html(response, hostPage({ mode: "normal", widgetKey: WIDGET_KEY }));
+    return;
+  }
+  if (url.pathname === "/dark") {
+    html(response, hostPage({ mode: "normal", widgetKey: DARK_WIDGET_KEY }));
+    return;
+  }
+  if (url.pathname === "/invalid-colour") {
+    html(response, hostPage({ mode: "normal", widgetKey: INVALID_COLOUR_WIDGET_KEY }));
     return;
   }
   if (url.pathname === "/blocked-frame") {
     response.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'unsafe-inline' ${WIDGET_ORIGIN}; frame-src 'none'; style-src 'self' 'unsafe-inline'`);
-    html(response, hostPage({ mode: "normal" }));
+    html(response, hostPage({ mode: "normal", widgetKey: WIDGET_KEY }));
     return;
   }
   text(response, 404, "not found");
 }
 
-function hostPage(options: { mode: "normal" | "duplicate" }): string {
+function hostPage(options: { mode: "normal" | "duplicate"; widgetKey: string }): string {
   const duplicate = options.mode === "duplicate" ? "window.YoranixWidget.init(config).catch((error) => { window.__secondInitError = error; });" : "";
   return `<!doctype html>
 <html>
@@ -75,7 +85,7 @@ function hostPage(options: { mode: "normal" | "duplicate" }): string {
 <script src="${WIDGET_ORIGIN}/sdk/yoranix-widget-sdk.global.js"></script>
 <script>
 window.__widgetEvents = [];
-const config = { widgetKey: "${WIDGET_KEY}", environment: "development", iframeHost: "${WIDGET_ORIGIN}" };
+const config = { widgetKey: "${options.widgetKey}", environment: "development", iframeHost: "${WIDGET_ORIGIN}" };
 window.YoranixWidget.on('ready', (event) => window.__widgetEvents.push(['ready', event]));
 window.YoranixWidget.on('opened', (event) => window.__widgetEvents.push(['opened', event]));
 window.YoranixWidget.on('closed', (event) => window.__widgetEvents.push(['closed', event]));
@@ -135,7 +145,7 @@ function handleApi(request: IncomingMessage, response: ServerResponse, requests:
         return;
       }
       response.setHeader("ETag", '"cfg-1"');
-      json(response, 200, configResponse());
+      json(response, 200, configResponse(url.pathname));
       return;
     }
     if (url.pathname.endsWith("/sessions")) {
@@ -159,9 +169,11 @@ function handleApi(request: IncomingMessage, response: ServerResponse, requests:
   });
 }
 
-function configResponse() {
+function configResponse(pathname: string) {
+  const isDark = pathname.includes(DARK_WIDGET_KEY);
+  const isInvalidColour = pathname.includes(INVALID_COLOUR_WIDGET_KEY);
   return {
-    widget: { bot_name: "Yoranix", welcome_message: "Hello", launcher_label: "Chat", primary_colour: "#123456", secondary_colour: null, logo_url: null, avatar_url: null, position: "bottom-right", theme_mode: "light", language: "en" },
+    widget: { bot_name: "Yoranix", welcome_message: "Hello", launcher_label: "Chat", primary_colour: isInvalidColour ? "not-a-colour" : "#123456", secondary_colour: null, logo_url: null, avatar_url: null, position: "bottom-right", theme_mode: isDark ? "dark" : "light", language: "en" },
     behaviour: { suggested_questions: ["What can you do?"], max_initial_suggestions: 1, show_citations: true, allow_conversation_history: false, session_required: true, messages_enabled: true },
     privacy: { privacy_notice_text: null, privacy_notice_url: null, terms_url: null, fallback_contact_text: null },
     capabilities: { can_create_session: true, can_send_messages: true, citations_enabled: true, conversation_history_enabled: false },

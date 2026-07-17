@@ -64,3 +64,6 @@ Playwright keeps traces and screenshots only on failure. Test data uses fake pub
 - The test-only iframe harness exists only in Vite `test` mode and is used because the final message UI does not exist yet.
 - No visual launcher, chat panel, composer, Markdown renderer, citation UI, telemetry, or analytics are tested in TASK-064B5.
 - Full cross-browser execution is available but not required for every normal verification run.
+## TASK-065B1 Browser Coverage
+
+The browser suite now validates the structural Preact shell, including launcher accessibility, panel semantics, dark configuration tokens, invalid-colour response fail-closed behavior, viewport bounds, and continued token isolation.

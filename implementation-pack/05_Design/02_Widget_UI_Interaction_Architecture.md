@@ -504,3 +504,9 @@ flowchart LR
 ## Acceptance Criteria
 
 TASK-065A is complete when UI/SDK/backend boundaries, user journeys, component architecture, design tokens, customer-brand mapping, accessibility/focus model, message/citation/fallback/error/composer states, responsive and motion systems, rendering framework decision, test/review gates, implementation split, threat/failure models, diagrams, and ADR-0015 are documented, and no UI runtime code is added.
+
+## TASK-065B1 Implementation Note
+
+The iframe widget app now has a Preact rendering foundation for the visual shell. Implemented scope is limited to design tokens, contrast utilities, customer-brand token mapping, launcher/panel/header/viewport/footer structure, safe asset boundary, shell accessibility foundations, and browser/unit coverage.
+
+Still deferred: full welcome state, suggested questions, messages, composer, citations, privacy content, final focus trap, visual regression, telemetry, Markdown rendering, and backend changes.

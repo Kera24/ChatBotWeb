@@ -1,4 +1,4 @@
-import {
+﻿import {
   createProtocolEnvelope,
   createSafeProtocolError,
   RecentMessageTracker,
@@ -38,6 +38,14 @@ export class IframeHandshakeController {
     this.lifecycle.transition("waiting_for_initialise");
     this.options.selfWindow.addEventListener("message", this.handleMessage);
     this.post("iframe_ready", { protocolVersion: WIDGET_PROTOCOL_VERSION });
+  }
+
+  requestOpenFromUi(): void {
+    this.handleOpen();
+  }
+
+  requestCloseFromUi(): void {
+    this.handleClose();
   }
 
   destroy(): void {
@@ -147,7 +155,7 @@ export class IframeHandshakeController {
 
   private postResizeForState(): void {
     if (this.lifecycle.state === "ready_open") {
-      this.post("resize_request", { width: 380, height: 640 });
+      this.post("resize_request", { width: 390, height: 620 });
       return;
     }
     if (this.lifecycle.state === "ready_closed") {

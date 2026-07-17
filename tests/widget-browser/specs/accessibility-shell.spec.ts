@@ -1,11 +1,15 @@
-import { test, expect, openReadyWidget } from "../helpers/fixtures";
+﻿import { test, expect, openReadyWidget } from "../helpers/fixtures";
 
-test("iframe shell exposes accessible status semantics", async ({ instrumentedPage: page }) => {
+test("iframe shell exposes accessible structural semantics", async ({ instrumentedPage: page }) => {
   const frame = await openReadyWidget(page);
   const shell = frame.locator("#app");
-  await expect(shell).toHaveAttribute("role", "status");
-  await expect(shell).toHaveAttribute("aria-live", "polite");
-  await expect(shell).toContainText("Widget ready");
+  await expect(shell).toHaveAttribute("data-widget-state", "closed");
+  await expect(frame.getByRole("button", { name: "Chat" })).toBeVisible();
+  await page.evaluate(() => window.YoranixWidget.open());
+  await expect(frame.getByRole("dialog", { name: "Yoranix" })).toBeVisible();
+  await expect(frame.getByRole("heading", { name: "Yoranix" })).toBeVisible();
+  await expect(frame.getByText("AI assistant")).toBeVisible();
+  await expect(frame.getByRole("region", { name: "Chat conversation" })).toBeVisible();
   await expect(page.locator("#yoranix-widget-iframe")).toHaveAttribute("title", "Yoranix chat widget");
 });
 

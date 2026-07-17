@@ -167,3 +167,12 @@ The host SDK cannot send messages itself and never receives a public session tok
 ## Widget Browser Security Tests
 
 TASK-064B5 adds Playwright browser tests under `tests/widget-browser`. The required Chromium suite is part of `npm run verify`; the extended Firefox/WebKit suite is available with `npm run widget:e2e:extended`.
+
+### Widget UI foundation
+
+TASK-065B1 adds the Preact-based iframe visual shell and design-token foundation. The shell does not yet include welcome content, messages, composer, citations, or final visual polish.
+
+```bash
+npm run widget:test
+npm run widget:e2e:chromium
+```

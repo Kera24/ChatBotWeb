@@ -339,3 +339,15 @@ npm run widget:e2e:extended
 ```
 
 `npm run verify` runs the Chromium suite and then rebuilds the production widget artifact. The tests use fake widget keys and local mock endpoints only.
+
+### Widget rendering foundation
+
+The widget iframe now has a Preact-based structural shell and design-token system. Preact is isolated to `apps/widget`; the loader SDK remains framework-free. Current UI scope is launcher/panel/header/status/viewport/footer only.
+
+Useful commands:
+
+```bash
+npm run widget:test
+npm run widget:build
+npm run widget:e2e:chromium
+```

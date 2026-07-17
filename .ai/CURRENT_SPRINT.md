@@ -1,23 +1,22 @@
 ﻿# Current Sprint
 
 Current phase: Sprint 3E - Widget Experience
-Current task: TASK-065A - Widget UI and Interaction Architecture
+Current task: TASK-065B1 - Widget Rendering Foundation, Design Tokens, and Structural Shell
 
 ## Active Objective
 
-Design the complete visual, interaction, accessibility, responsive, and implementation architecture for the embeddable Yoranix website-chat widget before any visual UI implementation begins.
+Implement the Preact rendering foundation, design-token system, customer-brand mapping, and structural launcher/panel/header shell for the iframe widget app.
 
 ## Guardrails
 
-- Do not implement Preact/React/framework dependencies, widget components, CSS, launcher, panel, composer, message thread, citation disclosure, animations, visual assets, backend changes, SDK changes, telemetry, lead capture, public history, or Markdown rendering in TASK-065A.
+- Preact is allowed only inside `apps/widget`.
 - The loader SDK remains framework-free.
-- Public config/session/message API calls remain iframe-owned.
-- Public session tokens must never enter host-page JavaScript, iframe URLs, postMessage, logs, telemetry, or public state snapshots.
-- Backend public message output is currently sanitised plain text plus safe citations; the UI must render defensively and not assume Markdown.
-- Widget UI implementation must be split across TASK-065B1 through TASK-065B4.
+- Public API calls, session storage, message service, and state store remain framework-independent.
+- Session tokens must not enter component props, context, DOM, postMessage, debug output, or host callbacks.
+- Do not implement full welcome state, suggestions, message thread, composer, citations, privacy/terms content, final motion polish, telemetry, lead capture, Markdown rendering, or backend changes.
 
 ## Definition Of Done
 
-- UI/SDK/backend boundaries are explicit.
-- User journeys, component hierarchy, design-token mapping, accessibility/focus model, responsive/motion system, message/citation/composer/error states, testing strategy, threat/failure models, diagrams, ADR, and implementation split are documented.
-- No runtime UI code or dependency changes are added.
+- Structural Preact shell renders after secure bootstrap/config loading.
+- Tokens, branding, contrast, light/dark/auto theme behavior, launcher/panel/header/viewport/footer, safe asset boundary, accessibility foundation, and resize/lifecycle integration are tested.
+- Existing browser security tests remain passing.

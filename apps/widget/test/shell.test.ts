@@ -1,20 +1,35 @@
-import { describe, expect, it, vi } from "vitest";
-import { bootstrapWidgetShell, renderShell, setShellFailed, setShellReady } from "../src/bootstrap";
+﻿import { describe, expect, it, vi } from "vitest";
+import { bootstrapWidgetShell } from "../src/bootstrap";
+import { mountWidgetUi } from "../src/ui/root";
+import { WidgetStateStore } from "../src/state/widget-state";
+import { validConfig } from "./fixtures";
 
 describe("iframe shell", () => {
-  it("renders accessible loading, ready, and failure states", () => {
+  it("renders accessible loading, ready, open, and failure shell states", async () => {
     document.body.innerHTML = `<div id="app"></div>`;
     const root = document.getElementById("app");
     expect(root).not.toBeNull();
     if (!root) return;
-    renderShell(root);
-    expect(root.getAttribute("role")).toBe("status");
-    expect(root.getAttribute("aria-live")).toBe("polite");
-    expect(root.textContent).toContain("Loading widget");
-    setShellReady(root);
-    expect(root.textContent).toContain("Widget ready");
-    setShellFailed(root);
-    expect(root.textContent).toContain("Widget unavailable");
+    const ui = mountWidgetUi(root);
+    expect(root.getAttribute("data-widget-state")).toBe("loading");
+    expect(root.textContent).toContain("Open chat");
+
+    const store = new WidgetStateStore();
+    ui.attachStore(store);
+    store.update({ bootstrapStatus: "ready", config: { status: "ready", data: validConfig, etag: "etag" } });
+    ui.setShellState("closed");
+    await Promise.resolve();
+    expect(root.textContent).toContain("Chat");
+    ui.setShellState("open");
+    await Promise.resolve();
+    expect(root.textContent).toContain("Yoranix");
+    expect(root.querySelector('[role="dialog"]')).not.toBeNull();
+    ui.setUnavailable();
+    await Promise.resolve();
+    expect(root.getAttribute("data-widget-state")).toBe("unavailable");
+    expect(root.querySelector(".yw-launcher")?.getAttribute("data-unavailable")).toBe("true");
+    ui.destroy();
+    expect(root.getAttribute("data-widget-state")).toBe("destroyed");
   });
 
   it("does not call APIs or write storage during bootstrap failure", () => {

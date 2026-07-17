@@ -1,17 +1,10 @@
-import { resolveParentOriginFromBootstrap } from "./parent-origin";
-import { startIframeHandshake } from "./handshake";
+﻿import { resolveParentOriginFromBootstrap } from "./parent-origin";
+import { startIframeHandshake, type IframeHandshakeController } from "./handshake";
 import { WidgetBootstrapService, type WidgetRuntimeServices } from "./services/bootstrap-service";
 import type { FetchLike } from "./api/client";
 import type { ConfigCacheStorage } from "./api/config";
-import {
-  IFRAME_STATE_ATTRIBUTE,
-  WIDGET_SHELL_CLOSED_TEXT,
-  WIDGET_SHELL_LOADING_TEXT,
-  WIDGET_SHELL_OPEN_TEXT,
-  WIDGET_SHELL_READY_TEXT,
-  WIDGET_SHELL_ROOT_ID,
-  WIDGET_SHELL_UNAVAILABLE_TEXT,
-} from "./constants";
+import { WIDGET_SHELL_ROOT_ID } from "./constants";
+import { mountWidgetUi } from "./ui/root";
 import "./style.css";
 
 export type BootstrapWidgetShellOptions = Readonly<{
@@ -21,48 +14,26 @@ export type BootstrapWidgetShellOptions = Readonly<{
   onRuntimeReady?: (runtime: WidgetRuntimeServices) => void;
 }>;
 
-export function renderShell(root: HTMLElement, statusText = WIDGET_SHELL_LOADING_TEXT): void {
-  root.setAttribute("role", "status");
-  root.setAttribute("aria-live", "polite");
-  root.setAttribute(IFRAME_STATE_ATTRIBUTE, "loading");
-  root.textContent = statusText;
-}
-
-export function setShellReady(root: HTMLElement): void {
-  root.setAttribute(IFRAME_STATE_ATTRIBUTE, "ready");
-  root.textContent = WIDGET_SHELL_READY_TEXT;
-}
-
-export function setShellOpen(root: HTMLElement): void {
-  root.setAttribute(IFRAME_STATE_ATTRIBUTE, "open");
-  root.textContent = WIDGET_SHELL_OPEN_TEXT;
-}
-
-export function setShellClosed(root: HTMLElement): void {
-  root.setAttribute(IFRAME_STATE_ATTRIBUTE, "closed");
-  root.textContent = WIDGET_SHELL_CLOSED_TEXT;
-}
-
-export function setShellFailed(root: HTMLElement): void {
-  root.setAttribute(IFRAME_STATE_ATTRIBUTE, "failed");
-  root.textContent = WIDGET_SHELL_UNAVAILABLE_TEXT;
-}
-
 export function bootstrapWidgetShell(documentRef: Document = document, windowRef: Window = window, options: BootstrapWidgetShellOptions = {}): void {
   const root = documentRef.getElementById(WIDGET_SHELL_ROOT_ID);
-  if (!root) {
-    return;
-  }
-  renderShell(root);
+  if (!root) return;
+
+  let controller: IframeHandshakeController | null = null;
   let runtime: WidgetRuntimeServices | null = null;
+  const ui = mountWidgetUi(root, {
+    onOpen: () => controller?.requestOpenFromUi(),
+    onClose: () => controller?.requestCloseFromUi(),
+  });
+
   try {
     const parent = resolveParentOriginFromBootstrap(windowRef.location.href, documentRef.referrer);
     const bootstrapService = new WidgetBootstrapService();
-    startIframeHandshake({
+    controller = startIframeHandshake({
       parentOrigin: parent.parentOrigin,
       parentWindow: windowRef.parent,
       selfWindow: windowRef,
       onInitialise: async (payload) => {
+        setDocumentLanguage(documentRef, payload.localeHint);
         runtime = await bootstrapService.bootstrap({
           payload,
           windowRef,
@@ -70,26 +41,35 @@ export function bootstrapWidgetShell(documentRef: Document = document, windowRef
           configStorage: options.configStorage,
           apiHostOverride: options.apiHostOverride ?? getTestApiHostOverride(),
         });
+        const configLanguage = runtime.stateStore.snapshot().config.data?.widget.language;
+        setDocumentLanguage(documentRef, configLanguage ?? payload.localeHint);
+        ui.attachStore(runtime.stateStore);
         installTestHarness(windowRef, runtime);
         options.onRuntimeReady?.(runtime);
       },
-      onReady: () => setShellReady(root),
-      onOpen: () => setShellOpen(root),
-      onClose: () => setShellClosed(root),
+      onReady: (payload) => ui.setShellState(payload.initialOpen ? "open" : "closed"),
+      onOpen: () => ui.setShellState("open"),
+      onClose: () => ui.setShellState("closed"),
       onDestroy: () => {
         runtime?.sessionService.destroyInMemory();
         runtime?.stateStore.destroy();
-        setShellClosed(root);
+        ui.destroy();
       },
-      onError: () => setShellFailed(root),
+      onError: () => ui.setUnavailable(),
     });
   } catch {
-    setShellFailed(root);
+    ui.setUnavailable();
   }
 }
+
 function getTestApiHostOverride(): string | undefined {
   if (import.meta.env.MODE === "production") return undefined;
   return import.meta.env.VITE_WIDGET_TEST_API_HOST;
+}
+
+function setDocumentLanguage(documentRef: Document, value: string | undefined): void {
+  const language = typeof value === "string" && /^[a-zA-Z]{2,8}(-[a-zA-Z0-9]{2,8})?$/.test(value) ? value : "en";
+  documentRef.documentElement.lang = language;
 }
 
 function installTestHarness(windowRef: Window, runtime: WidgetRuntimeServices): void {

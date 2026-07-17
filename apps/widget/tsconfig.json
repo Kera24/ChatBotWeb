@@ -1,4 +1,4 @@
-{
+﻿{
   "compilerOptions": {
     "target": "ES2020",
     "lib": ["ES2020", "DOM"],
@@ -11,11 +11,13 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
-    "types": ["vitest/globals", "node"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "types": ["vitest/globals", "node", "@testing-library/jest-dom"],
     "paths": {
       "@yoranix/widget-sdk": ["../../packages/widget-sdk/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.mjs", "vite.config.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "scripts/**/*.mjs", "vite.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

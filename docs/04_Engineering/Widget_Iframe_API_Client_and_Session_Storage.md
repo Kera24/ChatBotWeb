@@ -134,3 +134,9 @@ npm run verify
 TASK-064B5 adds Playwright browser tests under `tests/widget-browser` using separate local host, widget, and mock API origins. The required Chromium suite is included in `npm run verify`; Firefox and WebKit are available through `npm run widget:e2e:extended`.
 
 The suite validates real built SDK and iframe artifacts, token isolation, postMessage origin/source checks, iframe-owned API calls, storage reuse, CORS assumptions, CSP/sandbox attributes, lifecycle, focus, responsive bounds, and safe logging.
+
+## Rendering Foundation
+
+TASK-065B1 adds Preact rendering inside the iframe application only. The SDK remains framework-free. The current shell renders launcher, panel, header, status, viewport, and footer structure, but not welcome content, suggestions, messages, composer, citations, or privacy content.
+
+The Preact layer consumes safe state snapshots only. Session tokens remain in iframe storage/service internals and are not passed through component props, rendered DOM, postMessage, or host callbacks.
