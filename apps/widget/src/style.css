@@ -606,3 +606,215 @@ a:focus-visible,
     border: 1px solid CanvasText;
   }
 }
+
+/* TASK-065B3 composer, citations, recovery, and accessibility completion */
+.yw-panel {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+.yw-notices {
+  display: grid;
+  gap: var(--yw-spacing-xs, 0.25rem);
+  margin: 0 0 var(--yw-spacing-sm, 0.5rem);
+}
+
+.yw-inline-notice {
+  padding: 8px 10px;
+  border: 1px solid var(--yw-colours-border-subtle, rgba(15,23,42,.12));
+  border-radius: 12px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  background: var(--yw-colours-surface-inset, #eef2f7);
+  color: var(--yw-colours-text-secondary, #475569);
+}
+
+.yw-inline-notice--warning {
+  border-color: var(--yw-colours-state-warning, #b7791f);
+}
+
+.yw-inline-notice--error {
+  border-color: var(--yw-colours-state-danger, #b91c1c);
+  color: var(--yw-colours-state-danger, #b91c1c);
+}
+
+.yw-citations {
+  border-top: 1px solid var(--yw-colours-border-subtle, rgba(15,23,42,.12));
+  padding-top: var(--yw-spacing-sm, 0.5rem);
+}
+
+.yw-citations summary {
+  width: fit-content;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--yw-colours-accent-primary, #1f6feb);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.yw-citations__list {
+  display: grid;
+  gap: var(--yw-spacing-sm, 0.5rem);
+  margin: var(--yw-spacing-xs, 0.25rem) 0 0;
+  padding-inline-start: 1.25rem;
+}
+
+.yw-citation-item {
+  padding: 8px 9px;
+  border-radius: 10px;
+  background: var(--yw-colours-citation-surface, var(--yw-colours-surface-inset, #eef2f7));
+  overflow-wrap: anywhere;
+}
+
+.yw-citation-item__title,
+.yw-citation-item__meta,
+.yw-citation-item__quote {
+  margin: 0;
+}
+
+.yw-citation-item__title {
+  font-size: 0.84rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.yw-citation-item__meta {
+  margin-top: 3px;
+  color: var(--yw-colours-text-muted, #64748b);
+  font-size: 0.76rem;
+}
+
+.yw-citation-item__quote {
+  margin-top: 6px;
+  color: var(--yw-colours-text-secondary, #475569);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.yw-footer {
+  display: grid;
+  gap: 7px;
+  padding: 9px 10px max(10px, env(safe-area-inset-bottom));
+  min-height: auto;
+  border-top: 1px solid var(--yw-colours-border-subtle, rgba(15, 23, 42, 0.12));
+  background: var(--yw-colours-surface-elevated, #fff);
+}
+
+.yw-privacy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--yw-colours-text-muted, #64748b);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.yw-privacy a {
+  color: var(--yw-colours-accent-primary, #1f6feb);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.yw-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "label label" "field send" "meta meta";
+  gap: 6px 8px;
+  align-items: end;
+}
+
+.yw-composer__label {
+  grid-area: label;
+  color: var(--yw-colours-text-secondary, #475569);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.yw-composer__field {
+  grid-area: field;
+  width: 100%;
+  min-height: 44px;
+  max-height: 116px;
+  resize: none;
+  overflow: auto;
+  padding: 11px 12px;
+  border: 1px solid var(--yw-colours-border-strong, rgba(15,23,42,.2));
+  border-radius: 14px 14px 14px 7px;
+  color: var(--yw-colours-text-primary, #111827);
+  background: var(--yw-colours-surface-inset, #eef2f7);
+  line-height: 1.4;
+}
+
+.yw-composer__field[aria-invalid="true"] {
+  border-color: var(--yw-colours-state-danger, #b91c1c);
+}
+
+.yw-composer__meta {
+  grid-area: meta;
+  min-height: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.yw-composer__error,
+.yw-composer__status,
+.yw-composer__count {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.yw-composer__error {
+  color: var(--yw-colours-state-danger, #b91c1c);
+}
+
+.yw-composer__status,
+.yw-composer__count {
+  color: var(--yw-colours-text-muted, #64748b);
+}
+
+.yw-send {
+  grid-area: send;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 14px 14px 14px 7px;
+  color: var(--yw-colours-accent-contrast, #fff);
+  background: var(--yw-colours-accent-primary, #1f6feb);
+  cursor: pointer;
+}
+
+.yw-send:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+@media (max-width: 480px) {
+  .yw-footer {
+    padding-inline: 8px;
+  }
+
+  .yw-composer__field {
+    max-height: 92px;
+  }
+
+  .yw-citation-item {
+    padding: 8px;
+  }
+}
+
+@media (forced-colors: active) {
+  .yw-inline-notice,
+  .yw-citation-item,
+  .yw-composer__field,
+  .yw-send {
+    border: 1px solid CanvasText;
+  }
+}

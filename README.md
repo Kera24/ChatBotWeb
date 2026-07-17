@@ -180,3 +180,7 @@ npm run widget:e2e:chromium
 ### Widget TASK-065B2
 
 The widget iframe now includes the welcome and in-memory conversation presentation layer. Suggested questions can send through the iframe-owned API client; free-text composer and citation disclosure are still deferred.
+
+### Widget TASK-065B3
+
+The widget iframe now supports free-text conversation, citation disclosure, privacy footer, and recovery notices. It still excludes Markdown, streaming, persisted history, uploads, voice, lead capture, telemetry, and backend changes.

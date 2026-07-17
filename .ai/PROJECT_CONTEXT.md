@@ -383,3 +383,10 @@ Guardrails for future Codex sessions:
 - Backend answers are rendered as safe plain text only. No Markdown, raw HTML, or auto-linkification is enabled.
 - Citation data may remain inside iframe conversation entries, but citation disclosure is deferred to TASK-065B3.
 - Messages, answers, citations, session tokens, idempotency keys, tenant IDs, provider/model metadata, and raw backend errors must never cross to the host SDK.
+
+## Widget TASK-065B3 Notes
+
+- The iframe widget now supports normal free-text conversations through the existing iframe-owned message service.
+- Conversation and draft content remain iframe-memory-only and never cross to the host SDK.
+- Session tokens remain private to iframe services/storage and are not passed into Preact props or rendered output.
+- Citation disclosure uses validated public citation fields only; no Markdown, streaming, uploads, voice, lead capture, telemetry, or history persistence is implemented.

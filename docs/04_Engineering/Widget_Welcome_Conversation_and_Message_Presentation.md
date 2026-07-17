@@ -171,3 +171,7 @@ B2 production widget build:
 - CSS gzip: approximately 3.20 KB.
 
 The SDK bundle remains materially unchanged and framework-free.
+
+## TASK-065B3 Update
+
+Suggested questions and free-text composer sends now share the same conversation orchestrator. B2's suggested-question-only visual send limitation is removed; citation disclosure, privacy footer, session/rate recovery notices, offline drafting, and keyboard/focus foundations are now implemented in the iframe UI.

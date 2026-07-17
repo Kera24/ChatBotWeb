@@ -13,6 +13,9 @@ export const FALLBACK_WIDGET_KEY = "wpk_dev_fallback00000000";
 export const LOW_CONFIDENCE_WIDGET_KEY = "wpk_dev_lowconfidence000";
 export const MALICIOUS_WIDGET_KEY = "wpk_dev_malicious0000000";
 export const SLOW_WIDGET_KEY = "wpk_dev_slowmessage00000";
+export const CITATION_WIDGET_KEY = "wpk_dev_citations0000000";
+export const RATE_LIMIT_WIDGET_KEY = "wpk_dev_ratelimit0000000";
+export const INVALID_SESSION_WIDGET_KEY = "wpk_dev_invalidsess00000";
 export const SESSION_TOKEN = "pss_dev_abcdefghijklmnop.abcdefghijklmnopqrstuvwx";
 
 const repoRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
@@ -74,6 +77,9 @@ function handleHost(request: IncomingMessage, response: ServerResponse): void {
   if (url.pathname === "/low-confidence") { html(response, hostPage({ mode: "normal", widgetKey: LOW_CONFIDENCE_WIDGET_KEY })); return; }
   if (url.pathname === "/malicious") { html(response, hostPage({ mode: "normal", widgetKey: MALICIOUS_WIDGET_KEY })); return; }
   if (url.pathname === "/slow") { html(response, hostPage({ mode: "normal", widgetKey: SLOW_WIDGET_KEY })); return; }
+  if (url.pathname === "/citations") { html(response, hostPage({ mode: "normal", widgetKey: CITATION_WIDGET_KEY })); return; }
+  if (url.pathname === "/rate-limit-message") { html(response, hostPage({ mode: "normal", widgetKey: RATE_LIMIT_WIDGET_KEY })); return; }
+  if (url.pathname === "/invalid-session-message") { html(response, hostPage({ mode: "normal", widgetKey: INVALID_SESSION_WIDGET_KEY })); return; }
   if (url.pathname === "/blocked-frame") {
     response.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'unsafe-inline' ${WIDGET_ORIGIN}; frame-src 'none'; style-src 'self' 'unsafe-inline'`);
     html(response, hostPage({ mode: "normal", widgetKey: WIDGET_KEY }));
@@ -170,6 +176,15 @@ function handleApi(request: IncomingMessage, response: ServerResponse, requests:
         json(response, 404, { code: "invalid_session", message: "Invalid session", retryable: false });
         return;
       }
+      if (url.pathname.includes(RATE_LIMIT_WIDGET_KEY)) {
+        response.setHeader("Retry-After", "2");
+        json(response, 429, { code: "rate_limited", message: "Slow down", retryable: true, retry_after_seconds: 2 });
+        return;
+      }
+      if (url.pathname.includes(INVALID_SESSION_WIDGET_KEY)) {
+        json(response, 404, { code: "invalid_session", message: "Invalid session", retryable: false });
+        return;
+      }
       const payload = messageResponse(url.pathname);
       if (url.pathname.includes(SLOW_WIDGET_KEY)) {
         setTimeout(() => json(response, 200, payload), 160);
@@ -219,7 +234,10 @@ function messageResponse(pathname: string) {
     return { response_id: "resp_low", answer: "This may help, but please verify it against the available sources.", answer_state: "low_confidence", citations: [], remaining_messages: 18, session_expires_at: "2099-07-16T01:10:00.000Z", fallback_used: false, request_id: "req_message", response_schema_version: "1.0" };
   }
   if (pathname.includes(MALICIOUS_WIDGET_KEY)) {
-    return { response_id: "resp_malicious", answer: "<script>alert(1)</script>\n<img src=x onerror=alert(1)>\n[a](javascript:alert(1))", answer_state: "answered", citations: [], remaining_messages: 18, session_expires_at: "2099-07-16T01:10:00.000Z", fallback_used: false, request_id: "req_message", response_schema_version: "1.0" };
+    return { response_id: "resp_malicious", answer: "<script>alert(1)</script>\\n<img src=x onerror=alert(1)>\\n[a](javascript:alert(1))", answer_state: "answered", citations: [], remaining_messages: 18, session_expires_at: "2099-07-16T01:10:00.000Z", fallback_used: false, request_id: "req_message", response_schema_version: "1.0" };
+  }
+  if (pathname.includes(CITATION_WIDGET_KEY)) {
+    return { response_id: "resp_cited", answer: "Safe cited answer", answer_state: "answered", citations: [{ citation_index: 1, source_title: "Public guide", source_type: "document", page_number: 4, section_title: "Overview", quoted_text: "Approved public excerpt" }], remaining_messages: 18, session_expires_at: "2099-07-16T01:10:00.000Z", fallback_used: false, request_id: "req_message", response_schema_version: "1.0" };
   }
   return {
     response_id: "resp_1",

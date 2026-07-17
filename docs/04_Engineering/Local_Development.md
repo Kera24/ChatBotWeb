@@ -358,3 +358,14 @@ Run
 pm run widget:dev from the root equivalent via
 pm --prefix apps/widget run dev for the iframe app, or use
 pm run widget:e2e:chromium to exercise the loader, iframe, mock API, suggested-question send flow, and token-isolation checks.
+
+### Widget composer and citation checks
+
+TASK-065B3 browser coverage is included in the widget e2e commands:
+
+```bash
+npm run widget:e2e:chromium
+npm run widget:e2e:extended
+```
+
+The tests use fake widget keys and local mock API responses for composer, citation, rate-limit, and invalid-session scenarios.

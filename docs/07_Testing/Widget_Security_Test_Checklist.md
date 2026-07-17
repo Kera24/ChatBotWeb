@@ -43,3 +43,10 @@ Use this checklist before releasing widget SDK or iframe changes.
 - [ ] Closed widget does not block host-page interaction.
 - [ ] Resize requests remain bounded on desktop and mobile.
 - [ ] Console output does not include full widget keys, tokens, idempotency keys, messages, answers, citations, raw origins, or backend bodies.
+## TASK-065B3 Checklist Additions
+
+- [ ] Composer sends only through iframe-owned services.
+- [ ] Drafts, answers, citations, session tokens, and idempotency keys do not appear in parent postMessage payloads or host globals.
+- [ ] Citation disclosure renders only validated public citation fields.
+- [ ] Rate-limit and invalid-session recovery require explicit user action and do not retry storm.
+- [ ] Focus remains inside the open iframe widget and Escape closes without clearing the draft.

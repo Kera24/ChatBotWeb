@@ -514,3 +514,7 @@ Still deferred: full welcome state, suggested questions, messages, composer, cit
 ## TASK-065B2 Implementation Note
 
 The iframe widget now implements the B2 welcome and conversation presentation layer: configured welcome copy, suggested questions as the only visual send mechanism, in-memory message thread, user/assistant states, fallback/low-confidence labels, preparation state, safe retryable failure presentation, and foundational scrolling/live-region behavior. Composer, citation disclosure, and full recovery flows remain deferred.
+
+## TASK-065B3 Implementation Note
+
+The iframe widget now implements the functional free-text composer, safe citation disclosure, privacy/footer presentation, offline advisory state, session-ended recovery, rate-limit wait presentation, remaining-message warning, local focus containment, Escape close behavior, and keyboard-accessible message flow. Conversation and draft data remain iframe-memory-only; session tokens remain in iframe services/storage.

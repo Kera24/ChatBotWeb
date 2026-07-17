@@ -18,13 +18,13 @@ const emptyConversation: ConversationSnapshot = Object.freeze({ entries: Object.
 afterEach(() => cleanup());
 
 describe("Widget B2 welcome and message presentation", () => {
-  it("renders configured welcome and suggested questions without a composer", () => {
+  it("renders configured welcome, suggested questions, and composer", () => {
     render(<WidgetApp shellState="open" snapshot={readySnapshot} conversation={emptyConversation} systemDark={false} />);
     expect(screen.getByRole("heading", { name: "Ask Yoranix" })).toBeTruthy();
     expect(screen.getByText("Hello")).toBeTruthy();
     expect(screen.getByRole("group", { name: "Suggested questions" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /What can you do/ })).toBeTruthy();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy();
   });
 
   it("sends a suggestion directly and disables suggestions while busy", () => {
@@ -68,7 +68,7 @@ describe("Widget B2 welcome and message presentation", () => {
     render(<WidgetApp shellState="open" snapshot={readySnapshot} conversation={conversation} systemDark={false} />);
     expect(document.querySelector("script")).toBeNull();
     expect(document.querySelectorAll("img")).toHaveLength(1);
-    expect(document.querySelector("a")).toBeNull();
+    expect(document.querySelector("main a")).toBeNull();
     expect(document.body.textContent).toContain("<script>alert(1)</script>");
   });
 

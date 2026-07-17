@@ -33,14 +33,14 @@ describe("WidgetApp structural shell", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders open panel header viewport and footer shell", () => {
+  it("renders open panel header viewport and composer footer", () => {
     render(<WidgetApp shellState="open" snapshot={readySnapshot} systemDark={false} />);
     expect(screen.getByRole("dialog", { name: "Yoranix" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Yoranix" })).toBeTruthy();
     expect(screen.getByText("AI assistant")).toBeTruthy();
     expect(screen.getByRole("region", { name: "Chat conversation" })).toBeTruthy();
-    expect(screen.getByLabelText("Chat controls area")).toBeTruthy();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("contentinfo", { name: "Chat controls" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy();
   });
 
   it("uses safe fallback names", () => {

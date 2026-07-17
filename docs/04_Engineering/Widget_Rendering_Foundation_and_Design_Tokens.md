@@ -144,3 +144,7 @@ Welcome, suggestions, messages, composer, citations, privacy content, full focus
 ## TASK-065B2 Note
 
 The iframe visual layer now includes a configured welcome state, suggested-question direct send, in-memory conversation presentation, user/assistant message states, fallback and low-confidence labels, retryable failure presentation, and foundational scrolling/live-region behavior. Free-text composer, citation disclosure, full recovery workflows, and Markdown rendering remain deferred.
+
+## TASK-065B3 Update
+
+The structural shell now includes the functional composer footer, privacy notice, citation disclosure, recovery notices, and focus-boundary behavior. Design-token usage remains centralised and the loader SDK remains framework-free.

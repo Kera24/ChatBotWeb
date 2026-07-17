@@ -1,13 +1,14 @@
 ﻿# Current Sprint
 
-Current phase: Sprint 3E — Widget Experience
+Current phase:
+Sprint 3E - Widget Experience
 
-Current task: TASK-065B2 — Welcome State, Suggested Questions, Conversation Thread, and Message Presentation
+Current task:
+TASK-065B3 - Composer, Citations, Session Recovery, Offline Behaviour, and Accessibility Completion
 
-## Active Guardrails
+## Guardrails
 
-- Suggested questions are the only visual send mechanism in TASK-065B2.
-- Free-text composer, citation disclosure, offline drafting, and full session-expiry recovery remain deferred.
-- Conversation entries are iframe-memory-only.
-- Messages, answers, citations, session tokens, and idempotency keys must never cross to the host SDK.
-- The loader SDK remains framework-free.
+- Preserve iframe-owned public API calls and session-token isolation.
+- Do not add backend routes, SDK host-page send APIs, telemetry, streaming, uploads, voice, lead capture, Markdown, or history persistence.
+- Conversation and draft content remain iframe-memory-only.
+- Next implementation should continue with TASK-065B4 after TASK-065B3 approval.

@@ -71,3 +71,7 @@ The browser suite now validates the structural Preact shell, including launcher 
 ## TASK-065B2 Browser Coverage
 
 Browser tests now cover real loader-to-iframe welcome rendering, suggested-question sends, lazy session creation, duplicate activation prevention, fallback and low-confidence labels, malicious answer text rendered inertly, and iframe-memory-only conversation behavior across close/reopen and iframe reload.
+
+## TASK-065B3 Update
+
+Browser tests now cover real composer sends, citation disclosure, rate-limit presentation, invalid-session recovery, and continued token/postMessage isolation through the loader-to-iframe path.

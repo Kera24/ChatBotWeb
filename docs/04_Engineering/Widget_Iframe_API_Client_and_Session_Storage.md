@@ -144,3 +144,7 @@ The Preact layer consumes safe state snapshots only. Session tokens remain in if
 ## TASK-065B2 Note
 
 The visual layer now calls the existing iframe-owned message service only through a UI orchestration adapter for configured suggested questions. The session token remains private to iframe services/storage and is not passed into Preact props, DOM, postMessage, or host SDK state.
+
+## TASK-065B3 Update
+
+The iframe UI now invokes the existing message service from the conversation orchestrator for both suggestions and custom composer messages. The host SDK still cannot send messages and never receives session tokens, drafts, answers, citations, or idempotency keys.

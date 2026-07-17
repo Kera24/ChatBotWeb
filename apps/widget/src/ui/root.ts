@@ -50,6 +50,7 @@ export function mountWidgetUi(root: HTMLElement, options: Readonly<{ onOpen?: ()
       onOpen: options.onOpen,
       onClose: options.onClose,
       onSuggestionSelect: (id: string) => { void state.orchestrator?.submitSuggestedQuestion(id); },
+      onSubmitMessage: (message: string) => state.orchestrator?.submitCustomMessage(message),
       onRetry: (id: string) => { void state.orchestrator?.retry(id); },
       onRenderError: () => {
         state = { ...state, shellState: "unavailable" };

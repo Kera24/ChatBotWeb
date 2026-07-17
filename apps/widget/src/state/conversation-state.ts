@@ -83,15 +83,15 @@ export class ConversationStore {
     this.setSnapshot({ activeLogicalSendId: null, announcement: status === "fallback" ? "Fallback answer ready." : status === "low_confidence" ? "Low confidence answer ready." : "Answer ready." });
   }
 
-  failLogicalSend(userId: string, assistantId: string, logicalSendId: string, error: SafeWidgetApiErrorShape): void {
-    this.replaceEntry(userId, (entry) => freezeEntry({ ...entry, status: "failed", retry: Object.freeze({ retryable: error.retryable, logicalSendId }), error }));
+  failLogicalSend(userId: string, assistantId: string, logicalSendId: string, error: SafeWidgetApiErrorShape, allowExplicitRetry = error.retryable): void {
+    this.replaceEntry(userId, (entry) => freezeEntry({ ...entry, status: "failed", retry: Object.freeze({ retryable: allowExplicitRetry, logicalSendId }), error }));
     this.replaceEntry(assistantId, () => freezeEntry({
       id: assistantId,
       role: "assistant",
       createdAt: new Date().toISOString(),
       status: "failed",
       content: messageForError(error),
-      retry: Object.freeze({ retryable: error.retryable, logicalSendId }),
+      retry: Object.freeze({ retryable: allowExplicitRetry, logicalSendId }),
       error,
     }));
     this.setSnapshot({ activeLogicalSendId: null, announcement: "Message could not be sent." });
@@ -171,10 +171,10 @@ function totalContentLength(entries: readonly ConversationEntry[]): number {
 }
 
 function messageForError(error: SafeWidgetApiErrorShape): string {
-  if (error.code === "rate_limited") return "Please wait a moment before trying again.";
-  if (error.code === "unsafe_request" || error.code === "message_rejected") return "I can’t send that request. Try rephrasing it.";
+  if (error.code === "rate_limited") return error.retryAfterSeconds ? `Please wait ${error.retryAfterSeconds} seconds before trying again.` : "Please wait a moment before trying again.";
+  if (error.code === "unsafe_request" || error.code === "message_rejected") return "I can't send that request. Try rephrasing it.";
   if (error.code === "quota_exceeded" || error.code === "session_limit_reached") return "This chat is temporarily limited. Please try again later.";
-  if (error.code === "invalid_session" || error.code === "session_expired") return "This chat session is no longer active. Try sending again to start a fresh session.";
+  if (error.code === "invalid_session" || error.code === "session_expired") return "This chat session ended. Use Retry to start a fresh session for that message.";
   if (error.code === "request_timeout" || error.code === "network_error") return "The connection was interrupted before I could answer.";
-  return "I couldn’t get an answer right now. Please try again.";
+  return "I couldn't get an answer right now. Please try again.";
 }
