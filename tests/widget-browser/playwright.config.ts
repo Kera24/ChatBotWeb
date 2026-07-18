@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+﻿import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./specs",
@@ -15,8 +15,19 @@ export default defineConfig({
     navigationTimeout: 15_000,
   },
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "chromium", testIgnore: /visual-regression\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    { name: "firefox", testIgnore: /visual-regression\.spec\.ts/, use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", testIgnore: /visual-regression\.spec\.ts/, use: { ...devices["Desktop Safari"] } },
+    {
+      name: "visual-chromium",
+      testMatch: /visual-regression\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1,
+        colorScheme: "light",
+        reducedMotion: "reduce",
+      },
+    },
   ],
 });

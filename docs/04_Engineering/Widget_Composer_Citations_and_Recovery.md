@@ -1,4 +1,4 @@
-﻿# Widget Composer, Citations, and Recovery
+# Widget Composer, Citations, and Recovery
 
 TASK-065B3 makes the iframe widget usable for normal text conversations while preserving the SDK/API security boundary.
 
@@ -96,3 +96,6 @@ npm run verify
 ## Exclusions
 
 Still excluded: streaming, conversation history persistence, reload restoration of messages, draft storage, Markdown, uploads, voice, lead capture, human handoff, telemetry, analytics, public SDK send APIs, and backend changes.
+## TASK-065B4 Release Hardening
+
+Responsive, visual, accessibility, production-inspection, and release-readiness evidence for this functional widget layer now lives in `docs/04_Engineering/Widget_Responsive_Visual_and_Release_Readiness.md`. The B3 constraints remain unchanged: drafts and conversation content are iframe-memory-only, session tokens stay inside iframe services/storage, and Markdown, streaming, history persistence, uploads, voice, telemetry, and backend changes remain excluded.

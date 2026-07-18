@@ -369,3 +369,17 @@ npm run widget:e2e:extended
 ```
 
 The tests use fake widget keys and local mock API responses for composer, citation, rate-limit, and invalid-session scenarios.
+## Widget Release Verification
+
+TASK-065B4 adds release-readiness commands for the embeddable widget:
+
+```bash
+npm run widget:inspect:production
+npm run widget:bundle:check
+npm run widget:e2e:a11y
+npm run widget:e2e:visual
+npm run widget:e2e:visual:update
+npm run widget:release:verify
+```
+
+Run `npm run widget:build` before `npm run widget:inspect:production`; test-mode builds intentionally include browser-test hooks and should not be inspected as production artifacts.

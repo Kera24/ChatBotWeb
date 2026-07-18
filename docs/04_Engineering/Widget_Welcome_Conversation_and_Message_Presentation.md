@@ -1,4 +1,4 @@
-﻿# Widget Welcome, Conversation, and Message Presentation
+# Widget Welcome, Conversation, and Message Presentation
 
 Status: Implemented for TASK-065B2
 
@@ -175,3 +175,6 @@ The SDK bundle remains materially unchanged and framework-free.
 ## TASK-065B3 Update
 
 Suggested questions and free-text composer sends now share the same conversation orchestrator. B2's suggested-question-only visual send limitation is removed; citation disclosure, privacy footer, session/rate recovery notices, offline drafting, and keyboard/focus foundations are now implemented in the iframe UI.
+## TASK-065B4 Release Hardening
+
+TASK-065B4 adds responsive, motion, visual-regression, accessibility, and release-readiness validation over the B2 welcome/conversation presentation. The welcome, suggestion, message, fallback, low-confidence, and safe plain-text rendering boundaries remain unchanged.

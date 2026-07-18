@@ -75,3 +75,14 @@ Browser tests now cover real loader-to-iframe welcome rendering, suggested-quest
 ## TASK-065B3 Update
 
 Browser tests now cover real composer sends, citation disclosure, rate-limit presentation, invalid-session recovery, and continued token/postMessage isolation through the loader-to-iframe path.
+## TASK-065B4 Browser Release Suites
+
+TASK-065B4 extends browser coverage with targeted accessibility and visual-regression commands:
+
+```bash
+npm run widget:e2e:a11y
+npm run widget:e2e:visual
+npm run widget:e2e:visual:update
+```
+
+The required Chromium suite remains the functional/security baseline. Visual baselines use fake deterministic content and supplement, rather than replace, functional token-isolation, CSP, sandbox, lifecycle, and postMessage assertions.

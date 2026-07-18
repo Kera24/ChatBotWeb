@@ -1,4 +1,4 @@
-﻿import { h, render } from "preact";
+import { h, render } from "preact";
 import type { ConversationSnapshot, ConversationStore } from "../state/conversation-state";
 import type { WidgetStateSnapshot, WidgetStateStore } from "../state/widget-state";
 import type { ConversationOrchestrator } from "../services/conversation-orchestrator";
@@ -28,6 +28,7 @@ export function mountWidgetUi(root: HTMLElement, options: Readonly<{ onOpen?: ()
   let state: InternalUiState = { shellState: "loading", snapshot: null, conversation: null, orchestrator: null, systemDark: getSystemDark() };
   let unsubscribeWidget: (() => void) | null = null;
   let unsubscribeConversation: (() => void) | null = null;
+  const cleanupVisualViewport = installVisualViewportSync(root);
   const media = getColourSchemeMedia();
   const handleThemeChange = () => {
     state = { ...state, systemDark: getSystemDark() };
@@ -91,6 +92,7 @@ export function mountWidgetUi(root: HTMLElement, options: Readonly<{ onOpen?: ()
       unsubscribeWidget?.();
       unsubscribeConversation?.();
       media?.removeEventListener?.("change", handleThemeChange);
+      cleanupVisualViewport();
       state = { ...state, shellState: "destroyed" };
       render(null, root);
       root.setAttribute("data-widget-state", "destroyed");
@@ -106,4 +108,21 @@ function getColourSchemeMedia(): MediaQueryList | null {
 
 function getSystemDark(): boolean {
   return getColourSchemeMedia()?.matches ?? false;
+}
+
+function installVisualViewportSync(root: HTMLElement): () => void {
+  const viewport = typeof window !== "undefined" ? window.visualViewport : undefined;
+  const update = () => {
+    const height = viewport?.height ?? window.innerHeight;
+    if (Number.isFinite(height) && height > 0) root.style.setProperty("--yw-visual-viewport-height", `${Math.round(height)}px`);
+  };
+  update();
+  viewport?.addEventListener?.("resize", update);
+  viewport?.addEventListener?.("scroll", update);
+  window.addEventListener("orientationchange", update);
+  return () => {
+    viewport?.removeEventListener?.("resize", update);
+    viewport?.removeEventListener?.("scroll", update);
+    window.removeEventListener("orientationchange", update);
+  };
 }

@@ -7,7 +7,10 @@
     "test": "playwright test --project=chromium",
     "test:chromium": "playwright test --project=chromium",
     "test:extended": "playwright test",
-    "install:browsers": "playwright install chromium"
+    "install:browsers": "playwright install chromium",
+    "test:a11y": "playwright test specs/accessibility-release.spec.ts --project=chromium",
+    "test:visual": "playwright test specs/visual-regression.spec.ts --project=visual-chromium",
+    "test:visual:update": "playwright test specs/visual-regression.spec.ts --project=visual-chromium --update-snapshots"
   },
   "devDependencies": {
     "@playwright/test": "latest",

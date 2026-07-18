@@ -1,4 +1,4 @@
-﻿# Widget Rendering Foundation and Design Tokens
+# Widget Rendering Foundation and Design Tokens
 
 TASK-065B1 adds the first visual rendering foundation for the iframe widget app.
 
@@ -148,3 +148,6 @@ The iframe visual layer now includes a configured welcome state, suggested-quest
 ## TASK-065B3 Update
 
 The structural shell now includes the functional composer footer, privacy notice, citation disclosure, recovery notices, and focus-boundary behavior. Design-token usage remains centralised and the loader SDK remains framework-free.
+## TASK-065B4 Responsive And Release Hardening
+
+The tokenised shell now has release-readiness coverage for responsive breakpoints, Visual Viewport sizing, reduced motion, forced colours, customer-branding extremes, visual baselines, production bundle inspection, and controlled-pilot readiness. See `docs/04_Engineering/Widget_Responsive_Visual_and_Release_Readiness.md`.

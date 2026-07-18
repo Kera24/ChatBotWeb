@@ -184,3 +184,17 @@ The widget iframe now includes the welcome and in-memory conversation presentati
 ### Widget TASK-065B3
 
 The widget iframe now supports free-text conversation, citation disclosure, privacy footer, and recovery notices. It still excludes Markdown, streaming, persisted history, uploads, voice, lead capture, telemetry, and backend changes.
+### Widget TASK-065B4
+
+The widget iframe now has responsive/mobile hardening, controlled motion refinements, accessibility and visual-regression browser suites, production bundle inspection, and release-readiness documentation. The current release classification is controlled pilot readiness. General availability still requires production-domain setup, real-backend smoke coverage, operational monitoring, and manual assistive-technology review.
+
+Additional commands:
+
+```bash
+npm run widget:inspect:production
+npm run widget:bundle:check
+npm run widget:e2e:a11y
+npm run widget:e2e:visual
+npm run widget:e2e:visual:update
+npm run widget:release:verify
+```

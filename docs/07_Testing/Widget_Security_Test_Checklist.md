@@ -50,3 +50,10 @@ Use this checklist before releasing widget SDK or iframe changes.
 - [ ] Citation disclosure renders only validated public citation fields.
 - [ ] Rate-limit and invalid-session recovery require explicit user action and do not retry storm.
 - [ ] Focus remains inside the open iframe widget and Escape closes without clearing the draft.
+## TASK-065B4 Release Additions
+
+- [ ] Run `npm run widget:inspect:production` after a production widget build.
+- [ ] Run `npm run widget:e2e:a11y` for representative accessibility release states.
+- [ ] Run `npm run widget:e2e:visual` and review intentional visual baseline changes.
+- [ ] Confirm drafts, answers, citations, and idempotency keys remain absent from parent globals, postMessage, console output, and host storage.
+- [ ] Confirm production bundles exclude test harness globals, localhost mock hosts, fixture tokens, and mock response content.

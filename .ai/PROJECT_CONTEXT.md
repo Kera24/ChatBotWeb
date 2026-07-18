@@ -390,3 +390,8 @@ Guardrails for future Codex sessions:
 - Conversation and draft content remain iframe-memory-only and never cross to the host SDK.
 - Session tokens remain private to iframe services/storage and are not passed into Preact props or rendered output.
 - Citation disclosure uses validated public citation fields only; no Markdown, streaming, uploads, voice, lead capture, telemetry, or history persistence is implemented.
+## Widget Release Readiness
+
+- TASK-065B4 hardens the functional widget for controlled-pilot readiness through responsive, motion, accessibility, visual-regression, security, production-inspection, and release documentation work.
+- The widget remains iframe-owned for API calls and session storage; session tokens, drafts, messages, answers, citations, and idempotency keys must never cross to the host SDK.
+- Release classification is controlled pilot until production-domain configuration, real-backend smoke coverage, operational monitoring, and manual assistive-technology review are complete.
