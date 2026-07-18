@@ -395,3 +395,10 @@ Guardrails for future Codex sessions:
 - TASK-065B4 hardens the functional widget for controlled-pilot readiness through responsive, motion, accessibility, visual-regression, security, production-inspection, and release documentation work.
 - The widget remains iframe-owned for API calls and session storage; session tokens, drafts, messages, answers, citations, and idempotency keys must never cross to the host SDK.
 - Release classification is controlled pilot until production-domain configuration, real-backend smoke coverage, operational monitoring, and manual assistive-technology review are complete.
+## Widget Pilot And Operations
+
+- Widget experience TASK-065 is complete.
+- The widget is classified as release-ready for controlled pilot, not general availability.
+- Production deployment/versioning architecture requires TASK-066A approval.
+- No production deployment should occur before TASK-066A approval.
+- Admin/publishing architecture moves to TASK-067A after deployment semantics are defined.
