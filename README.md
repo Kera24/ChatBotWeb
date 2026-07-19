@@ -198,3 +198,14 @@ npm run widget:e2e:visual
 npm run widget:e2e:visual:update
 npm run widget:release:verify
 ```
+## Widget Production Delivery
+
+TASK-066B1 adds provider-neutral widget release artifact generation and delivery policy. It does not deploy production infrastructure.
+
+```bash
+npm run widget:config:validate
+npm run widget:release:build
+npm run widget:e2e:release
+```
+
+Generated release output is ignored under `artifacts/widget-release/`. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.

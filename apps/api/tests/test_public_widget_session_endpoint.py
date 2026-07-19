@@ -132,6 +132,7 @@ def test_public_widget_session_creation_returns_safe_token_and_persists_session(
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
     assert response.headers["access-control-allow-credentials"] == "false"
     assert response.headers["vary"] == "Origin"
+    assert response.headers["cache-control"] == "no-store"
     with client.app.state.testing_session() as db:
         sessions = db.execute(select(PublicSession)).scalars().all()
         assert len(sessions) == 1
@@ -242,6 +243,7 @@ def test_rate_limited_and_redis_unavailable_fail_closed_before_session_creation(
     assert limited.status_code == 429
     assert limited.json()["error"]["code"] == "rate_limited"
     assert limited.headers["retry-after"] == "17"
+    assert limited.headers["cache-control"] == "no-store"
     with client.app.state.testing_session() as db:
         assert db.execute(select(PublicSession)).scalars().all() == []
 

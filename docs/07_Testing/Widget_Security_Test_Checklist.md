@@ -57,3 +57,6 @@ Use this checklist before releasing widget SDK or iframe changes.
 - [ ] Run `npm run widget:e2e:visual` and review intentional visual baseline changes.
 - [ ] Confirm drafts, answers, citations, and idempotency keys remain absent from parent globals, postMessage, console output, and host storage.
 - [ ] Confirm production bundles exclude test harness globals, localhost mock hosts, fixture tokens, and mock response content.
+## TASK-066B1 Production Delivery Foundation
+
+TASK-066B1 implements repository-local, provider-neutral release artifacts, origin validation, cache/header policy, manifest/checksum generation, production inspection, and versioned-loader browser smoke coverage. It does not deploy production infrastructure. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.

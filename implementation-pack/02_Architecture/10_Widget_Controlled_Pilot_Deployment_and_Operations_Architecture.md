@@ -736,3 +736,6 @@ flowchart LR
 ## 51. Acceptance Criteria
 
 TASK-066A is complete when deployment topology, domain boundaries, SDK/iframe/API delivery architecture, versioning and compatibility, cache policy, CORS/security headers, pilot environment model, synthetic real-backend smoke, tenant-isolation production smoke, logging/privacy, observability, alerting, rollback, release channels, pilot/GA gates, ADR-0016, implementation split, and diagrams are documented, and no production infrastructure is deployed.
+## TASK-066B1 Production Delivery Foundation
+
+TASK-066B1 implements repository-local, provider-neutral release artifacts, origin validation, cache/header policy, manifest/checksum generation, production inspection, and versioned-loader browser smoke coverage. It does not deploy production infrastructure. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.

@@ -164,6 +164,7 @@ def test_public_widget_config_returns_safe_published_projection_without_side_eff
     assert response.headers["access-control-allow-credentials"] == "false"
     assert response.headers["vary"] == "Origin"
     assert response.headers["etag"].startswith('"')
+    assert "no-store" not in response.headers["cache-control"]
     assert response.headers["cache-control"].startswith("public, max-age=60")
     for excluded in ("organisation_id", "workspace_id", "credential_id", "allowed_origins", "policy_profile", "metadata_json", "provider_key", "model_key"):
         assert excluded not in str(body)

@@ -88,6 +88,8 @@ def test_public_widget_message_fallback_completes_idempotency_and_persists_messa
     response = post_message(client, public_key, token, message="No matching knowledge exists")
 
     assert response.status_code == 200, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["vary"] == "Origin"
     body = response.json()
     assert body["response_id"].startswith("pmr_")
     assert body["answer_state"] == "fallback"
@@ -118,6 +120,7 @@ def test_completed_duplicate_returns_snapshot_without_new_messages_or_slot(clien
 
     assert first.status_code == 200
     assert second.status_code == 200
+    assert second.headers["cache-control"] == "no-store"
     assert second.json() == first.json()
     with client.app.state.testing_session() as db:
         session = db.execute(select(PublicSession)).scalar_one()

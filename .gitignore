@@ -36,3 +36,6 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Generated release artifacts
+artifacts/widget-release/

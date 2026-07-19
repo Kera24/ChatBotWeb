@@ -402,3 +402,17 @@ Guardrails for future Codex sessions:
 - Production deployment/versioning architecture requires TASK-066A approval.
 - No production deployment should occur before TASK-066A approval.
 - Admin/publishing architecture moves to TASK-067A after deployment semantics are defined.
+## Widget Production Delivery Guardrails
+
+TASK-066B1 implements provider-neutral widget release artifacts and production-delivery policy only.
+
+Guardrails for future Codex sessions:
+
+- Generated release artifacts live under `artifacts/widget-release/` and are ignored build outputs.
+- `packages/widget-sdk/package.json` remains the authoritative SDK semantic version source; SDK semver, SDK major compatibility, postMessage protocol major, and public API version are separate.
+- Production-like widget, API, and SDK/CDN origins must be HTTPS, origin-only, credential-free, and non-localhost.
+- Immutable semantic SDK artifacts and hashed iframe assets may receive one-year immutable caching; SDK major aliases and iframe HTML must remain revalidatable.
+- Public session and message responses must remain `Cache-Control: no-store`; public configuration must preserve ETag and `Vary: Origin` isolation.
+- `deployment/widget/headers.json` is provider-neutral policy, not a live CDN deployment.
+- No production deployment, DNS/CDN mutation, monitoring vendor integration, synthetic tenant, kill switch, or admin publishing UI exists yet.
+- TASK-066B2 should add real-backend synthetic smoke, tenant-isolation smoke, and pilot release verification.

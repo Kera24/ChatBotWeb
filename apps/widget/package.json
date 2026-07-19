@@ -10,7 +10,9 @@
     "test": "vitest run",
     "build:test": "vite build --mode test && tsc --noEmit -p tsconfig.json && node scripts/check-size.mjs",
     "inspect:production": "node scripts/inspect-production.mjs",
-    "bundle:check": "node scripts/check-size.mjs"
+    "bundle:check": "node scripts/check-size.mjs",
+    "config:validate": "node scripts/validate-release-config.mjs",
+    "release:build": "node scripts/build-release.mjs"
   },
   "dependencies": {
     "@yoranix/widget-sdk": "file:../../packages/widget-sdk",

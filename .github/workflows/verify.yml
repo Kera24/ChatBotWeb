@@ -51,6 +51,15 @@ jobs:
 
       - name: Run verification
         run: npm run verify
+
+      - name: Upload widget release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-release-artifacts
+          path: artifacts/widget-release
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload widget browser artifacts
         if: failure()
         uses: actions/upload-artifact@v4

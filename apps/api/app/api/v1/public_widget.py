@@ -559,7 +559,7 @@ async def send_public_widget_message(public_key: str, request: Request, db: DbSe
         if payload.get("stored_response") is not None:
             db.commit()
             _emit(event_sink, "widget.message.duplicate", request_id=request_id, trace_id=result.response.trace_id, outcome="duplicate", latency_ms=int((time.perf_counter() - started) * 1000))
-            return JSONResponse(status_code=status.HTTP_200_OK, content=payload["stored_response"], headers=_message_cors_headers(cors_origin or ""))
+            return JSONResponse(status_code=status.HTTP_200_OK, content=payload["stored_response"], headers=_message_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL})
         if payload.get("safe_error_code"):
             db.rollback()
             detail = error_detail(str(payload["safe_error_code"]))
@@ -576,7 +576,7 @@ async def send_public_widget_message(public_key: str, request: Request, db: DbSe
         _emit(event_sink, "widget.message.response_projected", request_id=request_id, trace_id=result.response.trace_id, outcome="projected", latency_ms=int((time.perf_counter() - started) * 1000))
         if public_response.get("fallback_used"):
             _emit(event_sink, "widget.message.fallback", request_id=request_id, trace_id=result.response.trace_id, outcome="fallback", latency_ms=int((time.perf_counter() - started) * 1000))
-        return JSONResponse(status_code=status.HTTP_200_OK, content=public_response, headers=_message_cors_headers(cors_origin or ""))
+        return JSONResponse(status_code=status.HTTP_200_OK, content=public_response, headers=_message_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL})
     except PublicAccessError as exc:
         db.commit()
         detail = exc.detail
@@ -644,7 +644,7 @@ async def create_public_widget_session(public_key: str, request: Request, db: Db
         db.commit()
         payload = WidgetChannelAdapter().format_response(result.response)
         _emit(event_sink, "widget.session.created", request_id=request_id, trace_id=result.response.trace_id, outcome="created", latency_ms=int((time.perf_counter() - started) * 1000))
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content=payload, headers=_cors_headers(cors_origin or ""))
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=payload, headers=_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL})
     except PublicAccessError as exc:
         db.rollback()
         detail = _map_public_error(exc.detail)

@@ -383,3 +383,14 @@ npm run widget:release:verify
 ```
 
 Run `npm run widget:build` before `npm run widget:inspect:production`; test-mode builds intentionally include browser-test hooks and should not be inspected as production artifacts.
+## Widget release artifact commands
+
+TASK-066B1 adds local, provider-neutral release artifact preparation. These commands do not deploy anything:
+
+```bash
+npm run widget:config:validate
+npm run widget:release:build
+npm run widget:e2e:release
+```
+
+The generated output is ignored under `artifacts/widget-release/`. Production-like validation requires HTTPS origin-only values for `WIDGET_PUBLIC_ORIGIN`, `WIDGET_PUBLIC_API_ORIGIN`, and `WIDGET_SDK_PUBLIC_ORIGIN`; CI defaults use safe placeholder origins.

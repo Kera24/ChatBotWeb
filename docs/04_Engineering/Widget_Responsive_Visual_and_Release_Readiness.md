@@ -198,3 +198,6 @@ npm run widget:release:verify
 npm run verify
 git diff --check
 ```
+## TASK-066B1 Production Delivery Foundation
+
+TASK-066B1 implements repository-local, provider-neutral release artifacts, origin validation, cache/header policy, manifest/checksum generation, production inspection, and versioned-loader browser smoke coverage. It does not deploy production infrastructure. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.

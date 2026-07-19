@@ -21,6 +21,7 @@ export const SESSION_TOKEN = "pss_dev_abcdefghijklmnop.abcdefghijklmnopqrstuvwx"
 const repoRoot = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
 const sdkDist = join(repoRoot, "packages/widget-sdk/dist");
 const widgetDist = join(repoRoot, "apps/widget/dist");
+const releaseDist = join(repoRoot, "artifacts/widget-release");
 
 type RecordedRequest = {
   method: string;
@@ -37,16 +38,20 @@ export async function startWidgetBrowserServers() {
   const host = createServer((request, response) => handleHost(request, response));
   const widget = createServer((request, response) => handleWidget(request, response));
   const api = createServer((request, response) => handleApi(request, response, apiRequests));
+  const releaseApi = process.env.WIDGET_BROWSER_RELEASE_ARTIFACTS === "1"
+    ? createServer((request, response) => handleApi(request, response, apiRequests))
+    : undefined;
   await Promise.all([
     listen(host, 4100),
     listen(widget, 4200),
     listen(api, 4300),
+    ...(releaseApi ? [listen(releaseApi, 8000, "localhost")] : []),
   ]);
   return {
     origins: { host: HOST_ORIGIN, widget: WIDGET_ORIGIN, api: API_ORIGIN },
     apiRequests,
     resetApiRequests: () => { apiRequests.length = 0; },
-    close: async () => Promise.all([close(host), close(widget), close(api)]),
+    close: async () => Promise.all([close(host), close(widget), close(api), ...(releaseApi ? [close(releaseApi)] : [])]),
   };
 }
 
@@ -54,6 +59,10 @@ function handleHost(request: IncomingMessage, response: ServerResponse): void {
   const url = new URL(request.url ?? "/", HOST_ORIGIN);
   if (url.pathname === "/normal" || url.pathname === "/") {
     html(response, hostPage({ mode: "normal", widgetKey: WIDGET_KEY }));
+    return;
+  }
+  if (url.pathname === "/release") {
+    html(response, hostPage({ mode: "normal", widgetKey: WIDGET_KEY, sdkPath: "/widget-sdk/v1/loader.js" }));
     return;
   }
   if (url.pathname === "/duplicate") {
@@ -88,7 +97,7 @@ function handleHost(request: IncomingMessage, response: ServerResponse): void {
   text(response, 404, "not found");
 }
 
-function hostPage(options: { mode: "normal" | "duplicate"; widgetKey: string }): string {
+function hostPage(options: { mode: "normal" | "duplicate"; widgetKey: string; sdkPath?: string }): string {
   const duplicate = options.mode === "duplicate" ? "window.YoranixWidget.init(config).catch((error) => { window.__secondInitError = error; });" : "";
   return `<!doctype html>
 <html>
@@ -96,7 +105,7 @@ function hostPage(options: { mode: "normal" | "duplicate"; widgetKey: string }):
 <body>
 <button id="before-widget">Before widget</button>
 <button id="host-click-target" onclick="window.__hostClicked = true">Host target</button>
-<script src="${WIDGET_ORIGIN}/sdk/yoranix-widget-sdk.global.js"></script>
+<script src="${WIDGET_ORIGIN}${options.sdkPath ?? "/sdk/yoranix-widget-sdk.global.js"}"></script>
 <script>
 window.__widgetEvents = [];
 const config = { widgetKey: "${options.widgetKey}", environment: "development", iframeHost: "${WIDGET_ORIGIN}" };
@@ -112,16 +121,25 @@ ${duplicate}
 
 function handleWidget(request: IncomingMessage, response: ServerResponse): void {
   const url = new URL(request.url ?? "/", WIDGET_ORIGIN);
+  const useRelease = process.env.WIDGET_BROWSER_RELEASE_ARTIFACTS === "1";
   if (url.pathname === "/sdk/yoranix-widget-sdk.global.js") {
     file(response, join(sdkDist, "yoranix-widget-sdk.global.js"));
     return;
   }
+  if (useRelease && url.pathname.startsWith("/widget-sdk/")) {
+    file(response, join(releaseDist, "sdk", url.pathname.replace(/^\/widget-sdk\//, "")));
+    return;
+  }
+  if (useRelease && url.pathname === "/release-manifest.json") {
+    file(response, join(releaseDist, "manifest.json"));
+    return;
+  }
   if (url.pathname.startsWith("/assets/")) {
-    file(response, join(widgetDist, url.pathname));
+    file(response, useRelease ? join(releaseDist, "widget", url.pathname) : join(widgetDist, url.pathname));
     return;
   }
   if (url.pathname.startsWith("/embed/")) {
-    file(response, join(widgetDist, "index.html"));
+    file(response, useRelease ? join(releaseDist, "widget", "index.html") : join(widgetDist, "index.html"));
     return;
   }
   text(response, 404, "not found");
@@ -281,11 +299,12 @@ function contentType(path: string): string {
   if (ext === ".js") return "application/javascript";
   if (ext === ".css") return "text/css";
   if (ext === ".html") return "text/html; charset=utf-8";
+  if (ext === ".json") return "application/json; charset=utf-8";
   return "application/octet-stream";
 }
 
-function listen(server: Server, port: number): Promise<void> {
-  return new Promise((resolveListen) => server.listen(port, "127.0.0.1", () => resolveListen()));
+function listen(server: Server, port: number, host = "127.0.0.1"): Promise<void> {
+  return new Promise((resolveListen) => server.listen(port, host, () => resolveListen()));
 }
 
 function close(server: Server): Promise<void> {

@@ -86,3 +86,6 @@ npm run widget:e2e:visual:update
 ```
 
 The required Chromium suite remains the functional/security baseline. Visual baselines use fake deterministic content and supplement, rather than replace, functional token-isolation, CSP, sandbox, lifecycle, and postMessage assertions.
+## TASK-066B1 Production Delivery Foundation
+
+TASK-066B1 implements repository-local, provider-neutral release artifacts, origin validation, cache/header policy, manifest/checksum generation, production inspection, and versioned-loader browser smoke coverage. It does not deploy production infrastructure. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.
