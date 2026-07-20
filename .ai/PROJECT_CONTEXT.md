@@ -416,3 +416,31 @@ Guardrails for future Codex sessions:
 - `deployment/widget/headers.json` is provider-neutral policy, not a live CDN deployment.
 - No production deployment, DNS/CDN mutation, monitoring vendor integration, synthetic tenant, kill switch, or admin publishing UI exists yet.
 - TASK-066B2 should add real-backend synthetic smoke, tenant-isolation smoke, and pilot release verification.
+
+## Widget Real-Backend Synthetic Smoke Guardrails
+
+TASK-066B2 adds a deterministic synthetic real-backend verification gate for controlled pilot readiness.
+
+Guardrails for future Codex sessions:
+
+- `npm run widget:pilot:verify` is the repository-local pre-pilot gate after release artifact generation.
+- The suite uses synthetic Alpha/Beta tenants, widgets, origins, and knowledge only. Do not use customer data.
+- Fixture setup requires explicit synthetic test mode and rejects production-like database/environment inputs.
+- The suite exercises real public widget config, session, message, origin, idempotency, tenant lookup, and retrieval-filtering paths with the existing deterministic mock AI provider.
+- Tenant isolation must be proven with positive retrieval and negative cross-tenant retrieval assertions.
+- Passing release artifact checks alone is insufficient for controlled pilot deployment.
+- TASK-066B3 must define and implement operational controls, health checks, alerts, rollback, and pilot enablement before TASK-067A admin/publishing architecture begins.
+
+## Widget Operational Controls Guardrails
+
+TASK-066B3 adds the minimum provider-neutral operational layer for controlled pilot readiness.
+
+Guardrails for future Codex sessions:
+
+- `/health/live` is lightweight liveness; `/health/ready` checks internal readiness without creating sessions, running retrieval, or calling model providers.
+- Public widget routes validate bounded `X-Request-ID` values and return safe request IDs in response headers.
+- Operational logging and metrics are allowlisted and must not contain session tokens, raw messages, answers, citation quotes, prompts, credentials, raw public keys, or raw hostile Origins.
+- Pilot enablement and kill switches are server-controlled through configuration/state only; host pages cannot enable themselves.
+- `PUBLIC_WIDGETS_ENABLED=false` disables config/session/message. `PUBLIC_WIDGET_MESSAGES_ENABLED=false` disables message sends, including existing sessions.
+- `npm run widget:pilot:readiness` is the repository-local B3 readiness gate and writes an ignored safe report under `artifacts/widget-pilot-readiness/`.
+- TASK-067A may now define administration, publishing, and embed management around publishable, pilot-enabled, disabled, release/channel, allowed origins, embed version, operational health, and rollback concepts.

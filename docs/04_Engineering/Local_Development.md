@@ -394,3 +394,17 @@ npm run widget:e2e:release
 ```
 
 The generated output is ignored under `artifacts/widget-release/`. Production-like validation requires HTTPS origin-only values for `WIDGET_PUBLIC_ORIGIN`, `WIDGET_PUBLIC_API_ORIGIN`, and `WIDGET_SDK_PUBLIC_ORIGIN`; CI defaults use safe placeholder origins.
+
+## Widget Pilot Verification
+
+Run the synthetic real-backend pre-pilot gate with:
+
+```bash
+npm run widget:pilot:verify
+```
+
+The command uses synthetic test data only and writes a safe report to `artifacts/widget-pilot-verification/report.json`.
+
+## TASK-066B3 Operational Controls
+
+TASK-066B3 adds provider-neutral operational controls for controlled pilot readiness: `/health/live`, `/health/ready`, safe request correlation IDs, privacy-preserving redaction helpers, in-memory operational counters for test evidence, server-side pilot allowlist controls, global/widget/message kill switches, provider-neutral alert definitions, a dry-run rollback planner, and `npm run widget:pilot:readiness`. It does not deploy production infrastructure or add a monitoring vendor.

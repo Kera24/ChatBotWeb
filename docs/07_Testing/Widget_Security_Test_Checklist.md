@@ -60,3 +60,21 @@ Use this checklist before releasing widget SDK or iframe changes.
 ## TASK-066B1 Production Delivery Foundation
 
 TASK-066B1 implements repository-local, provider-neutral release artifacts, origin validation, cache/header policy, manifest/checksum generation, production inspection, and versioned-loader browser smoke coverage. It does not deploy production infrastructure. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.
+
+## TASK-066B2 Real-Backend Isolation Additions
+
+- [ ] Synthetic Alpha/Beta tenants are isolated at public credential, session, message, and retrieval boundaries.
+- [ ] Alpha public session token is rejected against Beta widget context and vice versa.
+- [ ] Alpha asks a Beta-only fact and receives no Beta citation, title, or quoted text.
+- [ ] Beta asks an Alpha-only fact and receives no Alpha citation, title, or quoted text.
+- [ ] Public config ETags and conditional requests do not serve cross-widget representations.
+- [ ] Public widget APIs set no cookies in synthetic real-backend smoke.
+- [ ] Pilot verification report redacts tokens, message bodies, answers, prompts, and credentials.
+
+## TASK-066B3 Operational Security Additions
+
+- [ ] Operational logs redact session tokens, Authorization headers, cookies, messages, answers, citation quotes, prompts, credentials, and raw public keys.
+- [ ] Operational metric labels avoid raw session tokens, request IDs, public keys, origins, and message text.
+- [ ] Host pages cannot enable pilot access or override kill switches.
+- [ ] Existing sessions cannot bypass global message disablement.
+- [ ] Pilot readiness reports contain no secrets, customer content, tokens, prompts, answers, or citation quotes.

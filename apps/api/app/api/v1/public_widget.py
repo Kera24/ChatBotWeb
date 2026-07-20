@@ -37,6 +37,10 @@ from app.access.widget_config.public_projection import project_public_widget_con
 from app.access.widget_config.repository import get_configuration_for_credential
 from app.api.deps import DbSession
 from app.core.config import settings
+from app.operations.correlation import safe_request_id
+from app.operations.logging import log_operational_event, pseudonymous_identifier
+from app.operations.metrics import metric_name_for_event
+from app.operations.widget_controls import evaluate_widget_access, resolve_controls
 from app.db.models import Organisation, PublicCredential, Workspace
 from app.services.embeddings import build_embedding_provider
 from app.schemas.public_widget import PublicWidgetConfigurationResponse, PublicWidgetMessageCreateRequest, PublicWidgetMessageResponse, PublicWidgetSessionCreateRequest, PublicWidgetSessionCreateResponse
@@ -55,10 +59,7 @@ _ORIGIN_ERROR_CODES = {"origin_required", "origin_not_allowed", "malformed_origi
 
 
 def _request_id(request: Request) -> str:
-    header = request.headers.get("x-request-id")
-    if header and 0 < len(header) <= 120:
-        return header
-    return new_request_id()
+    return safe_request_id(request.headers.get("x-request-id"))
 
 
 def _headers(request: Request) -> dict[str, str]:
@@ -105,26 +106,54 @@ async def _parse_body(request: Request) -> tuple[dict[str, Any] | None, PublicAc
     return parsed.model_dump(exclude_none=True), None
 
 
+def _operational_policy_error(public_key: str, request: Request, *, operation: str) -> PublicAccessErrorDetail | None:
+    return evaluate_widget_access(public_key, controls=resolve_controls(request.app.state), operation=operation)
+
+
 def _event_sink(request: Request) -> InMemoryAccessEventSink:
     existing = getattr(request.app.state, "public_widget_event_sink", None)
     if existing is not None:
+        metrics = getattr(request.app.state, "public_widget_operational_metrics", None)
+        if metrics is not None:
+            setattr(existing, "operational_metrics", metrics)
+        logger = getattr(request.app.state, "public_widget_operational_logger", None)
+        if logger is not None:
+            setattr(existing, "operational_logger", logger)
         return existing
     return InMemoryAccessEventSink()
 
 
 def _emit(event_sink: InMemoryAccessEventSink, event_type: str, *, request_id: str, trace_id: str = "unresolved", channel: str = "widget", credential_id: str | None = None, outcome: str | None = None, error_code: str | None = None, latency_ms: int | None = None) -> None:
-    event_sink.emit(
-        AccessEvent(
-            event_type=event_type,
-            request_id=request_id,
-            trace_id=trace_id,
-            channel=channel,
-            credential_id=credential_id,
-            outcome=outcome,
-            error_code=error_code,
-            latency_ms=latency_ms,
-        )
+    event = AccessEvent(
+        event_type=event_type,
+        request_id=request_id,
+        trace_id=trace_id,
+        channel=channel,
+        credential_id=credential_id,
+        outcome=outcome,
+        error_code=error_code,
+        latency_ms=latency_ms,
     )
+    event_sink.emit(event)
+    metrics = getattr(event_sink, "operational_metrics", None)
+    if metrics is not None:
+        name, metric_status = metric_name_for_event(event_type)
+        metrics.increment(name, status=metric_status)
+    logger = getattr(event_sink, "operational_logger", None)
+    if logger is not None:
+        log_operational_event(
+            logger,
+            {
+                "event_type": event_type,
+                "request_id": request_id,
+                "trace_id": trace_id,
+                "channel": channel,
+                "widget_ref": pseudonymous_identifier(credential_id, prefix="widget") if credential_id else None,
+                "outcome": outcome,
+                "error_code": error_code,
+                "latency_ms": latency_ms,
+            },
+        )
 
 
 def _cors_headers(origin: str, *, methods: str = "POST, OPTIONS", allowed_headers: str = _ALLOWED_SESSION_CORS_HEADERS) -> dict[str, str]:
@@ -182,6 +211,7 @@ def _map_public_error(detail: PublicAccessErrorDetail) -> PublicAccessErrorDetai
 def _error_response(detail: PublicAccessErrorDetail, *, request_id: str, cors_origin: str | None = None, cache_errors: bool = False) -> JSONResponse:
     mapped = _map_public_error(detail)
     headers: dict[str, str] = {"Cache-Control": _ERROR_CACHE_CONTROL} if not cache_errors else {}
+    headers["X-Request-ID"] = request_id
     if mapped.retry_after_seconds is not None:
         headers["Retry-After"] = str(mapped.retry_after_seconds)
     if cors_origin and mapped.code not in {"origin_not_allowed", "origin_required", "malformed_origin"}:
@@ -404,6 +434,7 @@ def _message_error_response(detail: PublicAccessErrorDetail, *, request_id: str,
     elif mapped.code == "unsupported_origin_scheme":
         mapped = error_detail("malformed_origin")
     headers: dict[str, str] = {"Cache-Control": _ERROR_CACHE_CONTROL}
+    headers["X-Request-ID"] = request_id
     if mapped.retry_after_seconds is not None:
         headers["Retry-After"] = str(mapped.retry_after_seconds)
     if cors_origin and mapped.code not in {"origin_not_allowed", "origin_required", "malformed_origin"}:
@@ -438,6 +469,9 @@ def public_widget_config_preflight(public_key: str, request: Request, db: DbSess
     origin = request.headers.get("origin")
     started = time.perf_counter()
     _emit(event_sink, "widget.config.requested", request_id=request_id, outcome="preflight")
+    if (detail := _operational_policy_error(public_key, request, operation="config")) is not None:
+        _emit(event_sink, "widget.config.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(detail, request_id=request_id)
     raw = _raw_config_gateway_request(public_key, request, request_id)
     try:
         result = _gateway(request, db, event_sink).validate_access(raw)
@@ -451,6 +485,7 @@ def public_widget_config_preflight(public_key: str, request: Request, db: DbSess
         return _error_response(error_detail("origin_required"), request_id=request_id)
     headers = _config_cors_headers(origin)
     headers["Cache-Control"] = _CONFIG_CACHE_CONTROL
+    headers["X-Request-ID"] = request_id
     return Response(status_code=status.HTTP_204_NO_CONTENT, headers=headers)
 
 
@@ -460,6 +495,9 @@ def get_public_widget_config(public_key: str, request: Request, db: DbSession) -
     event_sink = _event_sink(request)
     started = time.perf_counter()
     _emit(event_sink, "widget.config.requested", request_id=request_id, outcome="requested")
+    if (detail := _operational_policy_error(public_key, request, operation="config")) is not None:
+        _emit(event_sink, "widget.config.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(detail, request_id=request_id)
     if request.headers.get("content-length") not in {None, "0"}:
         detail = error_detail("invalid_request")
         _emit(event_sink, "widget.config.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
@@ -475,6 +513,7 @@ def get_public_widget_config(public_key: str, request: Request, db: DbSession) -
         payload = WidgetChannelAdapter().format_config_response(result.response)
         etag = str(result.response.metadata.get("etag") or public_widget_config_etag(payload))
         headers = _config_cors_headers(origin or "")
+        headers["X-Request-ID"] = request_id
         headers["ETag"] = etag
         headers["Cache-Control"] = _CONFIG_CACHE_CONTROL
         if any(event.event_type == "rate_limit.degraded_local_fallback" and event.request_id == request_id for event in event_sink.events):
@@ -504,6 +543,9 @@ def public_widget_message_preflight(public_key: str, request: Request, db: DbSes
     origin = request.headers.get("origin")
     started = time.perf_counter()
     _emit(event_sink, "widget.message.requested", request_id=request_id, outcome="preflight")
+    if (detail := _operational_policy_error(public_key, request, operation="message")) is not None:
+        _emit(event_sink, "widget.message.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _message_error_response(detail, request_id=request_id)
     raw = _raw_gateway_request(public_key, request, {}, request_id)
     raw["method"] = "OPTIONS"
     raw["allow_empty_message"] = True
@@ -533,6 +575,9 @@ async def send_public_widget_message(public_key: str, request: Request, db: DbSe
     started = time.perf_counter()
     cors_origin = request.headers.get("origin")
     _emit(event_sink, "widget.message.requested", request_id=request_id, outcome="requested")
+    if (detail := _operational_policy_error(public_key, request, operation="message")) is not None:
+        _emit(event_sink, "widget.message.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _message_error_response(detail, request_id=request_id, cors_origin=cors_origin)
     if not request.headers.get("idempotency-key"):
         detail = error_detail("idempotency_key_required")
         _emit(event_sink, "widget.message.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
@@ -559,7 +604,7 @@ async def send_public_widget_message(public_key: str, request: Request, db: DbSe
         if payload.get("stored_response") is not None:
             db.commit()
             _emit(event_sink, "widget.message.duplicate", request_id=request_id, trace_id=result.response.trace_id, outcome="duplicate", latency_ms=int((time.perf_counter() - started) * 1000))
-            return JSONResponse(status_code=status.HTTP_200_OK, content=payload["stored_response"], headers=_message_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL})
+            return JSONResponse(status_code=status.HTTP_200_OK, content=payload["stored_response"], headers=_message_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL, "X-Request-ID": request_id})
         if payload.get("safe_error_code"):
             db.rollback()
             detail = error_detail(str(payload["safe_error_code"]))
@@ -576,7 +621,7 @@ async def send_public_widget_message(public_key: str, request: Request, db: DbSe
         _emit(event_sink, "widget.message.response_projected", request_id=request_id, trace_id=result.response.trace_id, outcome="projected", latency_ms=int((time.perf_counter() - started) * 1000))
         if public_response.get("fallback_used"):
             _emit(event_sink, "widget.message.fallback", request_id=request_id, trace_id=result.response.trace_id, outcome="fallback", latency_ms=int((time.perf_counter() - started) * 1000))
-        return JSONResponse(status_code=status.HTTP_200_OK, content=public_response, headers=_message_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL})
+        return JSONResponse(status_code=status.HTTP_200_OK, content=public_response, headers=_message_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL, "X-Request-ID": request_id})
     except PublicAccessError as exc:
         db.commit()
         detail = exc.detail
@@ -594,6 +639,9 @@ def public_widget_session_preflight(public_key: str, request: Request, db: DbSes
     origin = request.headers.get("origin")
     started = time.perf_counter()
     _emit(event_sink, "widget.session.requested", request_id=request_id, outcome="preflight")
+    if (detail := _operational_policy_error(public_key, request, operation="session")) is not None:
+        _emit(event_sink, "widget.session.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(detail, request_id=request_id)
     raw = _raw_gateway_request(public_key, request, {}, request_id)
     raw["method"] = "OPTIONS"
     raw["allow_empty_message"] = True
@@ -620,6 +668,9 @@ async def create_public_widget_session(public_key: str, request: Request, db: Db
     event_sink = _event_sink(request)
     started = time.perf_counter()
     _emit(event_sink, "widget.session.requested", request_id=request_id, outcome="requested")
+    if (detail := _operational_policy_error(public_key, request, operation="session")) is not None:
+        _emit(event_sink, "widget.session.rejected", request_id=request_id, outcome="rejected", error_code=detail.code, latency_ms=int((time.perf_counter() - started) * 1000))
+        return _error_response(detail, request_id=request_id)
     body, parse_error = await _parse_body(request)
     if parse_error is not None or body is None:
         detail = parse_error or error_detail("invalid_request")
@@ -644,7 +695,7 @@ async def create_public_widget_session(public_key: str, request: Request, db: Db
         db.commit()
         payload = WidgetChannelAdapter().format_response(result.response)
         _emit(event_sink, "widget.session.created", request_id=request_id, trace_id=result.response.trace_id, outcome="created", latency_ms=int((time.perf_counter() - started) * 1000))
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content=payload, headers=_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL})
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=payload, headers=_cors_headers(cors_origin or "") | {"Cache-Control": _ERROR_CACHE_CONTROL, "X-Request-ID": request_id})
     except PublicAccessError as exc:
         db.rollback()
         detail = _map_public_error(exc.detail)

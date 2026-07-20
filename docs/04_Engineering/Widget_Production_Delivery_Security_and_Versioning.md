@@ -1,4 +1,4 @@
-﻿# Widget Production Delivery, Security, and Versioning
+# Widget Production Delivery, Security, and Versioning
 
 Status: Implemented foundation for TASK-066B1
 
@@ -124,3 +124,7 @@ npm run widget:e2e:release
 ## Current Exclusions
 
 TASK-066B1 does not deploy, publish, change DNS, provision CDN/cloud resources, implement monitoring, create synthetic backend tenants, add kill switches, or change widget product behavior.
+
+## TASK-066B3 Operational Controls
+
+TASK-066B3 adds provider-neutral operational controls for controlled pilot readiness: `/health/live`, `/health/ready`, safe request correlation IDs, privacy-preserving redaction helpers, in-memory operational counters for test evidence, server-side pilot allowlist controls, global/widget/message kill switches, provider-neutral alert definitions, a dry-run rollback planner, and `npm run widget:pilot:readiness`. It does not deploy production infrastructure or add a monitoring vendor.

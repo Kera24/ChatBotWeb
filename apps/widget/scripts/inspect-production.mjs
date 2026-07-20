@@ -17,6 +17,14 @@ const forbidden = [
   { value: "Hello from browser test", reason: "browser test message" },
   { value: "Token isolation check", reason: "security test message" },
   { value: "mock public API", reason: "mock server content" },
+  { value: "Alpha Observatory", reason: "synthetic real-backend fixture content" },
+  { value: "Beta Archive", reason: "synthetic real-backend fixture content" },
+  { value: "WIDGET_REAL_BACKEND_TEST", reason: "real-backend test environment flag" },
+  { value: "synthetic-widget-b2", reason: "synthetic real-backend fixture marker" },
+  { value: "widget-pilot-verification", reason: "pilot verification artifact name" },
+  { value: "widget-pilot-readiness", reason: "pilot readiness artifact name" },
+  { value: "PUBLIC_WIDGETS_ENABLED", reason: "public widget kill-switch config" },
+  { value: "PUBLIC_WIDGET_PILOT_ALLOWLIST", reason: "pilot allowlist server config" },
 ];
 
 const jsFiles = readdirSync(assets).filter((name) => name.endsWith(".js"));

@@ -39,3 +39,5 @@ Thumbs.db
 
 # Generated release artifacts
 artifacts/widget-release/
+artifacts/widget-pilot-verification/
+artifacts/widget-pilot-readiness/

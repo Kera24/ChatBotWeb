@@ -32,6 +32,12 @@
     "widget:release:verify": "npm run widget:install && npm run widget:test && npm run widget:lint && npm run widget:build && npm run widget-sdk:test && npm run widget-sdk:lint && npm run widget-sdk:build && npm run widget:config:validate && npm run widget:release:build && npm run widget:e2e:chromium && npm run widget:e2e:a11y && npm run widget:e2e:visual",
     "widget:config:validate": "npm --prefix apps/widget run config:validate",
     "widget:release:build": "npm run widget:config:validate && npm run widget-sdk:build && npm run widget:build && npm --prefix apps/widget run release:build && npm run widget:inspect:production && npm run widget:bundle:check",
-    "widget:e2e:release": "npm run widget:release:build && npm --prefix tests/widget-browser run test:release"
+    "widget:e2e:release": "npm run widget:release:build && npm --prefix tests/widget-browser run test:release",
+    "widget:real-backend:api": "python tests/widget-real-backend/run_pilot_verification.py --api-only",
+    "widget:real-backend:test": "python tests/widget-real-backend/run_pilot_verification.py --api-only",
+    "widget:pilot:verify": "npm run widget:release:build && python tests/widget-real-backend/run_pilot_verification.py --api-only",
+    "widget:ops:validate": "npm --prefix apps/widget run ops:validate",
+    "widget:rollback:plan": "node apps/widget/scripts/rollback-plan.mjs",
+    "widget:pilot:readiness": "npm run widget:pilot:verify && python tests/widget-real-backend/run_pilot_readiness.py"
   }
 }

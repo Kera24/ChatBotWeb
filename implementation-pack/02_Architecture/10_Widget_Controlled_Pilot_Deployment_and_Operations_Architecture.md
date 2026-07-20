@@ -739,3 +739,11 @@ TASK-066A is complete when deployment topology, domain boundaries, SDK/iframe/AP
 ## TASK-066B1 Production Delivery Foundation
 
 TASK-066B1 implements repository-local, provider-neutral release artifacts, origin validation, cache/header policy, manifest/checksum generation, production inspection, and versioned-loader browser smoke coverage. It does not deploy production infrastructure. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.
+
+## TASK-066B2 Implementation Note
+
+The controlled-pilot verification path now includes `npm run widget:pilot:verify`, which runs the B1 release build/inspection path and a synthetic real-backend API isolation suite. The suite uses isolated Alpha/Beta synthetic tenants, widgets, origins, and knowledge chunks. It exercises real public widget config/session/message routes, real session/idempotency/origin checks, and real tenant-scoped retrieval filtering with the existing deterministic mock AI provider. This is a repository-local pilot gate and does not deploy production infrastructure or configure external monitoring.
+
+## TASK-066B3 Operational Controls
+
+TASK-066B3 adds provider-neutral operational controls for controlled pilot readiness: `/health/live`, `/health/ready`, safe request correlation IDs, privacy-preserving redaction helpers, in-memory operational counters for test evidence, server-side pilot allowlist controls, global/widget/message kill switches, provider-neutral alert definitions, a dry-run rollback planner, and `npm run widget:pilot:readiness`. It does not deploy production infrastructure or add a monitoring vendor.

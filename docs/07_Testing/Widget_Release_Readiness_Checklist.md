@@ -84,3 +84,28 @@ Use this checklist before approving the embeddable widget for a controlled pilot
 ## TASK-066B1 Production Delivery Foundation
 
 TASK-066B1 implements repository-local, provider-neutral release artifacts, origin validation, cache/header policy, manifest/checksum generation, production inspection, and versioned-loader browser smoke coverage. It does not deploy production infrastructure. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.
+
+## TASK-066B2 Real-Backend Pilot Gate
+
+- [ ] `npm run widget:pilot:verify` completed successfully.
+- [ ] Synthetic real config smoke passed for Alpha and Beta widgets.
+- [ ] Synthetic real session smoke passed without cookies.
+- [ ] Synthetic real message smoke passed through the real public message route.
+- [ ] Positive retrieval returned only same-tenant synthetic citations.
+- [ ] Negative cross-tenant retrieval returned no foreign tenant citations or quoted text.
+- [ ] Cross-widget session-token use was rejected.
+- [ ] Wrong host origin and unknown public key were rejected safely.
+- [ ] ETag/cache behaviour did not cross widget boundaries.
+- [ ] Verification report contains synthetic metadata only and no tokens, prompts, messages, answers, or customer data.
+
+## TASK-066B3 Operational Readiness
+
+- [ ] `npm run widget:ops:validate` completed.
+- [ ] `/health/live` returns safe liveness status.
+- [ ] `/health/ready` returns safe readiness status without expensive AI/RAG calls.
+- [ ] Public widget request IDs are bounded, safe, and returned in response headers.
+- [ ] Pilot allowlist denies valid but non-enabled widgets when enforcement is active.
+- [ ] Global public-widget kill switch denies config/session/message.
+- [ ] Global message kill switch denies message sends, including existing sessions.
+- [ ] `deployment/widget/alerts.json` validates and each alert references a runbook.
+- [ ] `npm run widget:pilot:readiness` completed and wrote a safe report.

@@ -52,6 +52,33 @@ jobs:
       - name: Run verification
         run: npm run verify
 
+      - name: Run widget pilot verification
+        run: npm run widget:pilot:verify
+
+      - name: Run widget operational validation
+        run: npm run widget:ops:validate
+
+      - name: Run widget pilot readiness
+        run: npm run widget:pilot:readiness
+
+      - name: Upload widget pilot readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-pilot-readiness
+          path: artifacts/widget-pilot-readiness
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload widget pilot verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-pilot-verification
+          path: artifacts/widget-pilot-verification
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload widget release artifacts
         if: always()
         uses: actions/upload-artifact@v4

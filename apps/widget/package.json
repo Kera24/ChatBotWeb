@@ -12,7 +12,9 @@
     "inspect:production": "node scripts/inspect-production.mjs",
     "bundle:check": "node scripts/check-size.mjs",
     "config:validate": "node scripts/validate-release-config.mjs",
-    "release:build": "node scripts/build-release.mjs"
+    "release:build": "node scripts/build-release.mjs",
+    "ops:validate": "node scripts/validate-ops-config.mjs",
+    "rollback:plan": "node scripts/rollback-plan.mjs"
   },
   "dependencies": {
     "@yoranix/widget-sdk": "file:../../packages/widget-sdk",

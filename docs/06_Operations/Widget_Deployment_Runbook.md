@@ -1,8 +1,8 @@
-﻿# Widget Deployment Runbook
+# Widget Deployment Runbook
 
-Status: Foundation runbook for TASK-066B1
+Status: Foundation runbook updated through TASK-066B2
 
-This runbook describes repository-local release artifact preparation. Publishing, CDN configuration, DNS changes, real-backend smoke tests, and production rollout remain future tasks.
+This runbook describes repository-local release artifact preparation and synthetic real-backend pilot verification. Publishing, CDN configuration, DNS changes, production monitoring, and production rollout remain future tasks.
 
 ## 1. Prerequisites
 
@@ -75,10 +75,26 @@ A future deployment task will publish or replace `sdk/v{sdk_major}/loader.js` an
 
 Adapt `deployment/widget/headers.json` to the selected CDN/reverse proxy and verify cache, CSP, referrer, permissions, CORP, and nosniff headers before controlled pilot enablement.
 
-## 11. Smoke Tests - Future TASK-066B2
+## 11. Pre-Pilot Synthetic Real-Backend Gate
 
-TASK-066B2 should add real-backend synthetic widget smoke and tenant-isolation verification against a production-like deployment.
+Run:
+
+```bash
+npm run widget:pilot:verify
+```
+
+This command rebuilds release artifacts, runs production inspection and bundle checks, then verifies synthetic real-backend config/session/message smoke, tenant isolation, session isolation, origin isolation, retrieval isolation, and cache isolation. Passing `npm run widget:release:build` alone is insufficient for controlled pilot deployment. See `docs/06_Operations/Widget_Pilot_Verification_Runbook.md`.
 
 ## 12. Rollback Reference
 
 Rollback preparation requires retained previous release manifests and immutable artifacts. SDK alias rollback should not require rebuilding. Iframe rollback should restore a previous iframe HTML/release mapping and then rerun smoke tests.
+
+## TASK-066B3 Operational Readiness Gate
+
+Before any future controlled pilot deployment, run:
+
+```bash
+npm run widget:pilot:readiness
+```
+
+This gate validates operational configuration, requires the B2 pilot verification report to pass, checks production inspection and bundle budgets, and writes `artifacts/widget-pilot-readiness/report.json`. It covers repository Gates 1-4 only; staging/pilot deployment, post-deploy real smoke, and controlled tenant enablement remain separate operational steps.
