@@ -444,3 +444,15 @@ Guardrails for future Codex sessions:
 - `PUBLIC_WIDGETS_ENABLED=false` disables config/session/message. `PUBLIC_WIDGET_MESSAGES_ENABLED=false` disables message sends, including existing sessions.
 - `npm run widget:pilot:readiness` is the repository-local B3 readiness gate and writes an ignored safe report under `artifacts/widget-pilot-readiness/`.
 - TASK-067A may now define administration, publishing, and embed management around publishable, pilot-enabled, disabled, release/channel, allowed origins, embed version, operational health, and rollback concepts.
+## Widget Administration And Publishing Architecture
+
+TASK-067A defines widget administration and publishing before implementation.
+
+Guardrails for future Codex sessions:
+
+- Sprint 3F repository-level controlled-pilot operations readiness is complete.
+- Production deployment has not occurred.
+- Widget administration and publishing architecture is defined by TASK-067A before implementation.
+- Publication, pilot enablement, operational status, public key state, and deployment release channel are separate concepts.
+- The target publishing model is stable widget identity plus immutable versioned configuration revisions with one active published revision.
+- Admin implementation must preserve tenant isolation, revision immutability, auditability, safe public-key handling, and existing public widget runtime boundaries.

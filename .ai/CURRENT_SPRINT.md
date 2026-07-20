@@ -1,15 +1,15 @@
 # Current Sprint
 
 Current phase:
-Sprint 3F - Widget Pilot and Operations
+Sprint 3G - Widget Administration and Publishing
 
 Current task:
-TASK-066B3 - Widget Operational Controls, Health Checks, Observability, Rollback, and Pilot Enablement
+TASK-067A - Widget Administration, Publishing, and Embed Management Architecture
 
 ## Guardrails
 
-- TASK-066B3 implements minimum provider-neutral operational controls only.
-- Do not deploy production infrastructure, change DNS, provision cloud/CDN resources, add monitoring vendors, or implement admin publishing UI in TASK-066B3.
-- Operational logs, metrics, reports, and alert evidence must not include session tokens, message bodies, answers, citation quotes, prompts, credentials, or customer data.
+- TASK-067A is architecture and planning only.
+- Do not implement admin UI, publishing APIs, migrations, runtime behavior, deployment infrastructure, or production deployment in TASK-067A.
+- Publication, pilot enablement, operational status, public key state, and release channel must remain distinct concepts.
+- Admin implementation must preserve tenant isolation, immutable published revisions, auditability, and public widget runtime boundaries.
 - The widget remains controlled-pilot ready, not GA.
-- After successful TASK-066B3, the next recommended task is TASK-067A - Widget Administration, Publishing, and Embed Management Architecture.
