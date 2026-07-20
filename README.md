@@ -233,3 +233,9 @@ Backend widget administration revisioning is documented in `docs/04_Engineering/
 TASK-067B2 adds backend APIs for widget allowed origins, immediate public-key rotation, approved SDK embed-version preferences, supported-version listing, and safe embed snippet metadata. See `docs/04_Engineering/Widget_Origins_Public_Key_and_Embed_Management.md`.
 
 Admin UI, preview grants, installation verification, and production deployment remain deferred.
+
+## Widget Administration Frontend
+
+TASK-067B3 adds authenticated dashboard routes for widget list, creation, draft settings, allowed domains, embed setup, SDK version selection, and public-key rotation. See `docs/04_Engineering/Widget_Administration_Frontend_Settings_Domains_and_Embed.md`.
+
+Publish workflow, preview, revision history, rollback, knowledge selection, and installation verification remain deferred.

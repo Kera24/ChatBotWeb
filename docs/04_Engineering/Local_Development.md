@@ -428,3 +428,13 @@ npm run api:test -- tests/test_widget_admin_origins_embed.py
 ```
 
 The suite uses synthetic in-memory tenant/widget data and covers origin normalization, key rotation, embed metadata, RBAC, tenant isolation, and audit events.
+
+## Widget Administration Frontend Local Tests
+
+TASK-067B3 adds the first authenticated widget administration frontend. Focused frontend tests can be run with:
+
+```bash
+npm run web:test -- components/widgets/widget-admin.test.tsx
+```
+
+Use `npm run web:build` to verify the dynamic `/widgets`, `/widgets/new`, and `/widgets/[widgetId]` routes compile with the current Next.js app.

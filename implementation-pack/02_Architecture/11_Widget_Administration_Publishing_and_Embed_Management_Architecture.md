@@ -901,3 +901,7 @@ Widget administration now has a backend revisioning foundation: stable `Widget` 
 ## TASK-067B2 Implementation Note
 
 Allowed-origin CRUD, public-key rotation, SDK embed-version preference, supported-version listing, and embed metadata/snippet APIs are now implemented in the authenticated backend. Origins and embed preferences are stable widget/public-credential metadata, not configuration revision fields. Public key rotation is immediate cutover and does not mutate published configuration history. Preview grants, frontend screens, installation verification, and dual-key grace periods remain deferred.
+
+## TASK-067B3 Implementation Note
+
+The first authenticated widget administration frontend is implemented in the Next.js dashboard. It covers list, creation, settings, domains, embed snippet management, approved SDK version selection, and public-key rotation. Preview grants, publish UI, revision history, rollback UI, knowledge selection, and installation verification remain deferred to later tasks.

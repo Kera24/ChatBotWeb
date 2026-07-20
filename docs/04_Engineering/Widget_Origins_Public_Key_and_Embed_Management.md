@@ -176,3 +176,7 @@ The migration does not change public runtime behavior for existing widgets.
 - External installation verification crawler.
 - Knowledge-selection UI.
 - Production deployment/domain integration for the SDK CDN origin.
+
+## TASK-067B3 Frontend Implementation Note
+
+The B2 origin/key/embed APIs are now surfaced through authenticated dashboard UI. Tenant admins can manage exact allowed origins, view/copy the current public key, rotate it through a confirmation dialog, select managed-major or approved pinned SDK embed mode, and copy the inert server-generated snippet. Pilot enablement and global operational controls remain separate.

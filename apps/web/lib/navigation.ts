@@ -15,6 +15,11 @@ export const navigationItems = [
     glyph: "CB",
   },
   {
+    label: "Widgets",
+    href: "/widgets",
+    glyph: "WG",
+  },
+  {
     label: "Analytics",
     href: "/analytics",
     glyph: "AN",

@@ -474,3 +474,13 @@ Guardrails for future Codex sessions:
 - Embed delivery preference is stable widget metadata: managed major alias by default, with optional approved pinned SDK semver. Arbitrary SDK URLs and `latest` remain unsupported.
 - Public configuration ETags include public-key cache context to avoid cross-key conditional-cache confusion after rotation.
 - Admin frontend, preview grants, installation verification, and production deployment remain deferred.
+
+## TASK-067B3 Implementation Facts
+
+- The authenticated dashboard now includes widget administration routes for list, creation, and detail settings.
+- Widget detail supports Overview, Appearance, Conversation, Domains, and Embed sections only.
+- Draft editing uses explicit Save, dirty-state tracking, browser unload protection while dirty, discard, and conflict reload handling.
+- Domain management calls the B2 exact-origin APIs and surfaces backend validation/invariant errors.
+- Embed management renders backend-generated snippets inertly, supports managed-major and approved pinned SDK choices, and shows SRI only when returned by backend metadata.
+- Public-key rotation is available through an accessible confirmation dialog and refreshes the displayed key/snippet after success.
+- Publish UI, preview grants, revision history, rollback UI, knowledge selection, pilot mutation, and global operational controls remain deferred.

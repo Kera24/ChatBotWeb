@@ -96,3 +96,7 @@ TASK-067B2 should add allowed-origin management, public key lifecycle, embed ver
 TASK-067B2 extends the backend administration foundation with allowed-origin management, immediate public-key rotation, approved SDK embed-version selection, and embed metadata/snippet APIs. Origins remain attached to the stable public credential boundary rather than configuration revisions. Public key rotation revokes the old credential, preserves origins, leaves configuration revisions unchanged, and requires embed snippet replacement.
 
 Embed delivery preference is stable widget metadata: `managed_major` by default, with optional approved pinned SDK semver. Release channel, pilot status, operational status, and publication status remain separate concepts. Admin frontend, preview grants, installation verification, and knowledge-selection UI remain deferred.
+
+## TASK-067B3 Frontend Implementation Note
+
+The authenticated dashboard now includes `/widgets`, `/widgets/new`, and `/widgets/[widgetId]` for list, creation, draft settings, domains, and embed management. The frontend uses explicit draft Save with concurrency handling and does not implement publish, preview, revision history, rollback, or knowledge-selection workflows.

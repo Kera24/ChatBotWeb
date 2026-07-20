@@ -1,4 +1,4 @@
-import { developmentDashboardHeaders, type DevelopmentDashboardSession } from "../auth/development-session";
+﻿import { developmentDashboardHeaders, type DevelopmentDashboardSession } from "../auth/development-session";
 import { DashboardApiError, apiErrorKindFromStatus } from "./errors";
 import type { ApiEnvelope } from "./types";
 
@@ -17,7 +17,7 @@ type DashboardApiRequest = {
 };
 
 type DashboardApiMutationRequest = DashboardApiRequest & {
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
 };
 
 export async function dashboardApiGet<TData, TMeta = Record<string, unknown>>({
@@ -26,44 +26,43 @@ export async function dashboardApiGet<TData, TMeta = Record<string, unknown>>({
   searchParams,
   cache = "no-store",
 }: DashboardApiRequest): Promise<ApiEnvelope<TData, TMeta>> {
-  const url = new URL(`${getDashboardApiBaseUrl()}${path}`);
-  for (const [key, value] of Object.entries(searchParams ?? {})) {
-    if (value !== undefined && value !== null && value !== "") {
-      url.searchParams.set(key, String(value));
-    }
-  }
+  return dashboardApiRequest<TData, TMeta>({ method: "GET", path, session, searchParams, cache });
+}
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        ...developmentDashboardHeaders(session),
-      },
-      cache,
-    });
-  } catch (error) {
-    throw new DashboardApiError("network", "Network failure while calling dashboard API.", { detail: error });
-  }
-
-  const payload = await readPayload(response);
-  if (!response.ok) {
-    throw new DashboardApiError(apiErrorKindFromStatus(response.status), "Dashboard API request failed.", {
-      status: response.status,
-      detail: payload,
-    });
-  }
-
-  return payload as ApiEnvelope<TData, TMeta>;
+export async function dashboardApiPost<TData, TMeta = Record<string, unknown>>({
+  path,
+  session,
+  searchParams,
+  body = {},
+}: DashboardApiMutationRequest): Promise<ApiEnvelope<TData, TMeta>> {
+  return dashboardApiRequest<TData, TMeta>({ method: "POST", path, session, searchParams, body, cache: "no-store" });
 }
 
 export async function dashboardApiPatch<TData, TMeta = Record<string, unknown>>({
   path,
   session,
   searchParams,
-  body,
+  body = {},
 }: DashboardApiMutationRequest): Promise<ApiEnvelope<TData, TMeta>> {
+  return dashboardApiRequest<TData, TMeta>({ method: "PATCH", path, session, searchParams, body, cache: "no-store" });
+}
+
+export async function dashboardApiDelete<TData, TMeta = Record<string, unknown>>({
+  path,
+  session,
+  searchParams,
+}: DashboardApiRequest): Promise<ApiEnvelope<TData, TMeta>> {
+  return dashboardApiRequest<TData, TMeta>({ method: "DELETE", path, session, searchParams, cache: "no-store" });
+}
+
+async function dashboardApiRequest<TData, TMeta = Record<string, unknown>>({
+  method,
+  path,
+  session,
+  searchParams,
+  body,
+  cache = "no-store",
+}: DashboardApiRequest & { method: "GET" | "POST" | "PATCH" | "DELETE"; body?: Record<string, unknown> }): Promise<ApiEnvelope<TData, TMeta>> {
   const url = new URL(`${getDashboardApiBaseUrl()}${path}`);
   for (const [key, value] of Object.entries(searchParams ?? {})) {
     if (value !== undefined && value !== null && value !== "") {
@@ -74,14 +73,14 @@ export async function dashboardApiPatch<TData, TMeta = Record<string, unknown>>(
   let response: Response;
   try {
     response = await fetch(url, {
-      method: "PATCH",
+      method,
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
         ...developmentDashboardHeaders(session),
       },
-      body: JSON.stringify(body),
-      cache: "no-store",
+      body: body ? JSON.stringify(body) : undefined,
+      cache,
     });
   } catch (error) {
     throw new DashboardApiError("network", "Network failure while calling dashboard API.", { detail: error });
