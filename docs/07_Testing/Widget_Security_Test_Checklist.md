@@ -78,3 +78,7 @@ TASK-066B1 implements repository-local, provider-neutral release artifacts, orig
 - [ ] Host pages cannot enable pilot access or override kill switches.
 - [ ] Existing sessions cannot bypass global message disablement.
 - [ ] Pilot readiness reports contain no secrets, customer content, tokens, prompts, answers, or citation quotes.
+
+## TASK-067B1 Admin Revisioning Coverage
+
+Add security evidence for authenticated widget administration: tenant-scoped widget/revision reads, stale draft update rejection, draft changes not affecting public configuration, publish/rollback audit events, and cross-tenant denial for widget draft, publish, revision, and rollback APIs.

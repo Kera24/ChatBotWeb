@@ -114,6 +114,82 @@ class WidgetConfiguration(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     credential = relationship("PublicCredential", back_populates="widget_configuration")
 
+class Widget(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "widgets"
+    __table_args__ = (
+        UniqueConstraint("public_credential_id", name="uq_widgets_public_credential"),
+        Index("ix_widgets_tenant_workspace", "organisation_id", "workspace_id"),
+        Index("ix_widgets_workspace_status", "workspace_id", "operational_status"),
+        Index("ix_widgets_active_revision", "active_published_revision_id"),
+    )
+
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    public_credential_id: Mapped[str] = mapped_column(String(36), ForeignKey("public_credentials.id"), nullable=False, index=True)
+    display_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    operational_status: Mapped[str] = mapped_column(String(40), nullable=False, default="enabled", server_default="enabled")
+    pilot_status: Mapped[str] = mapped_column(String(40), nullable=False, default="not_approved", server_default="not_approved")
+    release_channel: Mapped[str] = mapped_column(String(40), nullable=False, default="pilot", server_default="pilot")
+    active_published_revision_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    archived_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    public_credential = relationship("PublicCredential")
+    configuration_revisions = relationship("WidgetConfigurationRevision", back_populates="widget", cascade="all, delete-orphan", foreign_keys="WidgetConfigurationRevision.widget_id")
+
+
+class WidgetConfigurationRevision(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "widget_configuration_revisions"
+    __table_args__ = (
+        UniqueConstraint("widget_id", "revision_number", name="uq_widget_configuration_revisions_widget_number"),
+        Index("ix_widget_configuration_revisions_tenant_workspace", "organisation_id", "workspace_id"),
+        Index("ix_widget_configuration_revisions_widget_status", "widget_id", "status"),
+        Index("ix_widget_configuration_revisions_credential_status", "public_credential_id", "status"),
+        Index("ix_widget_configuration_revisions_widget_number", "widget_id", "revision_number"),
+        Index("ix_widget_configuration_revisions_published_at", "published_at"),
+    )
+
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    widget_id: Mapped[str] = mapped_column(String(36), ForeignKey("widgets.id"), nullable=False, index=True)
+    public_credential_id: Mapped[str] = mapped_column(String(36), ForeignKey("public_credentials.id"), nullable=False, index=True)
+    revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="draft", server_default="draft")
+    concurrency_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    bot_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    welcome_message: Mapped[str] = mapped_column(Text, nullable=False)
+    launcher_label: Mapped[str] = mapped_column(String(80), nullable=False)
+    primary_colour: Mapped[str] = mapped_column(String(16), nullable=False)
+    secondary_colour: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    logo_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    avatar_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    position: Mapped[str] = mapped_column(String(40), nullable=False)
+    theme_mode: Mapped[str] = mapped_column(String(40), nullable=False)
+    suggested_questions_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    fallback_contact_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    privacy_notice_text: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    privacy_notice_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    terms_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    language: Mapped[str] = mapped_column(String(16), nullable=False, default="en", server_default="en")
+    show_citations: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    allow_conversation_history: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+    max_initial_suggestions: Mapped[int] = mapped_column(Integer, nullable=False, default=3, server_default="3")
+    configuration_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_revision_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("widget_configuration_revisions.id"), nullable=True)
+    created_by_user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    published_by_user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    published_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    widget = relationship("Widget", back_populates="configuration_revisions", foreign_keys=[widget_id])
+    public_credential = relationship("PublicCredential")
+    source_revision = relationship("WidgetConfigurationRevision", remote_side="WidgetConfigurationRevision.id")
+
+    @property
+    def credential_id(self) -> str:
+        return self.public_credential_id
+
+    @property
+    def configuration_version(self) -> int:
+        return self.revision_number
 
 class PublicSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "public_sessions"

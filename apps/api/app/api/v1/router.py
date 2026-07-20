@@ -11,6 +11,7 @@ from app.api.v1.public_widget import router as public_widget_router
 from app.api.v1.review import router as review_router
 from app.api.v1.system import router as system_router
 from app.api.v1.workspaces import router as workspaces_router
+from app.api.v1.widgets import router as widgets_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(admin_router, prefix="/admin", tags=["admin"])
@@ -21,6 +22,7 @@ api_v1_router.include_router(workspaces_router, prefix="/workspaces", tags=["wor
 api_v1_router.include_router(audit_events_router, prefix="/workspaces", tags=["audit-events"])
 api_v1_router.include_router(documents_router, prefix="/workspaces", tags=["documents"])
 api_v1_router.include_router(public_credentials_router, prefix="/workspaces", tags=["public-credentials"])
+api_v1_router.include_router(widgets_router, prefix="/workspaces", tags=["widgets"])
 api_v1_router.include_router(public_widget_router, tags=["public-widget"])
 api_v1_router.include_router(conversations_router, prefix="/workspaces", tags=["conversations"])
 api_v1_router.include_router(review_router, prefix="/workspaces", tags=["review"])

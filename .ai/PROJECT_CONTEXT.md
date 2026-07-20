@@ -456,3 +456,11 @@ Guardrails for future Codex sessions:
 - Publication, pilot enablement, operational status, public key state, and deployment release channel are separate concepts.
 - The target publishing model is stable widget identity plus immutable versioned configuration revisions with one active published revision.
 - Admin implementation must preserve tenant isolation, revision immutability, auditability, safe public-key handling, and existing public widget runtime boundaries.
+
+## TASK-067B1 Implementation Facts
+
+- Widget administration now has backend-only stable widget identity and immutable configuration revisioning.
+- Draft updates require optimistic concurrency and do not affect public configuration responses.
+- Publishing and rollback create new published snapshots and preserve historical revisions.
+- Public configuration resolution prefers the active published widget revision with a legacy compatibility fallback.
+- Admin frontend, full origin management, public-key rotation, embed management, and preview grants remain deferred.

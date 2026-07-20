@@ -128,3 +128,7 @@ TASK-066B1 does not deploy, publish, change DNS, provision CDN/cloud resources, 
 ## TASK-066B3 Operational Controls
 
 TASK-066B3 adds provider-neutral operational controls for controlled pilot readiness: `/health/live`, `/health/ready`, safe request correlation IDs, privacy-preserving redaction helpers, in-memory operational counters for test evidence, server-side pilot allowlist controls, global/widget/message kill switches, provider-neutral alert definitions, a dry-run rollback planner, and `npm run widget:pilot:readiness`. It does not deploy production infrastructure or add a monitoring vendor.
+
+## TASK-067B1 Administration Boundary
+
+Authenticated widget administration APIs create and publish revisioned configuration snapshots. Public-key rotation, embed version selection, and release-channel management are not part of B1 and remain separate from the production delivery/versioning model.

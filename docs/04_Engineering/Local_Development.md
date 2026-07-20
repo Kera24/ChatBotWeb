@@ -408,3 +408,13 @@ The command uses synthetic test data only and writes a safe report to `artifacts
 ## TASK-066B3 Operational Controls
 
 TASK-066B3 adds provider-neutral operational controls for controlled pilot readiness: `/health/live`, `/health/ready`, safe request correlation IDs, privacy-preserving redaction helpers, in-memory operational counters for test evidence, server-side pilot allowlist controls, global/widget/message kill switches, provider-neutral alert definitions, a dry-run rollback planner, and `npm run widget:pilot:readiness`. It does not deploy production infrastructure or add a monitoring vendor.
+
+## Widget Admin Revisioning Local Tests
+
+For TASK-067B1 development, run focused API coverage with:
+
+```bash
+npm run api:test -- tests/test_widget_admin_revisioning.py
+```
+
+The suite uses an isolated in-memory SQLite app fixture and synthetic tenant/widget data only.

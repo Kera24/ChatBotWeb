@@ -893,3 +893,7 @@ flowchart TD
 ## 31. Acceptance Criteria
 
 TASK-067A is complete when lifecycle, draft/published model, revision architecture, public key lifecycle, origin management, preview, publishing, rollback, embed management, SDK version/channel policy, pilot separation, RBAC, tenant isolation, audit, admin IA, tests, implementation split, diagrams, and ADR-0017 are documented, and no runtime/admin implementation is added.
+
+## TASK-067B1 Implementation Note
+
+Widget administration now has a backend revisioning foundation: stable `Widget` identity, immutable `WidgetConfigurationRevision` snapshots, draft updates with optimistic concurrency, publish and rollback APIs, and public configuration resolution through the active published revision. Allowed-origin CRUD, public-key rotation, embed management, preview grants, and admin frontend work remain deferred to later TASK-067B tasks.

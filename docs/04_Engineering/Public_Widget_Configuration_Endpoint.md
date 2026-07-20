@@ -186,3 +186,7 @@ curl -i \
   -H 'If-None-Match: "<etag>"' \
   http://localhost:8000/api/v1/widget/{public_key}/config
 ```
+
+## TASK-067B1 Revision-Aware Public Configuration
+
+The public configuration endpoint now prefers `Widget.active_published_revision_id` and serializes the referenced immutable `WidgetConfigurationRevision`. Draft revisions are never served publicly. A legacy `WidgetConfiguration` fallback remains only for compatibility with pre-revision data during migration rollout.
