@@ -98,3 +98,7 @@ npm run widget:pilot:readiness
 ```
 
 This gate validates operational configuration, requires the B2 pilot verification report to pass, checks production inspection and bundle budgets, and writes `artifacts/widget-pilot-readiness/report.json`. It covers repository Gates 1-4 only; staging/pilot deployment, post-deploy real smoke, and controlled tenant enablement remain separate operational steps.
+
+## TASK-067B2 Admin Embed Boundary
+
+Before handing a snippet to a pilot customer, use the authenticated widget embed metadata API rather than composing snippets manually. The current backend generates only approved managed-major or pinned-semver SDK snippets. Public-key rotation is immediate cutover; after rotation, operators must provide the new snippet and verify the old public key no longer resolves.

@@ -11,37 +11,49 @@ from app.access.widget_admin.service import (
     WidgetAdminNotFound,
     WidgetAdminValidationError,
     active_published_revision,
+    add_widget_origin,
     create_widget,
     diff_draft_to_published,
     get_current_draft,
+    get_embed_metadata,
     get_revision,
     get_widget,
     list_revisions,
+    list_supported_sdk_versions,
+    list_widget_origins,
     list_widgets,
     publish_widget,
+    remove_widget_origin,
     rollback_widget,
+    rotate_widget_public_key,
     update_draft,
+    update_embed_preference,
 )
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
-from app.db.models import Widget, WidgetConfigurationRevision
+from app.db.models import CredentialAllowedOrigin, Widget, WidgetConfigurationRevision
 from app.repositories.workspace_repository import get_workspace_for_organisation
 from app.schemas.common import success_response
 from app.schemas.widget_admin import (
     WidgetConfigurationPayload,
     WidgetCreateRequest,
     WidgetDetail,
-    WidgetDraftRead,
+    WidgetEmbedMetadata,
+    WidgetEmbedPreferenceUpdateRequest,
     WidgetDraftUpdateRequest,
+    WidgetOriginCreateRequest,
+    WidgetOriginRead,
     WidgetPublicationResult,
+    WidgetPublicKeyRotateRequest,
+    WidgetPublicKeyRotationResult,
     WidgetPublishRequest,
     WidgetRevisionDetail,
     WidgetRevisionSummary,
     WidgetRollbackRequest,
     WidgetRollbackResult,
     WidgetSummary,
+    WidgetSupportedSdkVersionsResponse,
     WidgetValidationErrorItem,
 )
-
 router = APIRouter()
 
 WidgetAdminDependency = Annotated[
@@ -223,6 +235,130 @@ def rollback_admin_widget(
     return success_response(result.model_dump(mode="json"))
 
 
+@router.get("/{workspace_id}/widgets/{widget_id}/origins")
+def list_admin_widget_origins(
+    workspace_id: str,
+    widget_id: str,
+    db: DbSession,
+    _current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    return success_response([_origin_response(origin).model_dump(mode="json") for origin in list_widget_origins(db, widget=widget, active_only=False)])
+
+
+@router.post("/{workspace_id}/widgets/{widget_id}/origins", status_code=status.HTTP_201_CREATED)
+def add_admin_widget_origin(
+    workspace_id: str,
+    widget_id: str,
+    payload: WidgetOriginCreateRequest,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        origin = add_widget_origin(db, widget=widget, origin=payload.origin, actor_user_id=current_user.user_id)
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(_origin_response(origin).model_dump(mode="json"))
+
+
+@router.delete("/{workspace_id}/widgets/{widget_id}/origins/{origin_id}")
+def remove_admin_widget_origin(
+    workspace_id: str,
+    widget_id: str,
+    origin_id: str,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        origin = remove_widget_origin(db, widget=widget, origin_id=origin_id, actor_user_id=current_user.user_id)
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(_origin_response(origin).model_dump(mode="json"))
+
+
+@router.post("/{workspace_id}/widgets/{widget_id}/rotate-key")
+def rotate_admin_widget_public_key(
+    workspace_id: str,
+    widget_id: str,
+    payload: WidgetPublicKeyRotateRequest,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        result = rotate_widget_public_key(db, widget=widget, actor_user_id=current_user.user_id, expected_public_credential_id=payload.expected_public_credential_id)
+    except WidgetAdminConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    new_credential = result["new_credential"]
+    response = WidgetPublicKeyRotationResult(
+        widget_id=widget.id,
+        public_credential_id=new_credential.id,
+        public_key=new_credential.public_identifier,
+        public_key_status=new_credential.status,
+        old_key_revoked=bool(result["old_key_revoked"]),
+        embed_update_required=bool(result["embed_update_required"]),
+        rotated_at=new_credential.activated_at or new_credential.created_at,
+    )
+    return success_response(response.model_dump(mode="json"))
+
+
+@router.get("/{workspace_id}/widgets/{widget_id}/embed")
+def get_admin_widget_embed(
+    workspace_id: str,
+    widget_id: str,
+    db: DbSession,
+    _current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        metadata = get_embed_metadata(db, widget=widget)
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(WidgetEmbedMetadata.model_validate(metadata).model_dump(mode="json"))
+
+
+@router.patch("/{workspace_id}/widgets/{widget_id}/embed")
+def update_admin_widget_embed(
+    workspace_id: str,
+    widget_id: str,
+    payload: WidgetEmbedPreferenceUpdateRequest,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        metadata = update_embed_preference(db, widget=widget, version_mode=payload.version_mode, pinned_sdk_version=payload.pinned_sdk_version, actor_user_id=current_user.user_id)
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(WidgetEmbedMetadata.model_validate(metadata).model_dump(mode="json"))
+
+
+@router.get("/{workspace_id}/widget-sdk-versions")
+def list_admin_widget_sdk_versions(
+    workspace_id: str,
+    db: DbSession,
+    _current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    ensure_workspace_in_organisation(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    try:
+        metadata = list_supported_sdk_versions()
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(WidgetSupportedSdkVersionsResponse.model_validate(metadata).model_dump(mode="json"))
+
 def _load_widget_or_404(db: DbSession, *, organisation_id: str, workspace_id: str, widget_id: str) -> Widget:
     ensure_workspace_in_organisation(db, organisation_id=organisation_id, workspace_id=workspace_id)
     try:
@@ -292,6 +428,22 @@ def _configuration_payload(revision: WidgetConfigurationRevision) -> WidgetConfi
     values["suggested_questions_json"] = list(values["suggested_questions_json"] or [])
     return WidgetConfigurationPayload(**values)
 
+
+def _origin_response(origin: CredentialAllowedOrigin) -> WidgetOriginRead:
+    host = f"*.{origin.hostname}" if origin.wildcard_subdomains else origin.hostname
+    port = f":{origin.port}" if origin.port is not None else ""
+    return WidgetOriginRead(
+        id=origin.id,
+        origin=f"{origin.scheme}://{host}{port}",
+        scheme=origin.scheme,
+        hostname=origin.hostname,
+        port=origin.port,
+        wildcard_subdomains=origin.wildcard_subdomains,
+        environment=origin.environment,
+        active=origin.active,
+        created_at=origin.created_at,
+        updated_at=origin.updated_at,
+    )
 
 def _validation_http_error(exc: WidgetAdminValidationError) -> HTTPException:
     errors = [WidgetValidationErrorItem(field=item.field, code=item.code, message=item.message).model_dump(mode="json") for item in exc.errors]

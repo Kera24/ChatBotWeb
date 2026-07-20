@@ -227,3 +227,9 @@ TASK-066B3 adds provider-neutral operational controls for controlled pilot readi
 ## Widget Administration Revisioning
 
 Backend widget administration revisioning is documented in `docs/04_Engineering/Widget_Administration_Revisioning_and_Publishing.md`. TASK-067B1 adds server APIs and database revisioning only; admin UI, embed management, public-key rotation, and preview grants remain deferred.
+
+## Widget Origins, Public Key, And Embed Management
+
+TASK-067B2 adds backend APIs for widget allowed origins, immediate public-key rotation, approved SDK embed-version preferences, supported-version listing, and safe embed snippet metadata. See `docs/04_Engineering/Widget_Origins_Public_Key_and_Embed_Management.md`.
+
+Admin UI, preview grants, installation verification, and production deployment remain deferred.

@@ -132,3 +132,9 @@ TASK-066B3 adds provider-neutral operational controls for controlled pilot readi
 ## TASK-067B1 Administration Boundary
 
 Authenticated widget administration APIs create and publish revisioned configuration snapshots. Public-key rotation, embed version selection, and release-channel management are not part of B1 and remain separate from the production delivery/versioning model.
+
+## TASK-067B2 Embed Administration Update
+
+TASK-067B2 adds an admin-facing supported SDK resolver backed by `deployment/widget/sdk-versions.json`. The default embed mode uses the managed major alias `/widget-sdk/v1/loader.js`; pinned mode uses an approved immutable semantic loader path and may include SRI when generated release metadata is available. The admin API does not allow arbitrary SDK URLs or `latest`.
+
+The current snippet generator uses the provider-neutral CDN placeholder from release documentation until approved production domains are wired by deployment configuration. No production deployment or CDN mutation is performed.

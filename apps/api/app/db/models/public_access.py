@@ -130,6 +130,8 @@ class Widget(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     operational_status: Mapped[str] = mapped_column(String(40), nullable=False, default="enabled", server_default="enabled")
     pilot_status: Mapped[str] = mapped_column(String(40), nullable=False, default="not_approved", server_default="not_approved")
     release_channel: Mapped[str] = mapped_column(String(40), nullable=False, default="pilot", server_default="pilot")
+    embed_version_mode: Mapped[str] = mapped_column(String(40), nullable=False, default="managed_major", server_default="managed_major")
+    pinned_sdk_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
     active_published_revision_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     archived_at: Mapped[datetime | None] = mapped_column(nullable=True)
 

@@ -105,3 +105,81 @@ class WidgetPublicationResult(BaseModel):
 
 class WidgetRollbackResult(WidgetPublicationResult):
     rolled_back_from_revision_id: str
+
+class WidgetOriginCreateRequest(BaseModel):
+    origin: str = Field(min_length=1, max_length=512)
+
+
+class WidgetOriginRead(BaseModel):
+    id: str
+    origin: str
+    scheme: str
+    hostname: str
+    port: int | None
+    wildcard_subdomains: bool
+    environment: str
+    active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class WidgetPublicKeyRotateRequest(BaseModel):
+    expected_public_credential_id: str = Field(min_length=1, max_length=80)
+
+
+class WidgetPublicKeyRotationResult(BaseModel):
+    widget_id: str
+    public_credential_id: str
+    public_key: str
+    public_key_status: str
+    old_key_revoked: bool
+    embed_update_required: bool
+    rotated_at: datetime | None
+
+
+class WidgetEmbedPreferenceUpdateRequest(BaseModel):
+    version_mode: str = Field(max_length=40)
+    pinned_sdk_version: str | None = Field(default=None, max_length=80)
+
+
+class WidgetSupportedSdkVersion(BaseModel):
+    version: str
+    sdk_major: int
+    protocol_major: int
+    api_version: str
+    support_status: str
+    immutable_loader_path: str
+    major_alias_path: str
+    release_channel: str | None = None
+    integrity: str | None = None
+
+
+class WidgetSupportedSdkVersionsResponse(BaseModel):
+    recommended: str
+    versions: list[WidgetSupportedSdkVersion]
+
+
+class WidgetEmbedMetadata(BaseModel):
+    public_key: str
+    public_key_status: str
+    public_key_created_at: datetime
+    public_key_rotated_at: datetime | None
+    publication_status: str
+    published: bool
+    operational_status: str
+    pilot_status: str
+    release_channel: str
+    version_mode: str
+    pinned_sdk_version: str | None
+    selected_sdk_version: str
+    selected_loader_path: str
+    protocol_major: int
+    api_version: str
+    sri: str | None
+    snippet: str
+    allowed_origins: list[WidgetOriginRead]
+    active_published_revision_id: str | None
+    active_revision_number: int | None
+    readiness: list[str]
+    active: bool
+    embed_update_required: bool

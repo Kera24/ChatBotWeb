@@ -91,3 +91,8 @@ Implemented under `/api/v1/workspaces/{workspace_id}`:
 ## Deferred Work
 
 TASK-067B2 should add allowed-origin management, public key lifecycle, embed versioning, and embed management APIs. Admin frontend and preview remain later tasks.
+## TASK-067B2 Origin, Key, And Embed Boundary
+
+TASK-067B2 extends the backend administration foundation with allowed-origin management, immediate public-key rotation, approved SDK embed-version selection, and embed metadata/snippet APIs. Origins remain attached to the stable public credential boundary rather than configuration revisions. Public key rotation revokes the old credential, preserves origins, leaves configuration revisions unchanged, and requires embed snippet replacement.
+
+Embed delivery preference is stable widget metadata: `managed_major` by default, with optional approved pinned SDK semver. Release channel, pilot status, operational status, and publication status remain separate concepts. Admin frontend, preview grants, installation verification, and knowledge-selection UI remain deferred.

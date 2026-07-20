@@ -62,3 +62,7 @@ PUBLIC_WIDGET_PILOT_ALLOWLIST=wpk_...
 ## Pilot State
 
 TASK-066B3 defines the controlled pilot gate. It does not perform production deployment or customer enablement by itself.
+
+## TASK-067B2 Pilot Enablement Dependency
+
+Pilot enablement assumes the widget has at least one active allowed origin and an active current public key. Public key rotation does not grant pilot access and does not publish configuration. After a rotation, rerun config smoke with the new key and expected customer origin before enabling or continuing pilot traffic.

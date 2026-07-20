@@ -897,3 +897,7 @@ TASK-067A is complete when lifecycle, draft/published model, revision architectu
 ## TASK-067B1 Implementation Note
 
 Widget administration now has a backend revisioning foundation: stable `Widget` identity, immutable `WidgetConfigurationRevision` snapshots, draft updates with optimistic concurrency, publish and rollback APIs, and public configuration resolution through the active published revision. Allowed-origin CRUD, public-key rotation, embed management, preview grants, and admin frontend work remain deferred to later TASK-067B tasks.
+
+## TASK-067B2 Implementation Note
+
+Allowed-origin CRUD, public-key rotation, SDK embed-version preference, supported-version listing, and embed metadata/snippet APIs are now implemented in the authenticated backend. Origins and embed preferences are stable widget/public-credential metadata, not configuration revision fields. Public key rotation is immediate cutover and does not mutate published configuration history. Preview grants, frontend screens, installation verification, and dual-key grace periods remain deferred.

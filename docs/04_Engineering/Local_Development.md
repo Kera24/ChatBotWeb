@@ -418,3 +418,13 @@ npm run api:test -- tests/test_widget_admin_revisioning.py
 ```
 
 The suite uses an isolated in-memory SQLite app fixture and synthetic tenant/widget data only.
+
+## Widget Admin Origins And Embed Local Tests
+
+For TASK-067B2 development, run focused API coverage with:
+
+```bash
+npm run api:test -- tests/test_widget_admin_origins_embed.py
+```
+
+The suite uses synthetic in-memory tenant/widget data and covers origin normalization, key rotation, embed metadata, RBAC, tenant isolation, and audit events.

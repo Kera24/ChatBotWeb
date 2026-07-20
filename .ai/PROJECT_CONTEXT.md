@@ -464,3 +464,13 @@ Guardrails for future Codex sessions:
 - Publishing and rollback create new published snapshots and preserve historical revisions.
 - Public configuration resolution prefers the active published widget revision with a legacy compatibility fallback.
 - Admin frontend, full origin management, public-key rotation, embed management, and preview grants remain deferred.
+
+## TASK-067B2 Implementation Facts
+
+- Widget administration now includes backend APIs for allowed-origin list/add/remove, public-key rotation, embed metadata, embed version preference updates, and supported SDK version listing.
+- Origins remain attached to the stable widget public credential boundary and are not configuration revisions.
+- Origin administration enforces exact canonical origins, default-port normalization, production localhost rejection through existing credential policy, a 20 active-origin limit, and final-active-origin protection for published enabled widgets.
+- Public-key rotation is immediate cutover: the old credential is revoked, active origins are copied to the new credential, the widget identity remains stable, and published revisions are not mutated.
+- Embed delivery preference is stable widget metadata: managed major alias by default, with optional approved pinned SDK semver. Arbitrary SDK URLs and `latest` remain unsupported.
+- Public configuration ETags include public-key cache context to avoid cross-key conditional-cache confusion after rotation.
+- Admin frontend, preview grants, installation verification, and production deployment remain deferred.

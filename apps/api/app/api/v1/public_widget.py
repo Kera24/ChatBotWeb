@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import time
@@ -299,7 +299,7 @@ def _gateway(request: Request, db: Session, event_sink: InMemoryAccessEventSink)
             request_id=_request.request_id,
             asset_base_url=settings.PUBLIC_WIDGET_ASSET_BASE_URL or None,
         )
-        etag = public_widget_config_etag(payload)
+        etag = public_widget_config_etag(payload, cache_key=record.public_identifier)
         return {
             "payload": payload,
             "etag": etag,
@@ -511,7 +511,7 @@ def get_public_widget_config(public_key: str, request: Request, db: DbSession) -
             db.rollback()
             return error
         payload = WidgetChannelAdapter().format_config_response(result.response)
-        etag = str(result.response.metadata.get("etag") or public_widget_config_etag(payload))
+        etag = str(result.response.metadata.get("etag") or public_widget_config_etag(payload, cache_key=public_key))
         headers = _config_cors_headers(origin or "")
         headers["X-Request-ID"] = request_id
         headers["ETag"] = etag

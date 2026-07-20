@@ -109,3 +109,12 @@ TASK-066B1 implements repository-local, provider-neutral release artifacts, orig
 - [ ] Global message kill switch denies message sends, including existing sessions.
 - [ ] `deployment/widget/alerts.json` validates and each alert references a runbook.
 - [ ] `npm run widget:pilot:readiness` completed and wrote a safe report.
+
+## TASK-067B2 Administration Release Checks
+
+- [ ] Origin administration normalizes exact origins and rejects wildcards, paths, duplicate canonical origins, and production localhost.
+- [ ] Published enabled widgets retain at least one active origin.
+- [ ] Public key rotation revokes the old key, preserves active origins, and requires embed snippet update.
+- [ ] Old public keys are rejected and new keys resolve the same active published configuration.
+- [ ] Public configuration ETags remain isolated by public key and Origin.
+- [ ] Embed snippets are generated from approved SDK metadata only and contain no `latest`, session token, API secret, or arbitrary URL override.

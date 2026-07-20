@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 import secrets
@@ -400,7 +400,10 @@ def normalise_origin(origin: str, *, environment: str, wildcard_subdomains: bool
             raise OriginValidationError("Wildcard origins require a concrete registrable domain.")
         if environment == "production" and len(labels) < 2:
             raise OriginValidationError("Broad production wildcards are not allowed.")
-    return {"scheme": scheme, "hostname": hostname, "port": parsed.port, "wildcard_subdomains": bool(wildcard_subdomains), "environment": environment}
+    port = parsed.port
+    if (scheme == "https" and port == 443) or (scheme == "http" and port == 80):
+        port = None
+    return {"scheme": scheme, "hostname": hostname, "port": port, "wildcard_subdomains": bool(wildcard_subdomains), "environment": environment}
 
 
 def add_origin(

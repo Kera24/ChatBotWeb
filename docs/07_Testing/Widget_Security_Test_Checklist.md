@@ -82,3 +82,7 @@ TASK-066B1 implements repository-local, provider-neutral release artifacts, orig
 ## TASK-067B1 Admin Revisioning Coverage
 
 Add security evidence for authenticated widget administration: tenant-scoped widget/revision reads, stale draft update rejection, draft changes not affecting public configuration, publish/rollback audit events, and cross-tenant denial for widget draft, publish, revision, and rollback APIs.
+
+## TASK-067B2 Admin Origin, Key, And Embed Coverage
+
+Add security evidence for authenticated origin/key/embed administration: exact-origin normalization, production localhost rejection, wildcard/path rejection, final active origin protection, public-key rotation cutover, old-key rejection, new-key public config resolution, cross-key ETag isolation, no arbitrary SDK URL or `latest`, snippet escaping, tenant-scoped origin/embed/key APIs, and audit events without full rotated keys.

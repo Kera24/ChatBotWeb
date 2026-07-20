@@ -102,9 +102,11 @@ def project_asset_url(value: str | None, *, asset_base_url: str | None = None) -
     return urljoin(base, candidate), False
 
 
-def public_widget_config_etag(public_projection: dict[str, object]) -> str:
+def public_widget_config_etag(public_projection: dict[str, object], *, cache_key: str | None = None) -> str:
     stable = deepcopy(public_projection)
     stable.pop("request_id", None)
+    if cache_key is not None:
+        stable["_cache_key"] = cache_key
     canonical = json.dumps(stable, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return f'"{digest}"'
