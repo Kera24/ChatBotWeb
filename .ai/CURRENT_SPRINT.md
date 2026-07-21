@@ -1,15 +1,16 @@
 ﻿# Current Sprint
 
 Current phase:
-Sprint 3G - Widget Administration and Publishing
+Sprint 3H - Controlled Production Pilot Deployment
 
 Current task:
-TASK-067B5 - Widget Administration Security Hardening, Authenticated Browser E2E, Accessibility, and Pilot Admin Release Gate
+TASK-068A - Controlled Pilot Production Deployment, Domain Wiring, Monitoring, and Post-Deploy Validation Architecture
 
 ## Guardrails
 
-- Implement widget administration hardening and release-gate evidence only.
-- Do not implement production deployment, GA declaration, analytics, telemetry, lead capture, human handoff, streaming, monitoring vendor integration, major new admin features, or broad operational-control UI.
-- Preserve tenant isolation, immutable revisions, draft/public separation, exact origins, preview-grant security, public-key semantics, pilot/operational separation, and public widget security.
-- After successful completion, Sprint 3G implementation is complete at controlled-pilot level.
-- Next recommended phase: TASK-068A - Controlled Pilot Deployment, Production Domain Wiring, Monitoring Integration, and Post-Deploy Validation Architecture.
+- Architecture and deployment planning only.
+- Do not deploy production infrastructure, change DNS, provision cloud resources, add production credentials, or modify live environments.
+- Define the concrete controlled-pilot hosting/provider, topology, monitoring, migration, rollback, and post-deploy validation model.
+- Preserve the controlled-pilot classification. Do not declare GA.
+- Sprint 3G is complete at controlled-pilot-admin-ready level.
+- Next recommended task: TASK-068B1 - Production Infrastructure-as-Code / Hosting Configuration, Domains, Secrets, DB/Storage, CDN.

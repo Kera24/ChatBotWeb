@@ -508,3 +508,18 @@ npm run widget:admin:release:verify
 It generates `artifacts/widget-admin-readiness/report.json` and verifies tenant isolation, RBAC, preview-grant security, knowledge-scope isolation, publish/rollback concurrency, key/origin/embed hardening, audit coverage, accessibility-oriented frontend behavior, and public-widget pilot regression via the existing pilot reports.
 
 Production deployment has not occurred. The implemented classification is controlled-pilot administration readiness, not GA readiness. TASK-068A should define controlled pilot deployment, production domain wiring, monitoring integration, and post-deploy validation architecture before any production pilot deployment work.
+
+## Controlled Production Pilot Deployment Architecture
+
+TASK-068A defines the actual controlled-production-pilot hosting and validation architecture.
+
+Implementation facts:
+
+- Sprint 3G is complete at controlled-pilot-admin-ready level.
+- Production deployment has not occurred.
+- TASK-068A selects an Azure-first controlled pilot model: Azure Front Door, Azure Container Apps, Azure Container Registry, Azure Database for PostgreSQL Flexible Server with pgvector, Azure Blob Storage, Azure Key Vault, optional Azure Cache for Redis where required, and Azure Monitor/Application Insights.
+- The production pilot is a production-grade environment with controlled tenant/widget enablement, not GA.
+- Widget static delivery uses the existing B1 versioned SDK, major alias, iframe hashed asset, cache-header, and release-manifest model through Azure Blob Storage plus Azure Front Door.
+- PostgreSQL with pgvector remains the production pilot vector path; a separate vector database is deferred until scale evidence requires it.
+- GitHub Actions remains the planned CI/CD orchestrator with manual production approval, staging smoke, migration job, release artifact publication, post-deploy live FastAPI browser smoke, and rollback planning.
+- GA remains blocked until controlled pilot deployment and observation succeed, including monitoring history, manual accessibility validation, restore drill, rollback drill, security review, support process validation, and pilot feedback.
