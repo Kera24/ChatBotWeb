@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -17,6 +17,7 @@ const DEFAULT_INITIAL_CONFIGURATION: Partial<WidgetConfigurationPayload> = {
   language: "en",
   suggested_questions_json: ["How can you help?"],
   max_initial_suggestions: 1,
+  knowledge_scope_json: [],
 };
 
 export function WidgetCreateForm({ session }: { session: DevelopmentDashboardSession }) {

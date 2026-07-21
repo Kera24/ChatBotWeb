@@ -138,3 +138,7 @@ Authenticated widget administration APIs create and publish revisioned configura
 TASK-067B2 adds an admin-facing supported SDK resolver backed by `deployment/widget/sdk-versions.json`. The default embed mode uses the managed major alias `/widget-sdk/v1/loader.js`; pinned mode uses an approved immutable semantic loader path and may include SRI when generated release metadata is available. The admin API does not allow arbitrary SDK URLs or `latest`.
 
 The current snippet generator uses the provider-neutral CDN placeholder from release documentation until approved production domains are wired by deployment configuration. No production deployment or CDN mutation is performed.
+
+## TASK-067B4 Update
+
+Passive installation evidence is recorded from valid public configuration requests and can be shown to administrators as observed/not observed per allowed origin. This is operational evidence, not product analytics.

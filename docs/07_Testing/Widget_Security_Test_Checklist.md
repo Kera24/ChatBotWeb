@@ -86,3 +86,11 @@ Add security evidence for authenticated widget administration: tenant-scoped wid
 ## TASK-067B2 Admin Origin, Key, And Embed Coverage
 
 Add security evidence for authenticated origin/key/embed administration: exact-origin normalization, production localhost rejection, wildcard/path rejection, final active origin protection, public-key rotation cutover, old-key rejection, new-key public config resolution, cross-key ETag isolation, no arbitrary SDK URL or `latest`, snippet escaping, tenant-scoped origin/embed/key APIs, and audit events without full rotated keys.
+
+## TASK-067B4 Security Checks
+
+- Cross-tenant knowledge IDs are rejected.
+- Preview grants cannot expose draft configuration through public endpoints.
+- Installation evidence records no session token, message body, answer text, or visitor identity.
+- Rollback target must belong to the same tenant/widget.
+- Public retrieval uses the active published revision knowledge scope.

@@ -102,3 +102,7 @@ This gate validates operational configuration, requires the B2 pilot verificatio
 ## TASK-067B2 Admin Embed Boundary
 
 Before handing a snippet to a pilot customer, use the authenticated widget embed metadata API rather than composing snippets manually. The current backend generates only approved managed-major or pinned-semver SDK snippets. Public-key rotation is immediate cutover; after rotation, operators must provide the new snippet and verify the old public key no longer resolves.
+
+## TASK-067B4 Addition
+
+The deployment runbook now treats publish validation, revision history, rollback readiness, and passive installation evidence as administration gates. Passing release artifact checks alone is not enough to consider a widget ready for pilot traffic.

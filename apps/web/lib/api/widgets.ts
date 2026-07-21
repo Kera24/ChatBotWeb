@@ -1,4 +1,4 @@
-﻿import { dashboardApiDelete, dashboardApiGet, dashboardApiPatch, dashboardApiPost } from "./client";
+import { dashboardApiDelete, dashboardApiGet, dashboardApiPatch, dashboardApiPost } from "./client";
 import type { DevelopmentDashboardSession } from "../auth/development-session";
 
 export type WidgetConfigurationPayload = {
@@ -20,6 +20,7 @@ export type WidgetConfigurationPayload = {
   show_citations: boolean;
   allow_conversation_history: boolean;
   max_initial_suggestions: number;
+  knowledge_scope_json: string[];
 };
 
 export type WidgetRevisionDetail = {
@@ -115,6 +116,48 @@ export type WidgetSupportedSdkVersionsResponse = {
   versions: WidgetSupportedSdkVersion[];
 };
 
+
+export type WidgetKnowledgeOption = {
+  id: string;
+  title: string;
+  type: string;
+  readiness: string;
+  indexing_status: string;
+  updated_at: string | null;
+};
+
+export type WidgetPublishValidationResult = {
+  publishable: boolean;
+  errors: Array<{ field: string; code: string; message: string }>;
+  warnings: Array<{ field: string; code: string; message: string }>;
+  diff: { changed_fields?: string[]; has_published_revision?: boolean };
+  knowledge: WidgetKnowledgeOption[];
+};
+
+export type WidgetPreviewGrant = {
+  preview_token: string;
+  expires_at: string;
+  draft_revision_id: string;
+  configuration: WidgetConfigurationPayload;
+};
+
+export type WidgetPublicationResult = {
+  widget: WidgetSummary;
+  published_revision: WidgetRevisionDetail;
+  validation_errors: Array<{ field: string; code: string; message: string }>;
+};
+
+export type WidgetRollbackResult = WidgetPublicationResult & {
+  rolled_back_from_revision_id: string;
+};
+
+export type WidgetInstallationStatus = {
+  origin: string;
+  status: string;
+  last_seen_at: string | null;
+  sdk_version: string | null;
+  protocol_major: number | null;
+};
 export type WidgetCreatePayload = {
   display_name: string;
   environment?: string;
@@ -238,3 +281,80 @@ export function listWidgetSdkVersions(session: DevelopmentDashboardSession) {
   });
 }
 
+
+export function listWidgetKnowledgeOptions(session: DevelopmentDashboardSession, widgetId: string) {
+  return dashboardApiGet<WidgetKnowledgeOption[]>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/knowledge-options`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+  });
+}
+
+export function updateWidgetKnowledgeScope(session: DevelopmentDashboardSession, widgetId: string, body: { document_ids: string[]; expected_concurrency_version: number }) {
+  return dashboardApiPatch<WidgetRevisionDetail>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/draft/knowledge`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+    body,
+  });
+}
+
+export function validateWidgetPublish(session: DevelopmentDashboardSession, widgetId: string, body: { draft_revision_id: string; expected_concurrency_version: number }) {
+  return dashboardApiPost<WidgetPublishValidationResult>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/validate-publish`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+    body,
+  });
+}
+
+export function publishWidget(session: DevelopmentDashboardSession, widgetId: string, body: { draft_revision_id: string; expected_concurrency_version: number }) {
+  return dashboardApiPost<WidgetPublicationResult>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/publish`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+    body,
+  });
+}
+
+export function listWidgetRevisions(session: DevelopmentDashboardSession, widgetId: string) {
+  return dashboardApiGet<WidgetRevisionDetail[]>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/revisions`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+  });
+}
+
+export function getWidgetRevision(session: DevelopmentDashboardSession, widgetId: string, revisionId: string) {
+  return dashboardApiGet<WidgetRevisionDetail>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/revisions/${revisionId}`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+  });
+}
+
+export function rollbackWidget(session: DevelopmentDashboardSession, widgetId: string, body: { target_revision_id: string; expected_active_revision_id: string }) {
+  return dashboardApiPost<WidgetRollbackResult>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/rollback`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+    body,
+  });
+}
+
+export function createWidgetPreviewGrant(session: DevelopmentDashboardSession, widgetId: string, draftRevisionId: string) {
+  return dashboardApiPost<WidgetPreviewGrant>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/preview-grant`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+    body: { draft_revision_id: draftRevisionId },
+  });
+}
+
+export function getWidgetInstallationStatus(session: DevelopmentDashboardSession, widgetId: string) {
+  return dashboardApiGet<WidgetInstallationStatus[]>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/installation-status`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+  });
+}

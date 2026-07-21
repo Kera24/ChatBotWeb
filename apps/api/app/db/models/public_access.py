@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -175,6 +175,7 @@ class WidgetConfigurationRevision(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     show_citations: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     allow_conversation_history: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     max_initial_suggestions: Mapped[int] = mapped_column(Integer, nullable=False, default=3, server_default="3")
+    knowledge_scope_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
     configuration_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     source_revision_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("widget_configuration_revisions.id"), nullable=True)
     created_by_user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
@@ -192,6 +193,28 @@ class WidgetConfigurationRevision(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     @property
     def configuration_version(self) -> int:
         return self.revision_number
+
+
+class WidgetInstallationObservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "widget_installation_observations"
+    __table_args__ = (
+        UniqueConstraint("widget_id", "public_credential_id", "origin", name="uq_widget_installation_observation_origin"),
+        Index("ix_widget_installation_observations_widget", "widget_id"),
+        Index("ix_widget_installation_observations_tenant_workspace", "organisation_id", "workspace_id"),
+        Index("ix_widget_installation_observations_last_seen", "last_seen_at"),
+    )
+
+    organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    widget_id: Mapped[str] = mapped_column(String(36), ForeignKey("widgets.id"), nullable=False, index=True)
+    public_credential_id: Mapped[str] = mapped_column(String(36), ForeignKey("public_credentials.id"), nullable=False, index=True)
+    origin: Mapped[str] = mapped_column(String(512), nullable=False)
+    sdk_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    protocol_major: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    widget = relationship("Widget")
+    public_credential = relationship("PublicCredential")
 
 class PublicSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "public_sessions"

@@ -438,3 +438,7 @@ npm run web:test -- components/widgets/widget-admin.test.tsx
 ```
 
 Use `npm run web:build` to verify the dynamic `/widgets`, `/widgets/new`, and `/widgets/[widgetId]` routes compile with the current Next.js app.
+
+## Widget Administration B4 Local Notes
+
+For local widget administration testing, use the authenticated development dashboard session, create a widget, add an allowed localhost origin, save a knowledge scope, validate publish, publish, and then call the public config endpoint from the allowed origin to populate installation evidence.

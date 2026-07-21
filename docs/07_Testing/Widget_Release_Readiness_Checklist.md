@@ -118,3 +118,12 @@ TASK-066B1 implements repository-local, provider-neutral release artifacts, orig
 - [ ] Old public keys are rejected and new keys resolve the same active published configuration.
 - [ ] Public configuration ETags remain isolated by public key and Origin.
 - [ ] Embed snippets are generated from approved SDK metadata only and contain no `latest`, session token, API secret, or arbitrary URL override.
+
+## TASK-067B4 Checks
+
+- Knowledge scope contains only tenant-owned resources.
+- Selected knowledge resources are ready before publication unless explicitly accepted as fallback-only.
+- Publish validation passes before confirmation.
+- Preview grant is short lived and draft-revision bound.
+- Rollback creates a new revision and does not mutate history.
+- Installation status is observed from an approved origin before pilot enablement.

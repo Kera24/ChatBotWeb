@@ -239,3 +239,7 @@ Admin UI, preview grants, installation verification, and production deployment r
 TASK-067B3 adds authenticated dashboard routes for widget list, creation, draft settings, allowed domains, embed setup, SDK version selection, and public-key rotation. See `docs/04_Engineering/Widget_Administration_Frontend_Settings_Domains_and_Embed.md`.
 
 Publish workflow, preview, revision history, rollback, knowledge selection, and installation verification remain deferred.
+
+## Widget Administration TASK-067B4
+
+Widget administration now includes saved-draft knowledge selection, grant-bound draft preview, publish validation and confirmation, immutable revision history, rollback, and passive embed installation evidence. Full authenticated browser hardening remains assigned to TASK-067B5.

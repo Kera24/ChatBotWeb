@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import base64
+import hmac
 import html
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +17,8 @@ from app.access.credentials.service import CredentialValidationError, OriginNotF
 from app.access.origin_validation.repository import list_active_origins_for_credential
 from app.access.widget_config.service import default_widget_payload, validate_configuration_payload
 from app.access.widget_config.validation import WidgetValidationError
-from app.db.models import CredentialAllowedOrigin, PublicCredential, Widget, WidgetConfigurationRevision
+from app.core.config import settings
+from app.db.models import CredentialAllowedOrigin, Document, DocumentVersion, PublicCredential, Widget, WidgetConfigurationRevision, WidgetInstallationObservation
 from app.repositories.audit_repository import add_audit_event
 
 MAX_WIDGET_ORIGINS = 20
@@ -41,6 +44,7 @@ CONFIG_FIELDS = (
     "show_citations",
     "allow_conversation_history",
     "max_initial_suggestions",
+    "knowledge_scope_json",
 )
 
 
@@ -141,7 +145,8 @@ def create_widget(
         status="draft",
         concurrency_version=1,
         created_by_user_id=actor_user_id,
-        configuration_hash=_configuration_hash(values),
+        knowledge_scope_json=[],
+        configuration_hash=_configuration_hash({**values, "knowledge_scope_json": []}),
         **values,
     )
     db.add(draft)
@@ -397,6 +402,10 @@ def _validate_publishability(db: Session, *, widget: Widget, draft: WidgetConfig
     origins = list_active_origins_for_credential(db, credential_id=widget.public_credential_id, environment=credential.environment)
     if not origins:
         errors.append(WidgetAdminFieldError("allowed_origins", "required", "At least one allowed origin is required before publishing."))
+    for resource in _knowledge_readiness(db, widget=widget, document_ids=list(draft.knowledge_scope_json or [])):
+        if resource["readiness"] != "ready":
+            errors.append(WidgetAdminFieldError("knowledge_scope_json", "not_ready", "Selected knowledge resources must be ready before publishing."))
+            break
     if errors:
         raise WidgetAdminValidationError("Widget is not publishable.", errors=errors)
 
@@ -724,3 +733,204 @@ def _stable_group_id() -> str:
     from uuid import uuid4
 
     return str(uuid4())
+
+
+def validate_publishability(db: Session, *, widget: Widget, draft_revision_id: str, expected_concurrency_version: int) -> dict[str, Any]:
+    draft = _get_revision(db, widget=widget, revision_id=draft_revision_id)
+    errors: list[WidgetAdminFieldError] = []
+    if draft.status != "draft":
+        errors.append(WidgetAdminFieldError("draft_revision_id", "not_current", "Only the current draft can be published."))
+    elif draft.concurrency_version != expected_concurrency_version:
+        errors.append(WidgetAdminFieldError("expected_concurrency_version", "stale", "Draft changed before validation."))
+    try:
+        _validate_publishability(db, widget=widget, draft=draft)
+    except WidgetAdminValidationError as exc:
+        errors.extend(exc.errors)
+    return {
+        "publishable": not errors,
+        "errors": errors,
+        "warnings": [] if draft.knowledge_scope_json else [WidgetAdminFieldError("knowledge_scope_json", "empty", "No knowledge documents are selected; the widget may use fallback answers until scope is configured.")],
+        "diff": diff_draft_to_published(db, widget=widget),
+        "knowledge": _knowledge_readiness(db, widget=widget, document_ids=list(draft.knowledge_scope_json or [])),
+    }
+
+
+def list_knowledge_options(db: Session, *, widget: Widget) -> list[dict[str, Any]]:
+    statement = (
+        select(Document)
+        .where(
+            Document.organisation_id == widget.organisation_id,
+            Document.workspace_id == widget.workspace_id,
+            Document.deleted_at.is_(None),
+        )
+        .order_by(Document.title, Document.id)
+    )
+    return [_knowledge_option(db, document) for document in db.execute(statement).scalars().all()]
+
+
+def update_draft_knowledge_scope(db: Session, *, widget: Widget, actor_user_id: str | None, document_ids: list[str], expected_concurrency_version: int) -> WidgetConfigurationRevision:
+    draft = get_current_draft(db, widget=widget)
+    if draft.concurrency_version != expected_concurrency_version:
+        raise WidgetAdminConflict("Draft has changed since it was loaded.")
+    ids = _normalise_scope_ids(document_ids)
+    found = {
+        row[0]
+        for row in db.execute(
+            select(Document.id).where(
+                Document.id.in_(ids) if ids else False,
+                Document.organisation_id == widget.organisation_id,
+                Document.workspace_id == widget.workspace_id,
+                Document.deleted_at.is_(None),
+            )
+        ).all()
+    }
+    missing = [item for item in ids if item not in found]
+    if missing:
+        raise WidgetAdminValidationError("Knowledge scope contains unavailable documents.", errors=[WidgetAdminFieldError("document_ids", "cross_tenant_or_missing", "Selected documents must belong to this workspace.")])
+    draft.knowledge_scope_json = ids
+    draft.concurrency_version += 1
+    draft.configuration_hash = _configuration_hash(_configuration_values(draft))
+    add_audit_event(
+        db,
+        organisation_id=widget.organisation_id,
+        workspace_id=widget.workspace_id,
+        actor_user_id=actor_user_id,
+        action="widget_knowledge_scope.changed",
+        entity_type="widget_configuration_revision",
+        entity_id=draft.id,
+        metadata_json={"widget_id": widget.id, "revision_number": draft.revision_number, "selected_count": len(ids)},
+    )
+    db.commit()
+    db.refresh(draft)
+    return draft
+
+
+def create_preview_grant(db: Session, *, widget: Widget, actor_user_id: str | None, draft_revision_id: str) -> dict[str, Any]:
+    draft = _get_revision(db, widget=widget, revision_id=draft_revision_id)
+    if draft.status != "draft":
+        raise WidgetAdminValidationError("Preview requires the current draft.", errors=[WidgetAdminFieldError("draft_revision_id", "invalid", "Preview requires the current draft revision.")])
+    expires_at = utc_now() + timedelta(minutes=10)
+    payload = {
+        "tenant": widget.organisation_id,
+        "workspace": widget.workspace_id,
+        "widget": widget.id,
+        "draft": draft.id,
+        "actor": actor_user_id,
+        "exp": int(expires_at.timestamp()),
+    }
+    body = base64.urlsafe_b64encode(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).decode("ascii").rstrip("=")
+    signature = hmac.new(settings.PUBLIC_SESSION_TOKEN_HASH_SECRET.encode("utf-8"), body.encode("ascii"), hashlib.sha256).hexdigest()
+    return {"preview_token": f"wpg_{body}.{signature}", "expires_at": expires_at, "configuration": _configuration_values(draft), "draft_revision_id": draft.id}
+
+
+def list_installation_status(db: Session, *, widget: Widget) -> list[dict[str, Any]]:
+    origins = list_widget_origins(db, widget=widget, active_only=True)
+    observations = {
+        row.origin: row
+        for row in db.execute(
+            select(WidgetInstallationObservation).where(
+                WidgetInstallationObservation.widget_id == widget.id,
+                WidgetInstallationObservation.public_credential_id == widget.public_credential_id,
+            )
+        ).scalars().all()
+    }
+    result = []
+    for origin in origins:
+        canonical = origin_to_string(origin)
+        observed = observations.get(canonical)
+        result.append({
+            "origin": canonical,
+            "status": "observed" if observed else "not_observed",
+            "last_seen_at": observed.last_seen_at if observed else None,
+            "sdk_version": observed.sdk_version if observed else None,
+            "protocol_major": observed.protocol_major if observed else None,
+        })
+    return result
+
+
+def record_installation_observation(db: Session, *, public_key: str, origin: str | None, sdk_version: str | None = None, protocol_major: int | None = None) -> None:
+    if not origin:
+        return
+    widget = db.execute(select(Widget).join(PublicCredential, Widget.public_credential_id == PublicCredential.id).where(PublicCredential.public_identifier == public_key, Widget.archived_at.is_(None))).scalar_one_or_none()
+    if widget is None:
+        return
+    if origin not in {origin_to_string(item) for item in list_widget_origins(db, widget=widget, active_only=True)}:
+        return
+    now = utc_now()
+    widget.public_credential.last_used_at = now
+    existing = db.execute(
+        select(WidgetInstallationObservation).where(
+            WidgetInstallationObservation.widget_id == widget.id,
+            WidgetInstallationObservation.public_credential_id == widget.public_credential_id,
+            WidgetInstallationObservation.origin == origin,
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        existing = WidgetInstallationObservation(
+            organisation_id=widget.organisation_id,
+            workspace_id=widget.workspace_id,
+            widget_id=widget.id,
+            public_credential_id=widget.public_credential_id,
+            origin=origin,
+            sdk_version=sdk_version,
+            protocol_major=protocol_major,
+            last_seen_at=now,
+        )
+        db.add(existing)
+    else:
+        existing.sdk_version = sdk_version or existing.sdk_version
+        existing.protocol_major = protocol_major or existing.protocol_major
+        existing.last_seen_at = now
+
+
+def _normalise_scope_ids(values: Any) -> list[str]:
+    if values is None:
+        return []
+    if not isinstance(values, list):
+        raise WidgetAdminValidationError("Knowledge scope is not valid.", errors=[WidgetAdminFieldError("knowledge_scope_json", "invalid", "Knowledge scope must be a list of document IDs.")])
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        item = str(value).strip()
+        if not item or len(item) > 80 or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def _knowledge_readiness(db: Session, *, widget: Widget, document_ids: list[str]) -> list[dict[str, Any]]:
+    if not document_ids:
+        return []
+    docs = {
+        document.id: _knowledge_option(db, document)
+        for document in db.execute(
+            select(Document).where(
+                Document.id.in_(document_ids),
+                Document.organisation_id == widget.organisation_id,
+                Document.workspace_id == widget.workspace_id,
+                Document.deleted_at.is_(None),
+            )
+        ).scalars().all()
+    }
+    return [docs.get(item, {"id": item, "title": "Unavailable", "type": "document", "readiness": "unavailable", "indexing_status": "unavailable", "updated_at": None}) for item in document_ids]
+
+
+def _knowledge_option(db: Session, document: Document) -> dict[str, Any]:
+    active_version = db.get(DocumentVersion, document.active_document_version_id) if document.active_document_version_id else None
+    if document.status == "ready" and active_version is not None and active_version.processing_status == "ready":
+        readiness = "ready"
+    elif document.status in {"failed", "error"} or (active_version is not None and active_version.processing_status in {"failed", "error"}):
+        readiness = "failed"
+    elif document.status in {"uploaded", "processing", "pending"} or (active_version is not None and active_version.processing_status in {"uploaded", "processing", "pending"}):
+        readiness = "indexing"
+    else:
+        readiness = "unavailable"
+    return {
+        "id": document.id,
+        "title": document.title,
+        "type": "document",
+        "readiness": readiness,
+        "indexing_status": active_version.processing_status if active_version else document.status,
+        "updated_at": document.updated_at,
+    }

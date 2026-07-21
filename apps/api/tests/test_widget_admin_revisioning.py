@@ -226,3 +226,115 @@ def test_widget_admin_tenant_scope_and_rbac(client: TestClient) -> None:
     assert cross_read.status_code == 404
     assert cross_update.status_code == 404
     assert non_member.status_code == 403
+
+def seed_document(client: TestClient, *, organisation_id: str, workspace_id: str, title: str, status: str = "ready", processing_status: str = "completed") -> str:
+    from app.db.models import Document, DocumentVersion
+
+    with client.app.state.testing_session() as db:
+        document = Document(
+            organisation_id=organisation_id,
+            workspace_id=workspace_id,
+            title=title,
+            source_type="synthetic",
+            source_key=f"synthetic-{uuid4().hex}",
+            status=status,
+            visibility="workspace",
+        )
+        db.add(document)
+        db.flush()
+        version = DocumentVersion(
+            organisation_id=organisation_id,
+            workspace_id=workspace_id,
+            document_id=document.id,
+            version_number=1,
+            checksum=uuid4().hex,
+            processing_status=processing_status,
+        )
+        db.add(version)
+        db.flush()
+        document.active_document_version_id = version.id
+        db.commit()
+        return document.id
+
+
+def test_widget_b4_knowledge_preview_validation_and_tenant_scope(client: TestClient) -> None:
+    org_a, workspace_a, _ = seed_tenant(client, slug="alpha-b4", email="alpha-b4@example.test")
+    org_b, workspace_b, _ = seed_tenant(client, slug="beta-b4", email="beta-b4@example.test")
+    alpha_doc = seed_document(client, organisation_id=org_a, workspace_id=workspace_a, title="Alpha Observatory Guide")
+    beta_doc = seed_document(client, organisation_id=org_b, workspace_id=workspace_b, title="Beta Archive Guide")
+    alpha_pending = seed_document(client, organisation_id=org_a, workspace_id=workspace_a, title="Alpha Indexing Draft", processing_status="pending")
+    created = create_widget_api(client, organisation_id=org_a, workspace_id=workspace_a, email="alpha-b4@example.test")
+    widget = created.json()["data"]
+    widget_id = widget["id"]
+    draft = widget["draft"]
+
+    options = client.get(
+        f"/api/v1/workspaces/{workspace_a}/widgets/{widget_id}/knowledge-options",
+        params={"organisation_id": org_a},
+        headers=headers("alpha-b4@example.test"),
+    )
+    assert options.status_code == 200
+    titles = {item["title"] for item in options.json()["data"]}
+    assert "Alpha Observatory Guide" in titles
+    assert "Beta Archive Guide" not in titles
+
+    cross_scope = client.patch(
+        f"/api/v1/workspaces/{workspace_a}/widgets/{widget_id}/draft/knowledge",
+        params={"organisation_id": org_a},
+        headers=headers("alpha-b4@example.test"),
+        json={"document_ids": [beta_doc], "expected_concurrency_version": draft["concurrency_version"]},
+    )
+    assert cross_scope.status_code == 422
+
+    saved_scope = client.patch(
+        f"/api/v1/workspaces/{workspace_a}/widgets/{widget_id}/draft/knowledge",
+        params={"organisation_id": org_a},
+        headers=headers("alpha-b4@example.test"),
+        json={"document_ids": [alpha_doc], "expected_concurrency_version": draft["concurrency_version"]},
+    )
+    assert saved_scope.status_code == 200
+    scoped_draft = saved_scope.json()["data"]
+    assert scoped_draft["configuration"]["knowledge_scope_json"] == [alpha_doc]
+
+    preview = client.post(
+        f"/api/v1/workspaces/{workspace_a}/widgets/{widget_id}/preview-grant",
+        params={"organisation_id": org_a},
+        headers=headers("alpha-b4@example.test"),
+        json={"draft_revision_id": scoped_draft["id"]},
+    )
+    assert preview.status_code == 200
+    assert preview.json()["data"]["preview_token"].startswith("wpg_")
+    assert preview.json()["data"]["configuration"]["knowledge_scope_json"] == [alpha_doc]
+
+    validate = client.post(
+        f"/api/v1/workspaces/{workspace_a}/widgets/{widget_id}/validate-publish",
+        params={"organisation_id": org_a},
+        headers=headers("alpha-b4@example.test"),
+        json={"draft_revision_id": scoped_draft["id"], "expected_concurrency_version": scoped_draft["concurrency_version"]},
+    )
+    assert validate.status_code == 200
+    assert validate.json()["data"]["publishable"] is False
+    assert any(error["field"] == "allowed_origins" for error in validate.json()["data"]["errors"])
+
+    pending_scope = client.patch(
+        f"/api/v1/workspaces/{workspace_a}/widgets/{widget_id}/draft/knowledge",
+        params={"organisation_id": org_a},
+        headers=headers("alpha-b4@example.test"),
+        json={"document_ids": [alpha_pending], "expected_concurrency_version": scoped_draft["concurrency_version"]},
+    )
+    assert pending_scope.status_code == 200
+    pending_validate = client.post(
+        f"/api/v1/workspaces/{workspace_a}/widgets/{widget_id}/validate-publish",
+        params={"organisation_id": org_a},
+        headers=headers("alpha-b4@example.test"),
+        json={"draft_revision_id": pending_scope.json()["data"]["id"], "expected_concurrency_version": pending_scope.json()["data"]["concurrency_version"]},
+    )
+    assert any(error["field"] == "knowledge_scope_json" for error in pending_validate.json()["data"]["errors"])
+
+    cross_preview = client.post(
+        f"/api/v1/workspaces/{workspace_b}/widgets/{widget_id}/preview-grant",
+        params={"organisation_id": org_b},
+        headers=headers("beta-b4@example.test"),
+        json={"draft_revision_id": scoped_draft["id"]},
+    )
+    assert cross_preview.status_code == 404

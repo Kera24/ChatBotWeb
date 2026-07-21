@@ -269,3 +269,44 @@ def test_widget_b2_admin_tenant_scope_and_rbac(client: TestClient) -> None:
     assert cross_origin.status_code == 404
     assert cross_embed.status_code == 404
     assert cross_rotate.status_code == 404
+
+def test_widget_b4_installation_status_records_only_valid_allowed_origin(client: TestClient) -> None:
+    org, workspace = seed_tenant(client, slug="install", email="install@example.test")
+    widget = create_widget(client, organisation_id=org, workspace_id=workspace, email="install@example.test")
+    added = add_origin(client, organisation_id=org, workspace_id=workspace, widget_id=widget["id"], email="install@example.test", origin="http://localhost:3000")
+    assert added.status_code == 201
+    activate_key(client, organisation_id=org, workspace_id=workspace, credential_id=widget["public_credential_id"], email="install@example.test")
+    publish_widget(client, organisation_id=org, workspace_id=workspace, widget=widget, email="install@example.test")
+
+    before = client.get(
+        f"/api/v1/workspaces/{workspace}/widgets/{widget['id']}/installation-status",
+        params={"organisation_id": org},
+        headers=headers("install@example.test"),
+    )
+    assert before.status_code == 200
+    assert before.json()["data"] == [{"origin": "http://localhost:3000", "status": "not_observed", "last_seen_at": None, "sdk_version": None, "protocol_major": None}]
+
+    denied = public_config(client, widget["public_identifier"], origin="http://unauthorised.localhost:3001")
+    assert denied.status_code in {403, 404}
+    observed = public_config(client, widget["public_identifier"])
+    assert observed.status_code == 200
+
+    after = client.get(
+        f"/api/v1/workspaces/{workspace}/widgets/{widget['id']}/installation-status",
+        params={"organisation_id": org},
+        headers=headers("install@example.test"),
+    )
+    assert after.status_code == 200
+    item = after.json()["data"][0]
+    assert item["origin"] == "http://localhost:3000"
+    assert item["status"] == "observed"
+    assert item["last_seen_at"] is not None
+    assert item["sdk_version"] is None
+
+    cross_org, cross_workspace = seed_tenant(client, slug="install-beta", email="install-beta@example.test")
+    cross = client.get(
+        f"/api/v1/workspaces/{cross_workspace}/widgets/{widget['id']}/installation-status",
+        params={"organisation_id": cross_org},
+        headers=headers("install-beta@example.test"),
+    )
+    assert cross.status_code == 404

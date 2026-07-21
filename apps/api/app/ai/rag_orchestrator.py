@@ -143,6 +143,7 @@ class RAGOrchestrator:
             max_context_chunks=settings.RETRIEVAL_MAX_CONTEXT_CHUNKS,
             max_context_chars=max_context_chars,
             provider=self.embedding_provider,
+            document_ids=(request.metadata or {}).get("knowledge_document_ids") or None,
         )
         context = "\n\n".join(block.context_text for block in retrieval.context_blocks)
         model_key = request.model_key or DEFAULT_RAG_MODEL_KEY

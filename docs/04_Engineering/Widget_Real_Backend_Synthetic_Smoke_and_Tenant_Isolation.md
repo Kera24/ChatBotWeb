@@ -168,3 +168,7 @@ TASK-066B3 evaluated adding a lightweight live FastAPI browser smoke. It remains
 ## TASK-066B3 Operational Controls
 
 TASK-066B3 adds provider-neutral operational controls for controlled pilot readiness: `/health/live`, `/health/ready`, safe request correlation IDs, privacy-preserving redaction helpers, in-memory operational counters for test evidence, server-side pilot allowlist controls, global/widget/message kill switches, provider-neutral alert definitions, a dry-run rollback planner, and `npm run widget:pilot:readiness`. It does not deploy production infrastructure or add a monitoring vendor.
+
+## TASK-067B4 Update
+
+Knowledge scope selection is now revision-bound for administration. Real-backend tenant isolation tests should include selected-scope retrieval and rollback-restored scope in TASK-067B5 hardening.

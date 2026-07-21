@@ -100,3 +100,7 @@ Embed delivery preference is stable widget metadata: `managed_major` by default,
 ## TASK-067B3 Frontend Implementation Note
 
 The authenticated dashboard now includes `/widgets`, `/widgets/new`, and `/widgets/[widgetId]` for list, creation, draft settings, domains, and embed management. The frontend uses explicit draft Save with concurrency handling and does not implement publish, preview, revision history, rollback, or knowledge-selection workflows.
+
+## TASK-067B4 Update
+
+Draft revisions now include `knowledge_scope_json`; publish validation checks selected resource readiness and public message retrieval receives the active published scope. Rollback clones historical configuration including knowledge scope into a new immutable published revision.

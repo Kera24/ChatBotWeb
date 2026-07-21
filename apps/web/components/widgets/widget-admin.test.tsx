@@ -1,11 +1,11 @@
-﻿import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, render, userEvent, waitFor } from "../../test/test-utils";
 
 import { WidgetCreateForm } from "./widget-create-form";
 import { WidgetDetailClient } from "./widget-detail-client";
 import { WidgetList } from "./widget-status";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
-import type { WidgetDetail, WidgetEmbedMetadata, WidgetOrigin, WidgetRevisionDetail, WidgetSupportedSdkVersionsResponse } from "../../lib/api/widgets";
+import type { WidgetDetail, WidgetEmbedMetadata, WidgetInstallationStatus, WidgetKnowledgeOption, WidgetOrigin, WidgetRevisionDetail, WidgetSupportedSdkVersionsResponse } from "../../lib/api/widgets";
 import * as widgetApi from "../../lib/api/widgets";
 
 const push = vi.fn();
@@ -28,6 +28,15 @@ vi.mock("../../lib/api/widgets", async (importOriginal) => {
     getWidgetEmbed: vi.fn(),
     updateWidgetEmbedPreference: vi.fn(),
     rotateWidgetPublicKey: vi.fn(),
+    listWidgetKnowledgeOptions: vi.fn(),
+    updateWidgetKnowledgeScope: vi.fn(),
+    validateWidgetPublish: vi.fn(),
+    publishWidget: vi.fn(),
+    listWidgetRevisions: vi.fn(),
+    getWidgetRevision: vi.fn(),
+    rollbackWidget: vi.fn(),
+    createWidgetPreviewGrant: vi.fn(),
+    getWidgetInstallationStatus: vi.fn(),
   };
 });
 
@@ -57,6 +66,7 @@ const config = {
   show_citations: true,
   allow_conversation_history: true,
   max_initial_suggestions: 1,
+  knowledge_scope_json: [],
 };
 
 const draft: WidgetRevisionDetail = {
@@ -132,6 +142,23 @@ const embed: WidgetEmbedMetadata = {
   embed_update_required: false,
 };
 
+const knowledgeOptions: WidgetKnowledgeOption[] = [
+  { id: "doc-1", title: "Admissions handbook", type: "document", readiness: "ready", indexing_status: "completed", updated_at: "2026-07-20T00:00:00.000Z" },
+];
+
+const publishedRevision: WidgetRevisionDetail = {
+  ...draft,
+  id: "published-1",
+  revision_number: 0,
+  status: "published",
+  is_active_published: false,
+  concurrency_version: 1,
+  published_at: "2026-07-20T00:00:00.000Z",
+};
+
+const installationStatus: WidgetInstallationStatus[] = [
+  { origin: "https://example.com", status: "observed", last_seen_at: "2026-07-20T01:00:00.000Z", sdk_version: "0.1.0-foundation.0", protocol_major: 1 },
+];
 const sdkVersions: WidgetSupportedSdkVersionsResponse = {
   recommended: "0.1.0-foundation.0",
   versions: [
@@ -153,6 +180,8 @@ describe("widget administration frontend", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
+    vi.mocked(widgetApi.getWidgetInstallationStatus).mockResolvedValue({ success: true, data: installationStatus });
+    vi.mocked(widgetApi.listWidgetRevisions).mockResolvedValue({ success: true, data: [draft, publishedRevision] });
   });
 
   it("renders widget list without exposing full public key", () => {
@@ -261,8 +290,10 @@ function renderDetail() {
       initialOrigins={[origin]}
       initialEmbed={embed}
       sdkVersions={sdkVersions}
+      knowledgeOptions={knowledgeOptions}
+      initialRevisions={[draft, publishedRevision]}
+      initialInstallationStatus={installationStatus}
     />,
   );
 }
-
 

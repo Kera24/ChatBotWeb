@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from math import sqrt
 
-from sqlalchemy import select, text
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.orm import Session
 
 from app.db.models import Chunk, Document, DocumentVersion
@@ -32,6 +32,7 @@ def search_embedded_chunks(
     query: str,
     limit: int,
     provider: EmbeddingProvider,
+    document_ids: list[str] | None = None,
 ) -> list[VectorSearchMatch]:
     query_vector = provider.embed(query)
     if len(query_vector) != provider.dimension:
@@ -45,6 +46,7 @@ def search_embedded_chunks(
             query_vector=query_vector,
             provider=provider,
             limit=limit,
+            document_ids=document_ids,
         )
     return _search_sqlite(
         db,
@@ -53,6 +55,7 @@ def search_embedded_chunks(
         query_vector=query_vector,
         provider=provider,
         limit=limit,
+        document_ids=document_ids,
     )
 
 
@@ -64,6 +67,7 @@ def _search_sqlite(
     query_vector: list[float],
     provider: EmbeddingProvider,
     limit: int,
+    document_ids: list[str] | None = None,
 ) -> list[VectorSearchMatch]:
     statement = (
         select(Chunk)
@@ -87,6 +91,8 @@ def _search_sqlite(
             DocumentVersion.processing_status == "ready",
         )
     )
+    if document_ids:
+        statement = statement.where(Chunk.document_id.in_(document_ids))
     chunks = list(db.execute(statement).scalars().all())
     matches = [
         _match_from_chunk(
@@ -107,6 +113,7 @@ def _search_postgresql(
     query_vector: list[float],
     provider: EmbeddingProvider,
     limit: int,
+    document_ids: list[str] | None = None,
 ) -> list[VectorSearchMatch]:
     query_vector_literal = "[" + ",".join(str(value) for value in query_vector) + "]"
     statement = text(
@@ -143,10 +150,11 @@ def _search_postgresql(
           AND dv.workspace_id = :workspace_id
           AND dv.id = c.document_version_id
           AND dv.processing_status = 'ready'
+          AND (:document_ids_empty = true OR c.document_id IN :document_ids)
         ORDER BY c.embedding_vector <=> CAST(:query_vector AS vector), c.chunk_index, c.id
         LIMIT :limit
         """
-    )
+    ).bindparams(bindparam("document_ids", expanding=True))
     rows = db.execute(
         statement,
         {
@@ -157,6 +165,8 @@ def _search_postgresql(
             "model_name": provider.model_name,
             "dimension": provider.dimension,
             "limit": limit,
+            "document_ids_empty": not bool(document_ids),
+            "document_ids": document_ids or ["__none__"],
         },
     ).mappings()
     return [VectorSearchMatch(**dict(row)) for row in rows]

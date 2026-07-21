@@ -131,3 +131,7 @@ The implementation uses semantic headings, labelled inputs, status text, accessi
 - Embed installation verification crawler
 - Pilot enablement mutation
 - Global operational controls
+
+## TASK-067B4 Update
+
+The authenticated administration frontend now includes Knowledge, Preview, Publish, History, and installation-status surfaces. Preview is config-faithful and grant-bound; publish and rollback remain backend-authoritative and do not change pilot or operational controls.

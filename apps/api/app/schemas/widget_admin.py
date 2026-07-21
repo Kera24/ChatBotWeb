@@ -51,6 +51,7 @@ class WidgetConfigurationPayload(BaseModel):
     show_citations: bool
     allow_conversation_history: bool
     max_initial_suggestions: int
+    knowledge_scope_json: list[str] = []
 
 
 class WidgetRevisionSummary(BaseModel):
@@ -183,3 +184,44 @@ class WidgetEmbedMetadata(BaseModel):
     readiness: list[str]
     active: bool
     embed_update_required: bool
+
+
+class WidgetKnowledgeOption(BaseModel):
+    id: str
+    title: str
+    type: str
+    readiness: str
+    indexing_status: str
+    updated_at: datetime | None
+
+
+class WidgetKnowledgeScopeUpdateRequest(BaseModel):
+    document_ids: list[str] = []
+    expected_concurrency_version: int = Field(ge=1)
+
+
+class WidgetPublishValidationResult(BaseModel):
+    publishable: bool
+    errors: list[WidgetValidationErrorItem]
+    warnings: list[WidgetValidationErrorItem]
+    diff: dict[str, Any]
+    knowledge: list[WidgetKnowledgeOption]
+
+
+class WidgetPreviewGrantRequest(BaseModel):
+    draft_revision_id: str = Field(min_length=1, max_length=80)
+
+
+class WidgetPreviewGrantResult(BaseModel):
+    preview_token: str
+    expires_at: datetime
+    draft_revision_id: str
+    configuration: WidgetConfigurationPayload
+
+
+class WidgetInstallationStatus(BaseModel):
+    origin: str
+    status: str
+    last_seen_at: datetime | None
+    sdk_version: str | None
+    protocol_major: int | None

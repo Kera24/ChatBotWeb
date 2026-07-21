@@ -9,6 +9,7 @@ from app.access.messages.idempotency import PublicMessageIdempotencyService
 from app.access.messages.output import PublicOutputSanitisationRequest, PublicOutputSanitiser
 from app.access.messages.security import SecuredPublicMessage
 from app.access.observability.events import AccessEvent, InMemoryAccessEventSink
+from app.access.widget_config.repository import get_configuration_for_credential
 from app.ai.rag_orchestrator import RAGOrchestrationRequest, RAGOrchestrator, RAGOrchestratorError, RAGProviderExecutionError
 
 _RESPONSE_SCHEMA_VERSION = "1.1"
@@ -55,6 +56,7 @@ class PublicWidgetRAGAdapter:
                     max_context_chars=secured.effective_max_context_characters,
                     metadata={
                         "public_access": True,
+                        "knowledge_document_ids": _knowledge_scope_for(self.orchestrator.db, prepared),
                         "public_session_id": prepared.public_session_id,
                         "idempotency_record_id": prepared.idempotency_record_id,
                     },
@@ -191,3 +193,12 @@ class PublicWidgetRAGAdapter:
 def _public_response_id(assistant_message_id: str, request_id: str) -> str:
     digest = sha256(f"{assistant_message_id}:{request_id}".encode("utf-8")).hexdigest()[:20]
     return f"pmr_{digest}"
+
+def _knowledge_scope_for(db, prepared) -> list[str]:  # noqa: ANN001
+    configuration = get_configuration_for_credential(
+        db,
+        organisation_id=prepared.organisation_id,
+        workspace_id=prepared.workspace_id,
+        credential_id=prepared.credential_id,
+    )
+    return list(getattr(configuration, "knowledge_scope_json", None) or [])

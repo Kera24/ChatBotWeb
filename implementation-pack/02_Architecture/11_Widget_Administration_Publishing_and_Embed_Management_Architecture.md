@@ -905,3 +905,7 @@ Allowed-origin CRUD, public-key rotation, SDK embed-version preference, supporte
 ## TASK-067B3 Implementation Note
 
 The first authenticated widget administration frontend is implemented in the Next.js dashboard. It covers list, creation, settings, domains, embed snippet management, approved SDK version selection, and public-key rotation. Preview grants, publish UI, revision history, rollback UI, knowledge selection, and installation verification remain deferred to later tasks.
+
+## TASK-067B4 Implementation Note
+
+TASK-067B4 implements the first complete authenticated publish workflow: tenant-scoped knowledge scope on revisions, side-effect-free publish validation, short-lived admin preview grants, publish confirmation UI, revision history/detail, rollback UI integration, and passive installation evidence from valid public configuration requests. Installation verification is intentionally passive rather than crawler-based to avoid SSRF risk. Full authenticated browser E2E and deeper accessibility/security hardening move to TASK-067B5.

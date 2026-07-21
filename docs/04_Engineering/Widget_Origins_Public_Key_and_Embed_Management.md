@@ -180,3 +180,7 @@ The migration does not change public runtime behavior for existing widgets.
 ## TASK-067B3 Frontend Implementation Note
 
 The B2 origin/key/embed APIs are now surfaced through authenticated dashboard UI. Tenant admins can manage exact allowed origins, view/copy the current public key, rotate it through a confirmation dialog, select managed-major or approved pinned SDK embed mode, and copy the inert server-generated snippet. Pilot enablement and global operational controls remain separate.
+
+## TASK-067B4 Update
+
+The Embed page now displays passive installation evidence by allowed origin. Evidence is recorded only after a valid public configuration request from an approved origin and stores no session token, message body, answer, visitor identity, or conversation content.

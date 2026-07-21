@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import time
@@ -34,6 +34,7 @@ from app.access.sessions.service import PublicSessionChecks, PublicSessionServic
 from app.ai.rag_orchestrator import RAGOrchestrator, RAGOrchestratorDependencies
 from app.access.tenant_resolution.service import PublicTenantResolutionService, TenantResolutionChecks
 from app.access.widget_config.public_projection import project_public_widget_configuration, public_widget_config_etag
+from app.access.widget_admin.service import record_installation_observation
 from app.access.widget_config.repository import get_configuration_for_credential
 from app.api.deps import DbSession
 from app.core.config import settings
@@ -523,6 +524,8 @@ def get_public_widget_config(public_key: str, request: Request, db: DbSession) -
             return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
         if bool(result.response.metadata.get("asset_omitted")):
             _emit(event_sink, "widget.config.asset_omitted", request_id=request_id, trace_id=result.response.trace_id, outcome="omitted", latency_ms=int((time.perf_counter() - started) * 1000))
+        record_installation_observation(db, public_key=public_key, origin=origin, sdk_version=request.headers.get("x-widget-sdk-version"), protocol_major=_safe_int(request.headers.get("x-widget-protocol-major")))
+        db.commit()
         _emit(event_sink, "widget.config.served", request_id=request_id, trace_id=result.response.trace_id, outcome="served", latency_ms=int((time.perf_counter() - started) * 1000))
         return JSONResponse(status_code=status.HTTP_200_OK, content=payload, headers=headers)
     except PublicAccessError as exc:
@@ -705,3 +708,10 @@ async def create_public_widget_session(public_key: str, request: Request, db: Db
         db.rollback()
         _emit(event_sink, "widget.session.unavailable", request_id=request_id, outcome="rejected", error_code="safe_internal_error", latency_ms=int((time.perf_counter() - started) * 1000))
         return _error_response(error_detail("safe_internal_error"), request_id=request_id)
+
+
+def _safe_int(value: str | None) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except ValueError:
+        return None

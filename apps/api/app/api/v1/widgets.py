@@ -13,9 +13,12 @@ from app.access.widget_admin.service import (
     active_published_revision,
     add_widget_origin,
     create_widget,
+    create_preview_grant,
     diff_draft_to_published,
     get_current_draft,
     get_embed_metadata,
+    list_installation_status,
+    list_knowledge_options,
     get_revision,
     get_widget,
     list_revisions,
@@ -27,6 +30,8 @@ from app.access.widget_admin.service import (
     rollback_widget,
     rotate_widget_public_key,
     update_draft,
+    update_draft_knowledge_scope,
+    validate_publishability,
     update_embed_preference,
 )
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
@@ -38,14 +43,20 @@ from app.schemas.widget_admin import (
     WidgetCreateRequest,
     WidgetDetail,
     WidgetEmbedMetadata,
+    WidgetInstallationStatus,
+    WidgetKnowledgeOption,
+    WidgetKnowledgeScopeUpdateRequest,
     WidgetEmbedPreferenceUpdateRequest,
     WidgetDraftUpdateRequest,
     WidgetOriginCreateRequest,
     WidgetOriginRead,
+    WidgetPreviewGrantRequest,
+    WidgetPreviewGrantResult,
     WidgetPublicationResult,
     WidgetPublicKeyRotateRequest,
     WidgetPublicKeyRotationResult,
     WidgetPublishRequest,
+    WidgetPublishValidationResult,
     WidgetRevisionDetail,
     WidgetRevisionSummary,
     WidgetRollbackRequest,
@@ -156,6 +167,72 @@ def update_admin_widget_draft(
     return success_response(_revision_detail(draft, widget).model_dump(mode="json"))
 
 
+
+@router.get("/{workspace_id}/widgets/{widget_id}/knowledge-options")
+def list_admin_widget_knowledge_options(
+    workspace_id: str,
+    widget_id: str,
+    db: DbSession,
+    _current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    return success_response([WidgetKnowledgeOption.model_validate(item).model_dump(mode="json") for item in list_knowledge_options(db, widget=widget)])
+
+
+@router.patch("/{workspace_id}/widgets/{widget_id}/draft/knowledge")
+def update_admin_widget_knowledge_scope(
+    workspace_id: str,
+    widget_id: str,
+    payload: WidgetKnowledgeScopeUpdateRequest,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        draft = update_draft_knowledge_scope(db, widget=widget, actor_user_id=current_user.user_id, document_ids=payload.document_ids, expected_concurrency_version=payload.expected_concurrency_version)
+    except WidgetAdminConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(_revision_detail(draft, widget).model_dump(mode="json"))
+
+
+@router.post("/{workspace_id}/widgets/{widget_id}/validate-publish")
+def validate_admin_widget_publish(
+    workspace_id: str,
+    widget_id: str,
+    payload: WidgetPublishRequest,
+    db: DbSession,
+    _current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        result = validate_publishability(db, widget=widget, draft_revision_id=payload.draft_revision_id, expected_concurrency_version=payload.expected_concurrency_version)
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return success_response(_publish_validation_response(result).model_dump(mode="json"))
+
+
+@router.post("/{workspace_id}/widgets/{widget_id}/preview-grant")
+def create_admin_widget_preview_grant(
+    workspace_id: str,
+    widget_id: str,
+    payload: WidgetPreviewGrantRequest,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        result = create_preview_grant(db, widget=widget, actor_user_id=current_user.user_id, draft_revision_id=payload.draft_revision_id)
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(WidgetPreviewGrantResult.model_validate(result).model_dump(mode="json"))
 @router.post("/{workspace_id}/widgets/{widget_id}/publish")
 def publish_admin_widget(
     workspace_id: str,
@@ -345,6 +422,17 @@ def update_admin_widget_embed(
     return success_response(WidgetEmbedMetadata.model_validate(metadata).model_dump(mode="json"))
 
 
+
+@router.get("/{workspace_id}/widgets/{widget_id}/installation-status")
+def get_admin_widget_installation_status(
+    workspace_id: str,
+    widget_id: str,
+    db: DbSession,
+    _current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    return success_response([WidgetInstallationStatus.model_validate(item).model_dump(mode="json") for item in list_installation_status(db, widget=widget)])
 @router.get("/{workspace_id}/widget-sdk-versions")
 def list_admin_widget_sdk_versions(
     workspace_id: str,
@@ -445,6 +533,15 @@ def _origin_response(origin: CredentialAllowedOrigin) -> WidgetOriginRead:
         updated_at=origin.updated_at,
     )
 
+
+def _publish_validation_response(result: dict[str, Any]) -> WidgetPublishValidationResult:
+    return WidgetPublishValidationResult(
+        publishable=bool(result["publishable"]),
+        errors=[WidgetValidationErrorItem(field=item.field, code=item.code, message=item.message) for item in result["errors"]],
+        warnings=[WidgetValidationErrorItem(field=item.field, code=item.code, message=item.message) for item in result["warnings"]],
+        diff=result["diff"],
+        knowledge=[WidgetKnowledgeOption.model_validate(item) for item in result["knowledge"]],
+    )
 def _validation_http_error(exc: WidgetAdminValidationError) -> HTTPException:
     errors = [WidgetValidationErrorItem(field=item.field, code=item.code, message=item.message).model_dump(mode="json") for item in exc.errors]
     return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"code": "widget_not_publishable", "message": str(exc), "errors": errors})

@@ -66,3 +66,7 @@ TASK-066B3 defines the controlled pilot gate. It does not perform production dep
 ## TASK-067B2 Pilot Enablement Dependency
 
 Pilot enablement assumes the widget has at least one active allowed origin and an active current public key. Public key rotation does not grant pilot access and does not publish configuration. After a rotation, rerun config smoke with the new key and expected customer origin before enabling or continuing pilot traffic.
+
+## TASK-067B4 Gate Addition
+
+Before pilot enablement, administrators must verify that the widget has a published revision, at least one valid allowed origin, selected knowledge resources are ready where used, and installation evidence is observed from the intended allowed origin after the embed snippet is installed.

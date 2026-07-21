@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -6,24 +6,37 @@ import { useRouter } from "next/navigation";
 import { isDashboardApiError } from "../../lib/api/errors";
 import {
   addWidgetOrigin,
+  createWidgetPreviewGrant,
+  getWidgetDetail,
   getWidgetEmbed,
+  getWidgetInstallationStatus,
+  getWidgetRevision,
   getWidgetDraft,
   listWidgetOrigins,
+  listWidgetRevisions,
+  publishWidget,
   removeWidgetOrigin,
+  rollbackWidget,
   rotateWidgetPublicKey,
   updateWidgetDraft,
   updateWidgetEmbedPreference,
+  updateWidgetKnowledgeScope,
+  validateWidgetPublish,
   type WidgetConfigurationPayload,
   type WidgetDetail,
   type WidgetEmbedMetadata,
+  type WidgetInstallationStatus,
+  type WidgetKnowledgeOption,
   type WidgetOrigin,
+  type WidgetPreviewGrant,
+  type WidgetPublishValidationResult,
   type WidgetRevisionDetail,
   type WidgetSupportedSdkVersionsResponse,
 } from "../../lib/api/widgets";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
 import { WidgetReadinessList, WidgetStatusBadge } from "./widget-status";
 
-type TabId = "overview" | "appearance" | "conversation" | "domains" | "embed";
+type TabId = "overview" | "appearance" | "conversation" | "knowledge" | "domains" | "preview" | "publish" | "history" | "embed";
 
 type DraftForm = WidgetConfigurationPayload;
 
@@ -31,7 +44,11 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "appearance", label: "Appearance" },
   { id: "conversation", label: "Conversation" },
+  { id: "knowledge", label: "Knowledge" },
   { id: "domains", label: "Domains" },
+  { id: "preview", label: "Preview" },
+  { id: "publish", label: "Publish" },
+  { id: "history", label: "History" },
   { id: "embed", label: "Embed" },
 ];
 
@@ -42,6 +59,9 @@ export function WidgetDetailClient({
   initialOrigins,
   initialEmbed,
   sdkVersions,
+  knowledgeOptions,
+  initialRevisions,
+  initialInstallationStatus,
 }: {
   session: DevelopmentDashboardSession;
   initialWidget: WidgetDetail;
@@ -49,6 +69,9 @@ export function WidgetDetailClient({
   initialOrigins: WidgetOrigin[];
   initialEmbed: WidgetEmbedMetadata;
   sdkVersions: WidgetSupportedSdkVersionsResponse;
+  knowledgeOptions: WidgetKnowledgeOption[];
+  initialRevisions: WidgetRevisionDetail[];
+  initialInstallationStatus: WidgetInstallationStatus[];
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
@@ -58,6 +81,8 @@ export function WidgetDetailClient({
   const [form, setForm] = useState<DraftForm>(initialDraft.configuration);
   const [origins, setOrigins] = useState(initialOrigins);
   const [embed, setEmbed] = useState(initialEmbed);
+  const [revisions, setRevisions] = useState(initialRevisions);
+  const [installationStatus, setInstallationStatus] = useState(initialInstallationStatus);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -112,6 +137,11 @@ export function WidgetDetailClient({
     setConflict(false);
   }
 
+  function acceptDraft(nextDraft: WidgetRevisionDetail) {
+    setDraft(nextDraft);
+    setSavedDraft(nextDraft.configuration);
+    setForm(nextDraft.configuration);
+  }
   function resetDraft() {
     setForm(savedDraft);
     setError(null);
@@ -122,13 +152,33 @@ export function WidgetDetailClient({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  async function refreshWidgetState() {
+    const [detailResponse, draftResponse, embedResponse, revisionResponse] = await Promise.all([
+      getWidgetDetail(session, widget.id),
+      getWidgetDraft(session, widget.id),
+      getWidgetEmbed(session, widget.id),
+      listWidgetRevisions(session, widget.id),
+    ]);
+    setWidget(detailResponse.data);
+    acceptDraft(draftResponse.data);
+    setEmbed(embedResponse.data);
+    setRevisions(revisionResponse.data);
+    router.refresh();
+  }
   async function refreshEmbedAndOrigins() {
-    const [originResponse, embedResponse] = await Promise.all([
+    const [originResponse, embedResponse, installationResponse] = await Promise.all([
       listWidgetOrigins(session, widget.id),
       getWidgetEmbed(session, widget.id),
+      getWidgetInstallationStatus(session, widget.id),
     ]);
     setOrigins(originResponse.data);
     setEmbed(embedResponse.data);
+    setInstallationStatus(installationResponse.data);
+  }
+
+  async function refreshInstallationStatus() {
+    const response = await getWidgetInstallationStatus(session, widget.id);
+    setInstallationStatus(response.data);
   }
 
   return (
@@ -164,7 +214,7 @@ export function WidgetDetailClient({
       {error ? <p className="errorText" role="alert">{error}</p> : null}
 
       {activeTab === "overview" ? (
-        <OverviewPanel widget={widget} draft={draft} dirty={dirty} origins={origins} embed={embed} />
+        <OverviewPanel widget={widget} draft={draft} dirty={dirty} origins={origins} embed={embed} installationStatus={installationStatus} />
       ) : null}
 
       {activeTab === "appearance" ? (
@@ -175,6 +225,21 @@ export function WidgetDetailClient({
         <ConversationPanel form={form} dirty={dirty} saving={saving} conflict={conflict} updateForm={updateForm} saveDraft={saveDraft} reloadDraft={reloadDraft} resetDraft={resetDraft} />
       ) : null}
 
+      {activeTab === "knowledge" ? (
+        <KnowledgePanel key={`${draft.id}-${draft.concurrency_version}`} session={session} widgetId={widget.id} draft={draft} options={knowledgeOptions} acceptDraft={acceptDraft} setError={setError} setNotice={setNotice} />
+      ) : null}
+
+      {activeTab === "preview" ? (
+        <PreviewPanel session={session} widgetId={widget.id} draft={draft} setError={setError} setNotice={setNotice} />
+      ) : null}
+
+      {activeTab === "publish" ? (
+        <PublishPanel session={session} widget={widget} draft={draft} origins={origins} onPublished={refreshWidgetState} setError={setError} setNotice={setNotice} />
+      ) : null}
+
+      {activeTab === "history" ? (
+        <HistoryPanel session={session} widget={widget} revisions={revisions} onRolledBack={refreshWidgetState} setError={setError} setNotice={setNotice} />
+      ) : null}
       {activeTab === "domains" ? (
         <DomainsPanel session={session} widgetId={widget.id} origins={origins} setOrigins={setOrigins} refreshEmbedAndOrigins={refreshEmbedAndOrigins} setError={setError} setNotice={setNotice} />
       ) : null}
@@ -187,6 +252,8 @@ export function WidgetDetailClient({
           embed={embed}
           setEmbed={setEmbed}
           sdkVersions={sdkVersions}
+          installationStatus={installationStatus}
+          refreshInstallationStatus={refreshInstallationStatus}
           setError={setError}
           setNotice={setNotice}
         />
@@ -195,7 +262,7 @@ export function WidgetDetailClient({
   );
 }
 
-function OverviewPanel({ widget, draft, dirty, origins, embed }: { widget: WidgetDetail; draft: WidgetRevisionDetail; dirty: boolean; origins: WidgetOrigin[]; embed: WidgetEmbedMetadata }) {
+function OverviewPanel({ widget, draft, dirty, origins, embed, installationStatus }: { widget: WidgetDetail; draft: WidgetRevisionDetail; dirty: boolean; origins: WidgetOrigin[]; embed: WidgetEmbedMetadata; installationStatus: WidgetInstallationStatus[] }) {
   return (
     <div className="widgetGrid">
       <section className="widgetPanel">
@@ -216,6 +283,7 @@ function OverviewPanel({ widget, draft, dirty, origins, embed }: { widget: Widge
           <div><dt>Published revision</dt><dd>{widget.active_revision_number ? `Revision ${widget.active_revision_number}` : "None"}</dd></div>
           <div><dt>Public key fingerprint</dt><dd>{fingerprint(embed.public_key)}</dd></div>
           <div><dt>Active origins</dt><dd>{origins.filter((origin) => origin.active).length}</dd></div>
+          <div><dt>Observed installations</dt><dd>{installationStatus.filter((item) => item.status === "observed").length}</dd></div>
         </dl>
       </section>
     </div>
@@ -299,6 +367,205 @@ function ConversationPanel(props: FormPanelProps) {
   }
 }
 
+function KnowledgePanel({ session, widgetId, draft, options, acceptDraft, setError, setNotice }: {
+  session: DevelopmentDashboardSession;
+  widgetId: string;
+  draft: WidgetRevisionDetail;
+  options: WidgetKnowledgeOption[];
+  acceptDraft: (draft: WidgetRevisionDetail) => void;
+  setError: (message: string | null) => void;
+  setNotice: (message: string | null) => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(draft.configuration.knowledge_scope_json || []);
+  const [pending, setPending] = useState(false);
+  const dirty = JSON.stringify([...selected].sort()) !== JSON.stringify([...(draft.configuration.knowledge_scope_json || [])].sort());
+
+  async function save() {
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await updateWidgetKnowledgeScope(session, widgetId, { document_ids: selected, expected_concurrency_version: draft.concurrency_version });
+      acceptDraft(response.data);
+      setNotice("Knowledge scope saved to the draft. Public retrieval remains unchanged until publish.");
+    } catch (caught) {
+      setError(messageForError(caught, "Knowledge scope could not be saved."));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section className="widgetPanel">
+      <h2>Knowledge scope</h2>
+      <p className="mutedText">Select tenant-owned resources for the draft. Published revisions freeze this selection until another publish or rollback.</p>
+      <div className="knowledgeList" role="list" aria-label="Knowledge resources">
+        {options.length === 0 ? <p className="mutedText">No tenant knowledge resources are available for this widget yet.</p> : null}
+        {options.map((option) => (
+          <label className="knowledgeItem" key={option.id}>
+            <input type="checkbox" checked={selected.includes(option.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, option.id] : current.filter((id) => id !== option.id))} />
+            <span><strong>{option.title}</strong><small>{option.type} - {option.readiness} - {option.indexing_status}</small></span>
+          </label>
+        ))}
+      </div>
+      <div className="formActions">
+        <button className="actionButton" type="button" disabled={!dirty || pending} onClick={() => void save()}>{pending ? "Saving" : "Save knowledge scope"}</button>
+        <span className="mutedText">{selected.length} selected</span>
+      </div>
+    </section>
+  );
+}
+
+function PreviewPanel({ session, widgetId, draft, setError, setNotice }: {
+  session: DevelopmentDashboardSession;
+  widgetId: string;
+  draft: WidgetRevisionDetail;
+  setError: (message: string | null) => void;
+  setNotice: (message: string | null) => void;
+}) {
+  const [grant, setGrant] = useState<WidgetPreviewGrant | null>(null);
+  const [mode, setMode] = useState<"desktop" | "mobile">("desktop");
+  const [pending, setPending] = useState(false);
+
+  async function refreshGrant() {
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await createWidgetPreviewGrant(session, widgetId, draft.id);
+      setGrant(response.data);
+      setNotice("Short-lived preview grant created for this saved draft revision.");
+    } catch (caught) {
+      setError(messageForError(caught, "Preview grant could not be created."));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const previewConfig = grant?.configuration || draft.configuration;
+  return (
+    <section className="widgetPanel">
+      <div className="panelHeaderLine">
+        <div><h2>Draft preview</h2><p>Preview uses a short-lived admin grant bound to this draft revision. It does not publish draft configuration.</p></div>
+        <button className="actionButton" type="button" disabled={pending} onClick={() => void refreshGrant()}>{pending ? "Creating" : "Refresh preview grant"}</button>
+      </div>
+      <div className="previewControls" role="group" aria-label="Preview viewport">
+        <button className="smallButton" type="button" aria-pressed={mode === "desktop"} onClick={() => setMode("desktop")}>Desktop</button>
+        <button className="smallButton" type="button" aria-pressed={mode === "mobile"} onClick={() => setMode("mobile")}>Mobile</button>
+        <span className="mutedText">Draft revision {draft.revision_number}{grant ? ` - expires ${formatDate(grant.expires_at)}` : ""}</span>
+      </div>
+      <div className={`previewShell ${mode}`}>
+        <iframe className="previewFrame" title="Widget draft preview" sandbox="allow-scripts" srcDoc={previewHtml(previewConfig)} />
+      </div>
+    </section>
+  );
+}
+function PublishPanel({ session, widget, draft, origins, onPublished, setError, setNotice }: {
+  session: DevelopmentDashboardSession;
+  widget: WidgetDetail;
+  draft: WidgetRevisionDetail;
+  origins: WidgetOrigin[];
+  onPublished: () => Promise<void>;
+  setError: (message: string | null) => void;
+  setNotice: (message: string | null) => void;
+}) {
+  const [validation, setValidation] = useState<WidgetPublishValidationResult | null>(null);
+  const [pending, setPending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  async function validate() {
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await validateWidgetPublish(session, widget.id, { draft_revision_id: draft.id, expected_concurrency_version: draft.concurrency_version });
+      setValidation(response.data);
+      setNotice(response.data.publishable ? "Draft passed publish validation." : "Draft has publish blockers.");
+    } catch (caught) {
+      setError(messageForError(caught, "Publish validation could not run."));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function publish() {
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await publishWidget(session, widget.id, { draft_revision_id: draft.id, expected_concurrency_version: draft.concurrency_version });
+      setConfirmOpen(false);
+      await onPublished();
+      setNotice("Draft published. A new draft revision is ready for future edits.");
+    } catch (caught) {
+      setError(messageForError(caught, "Publish failed."));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section className="widgetPanel">
+      <div className="panelHeaderLine">
+        <div><h2>Publish</h2><p>Publishing promotes the saved draft to an immutable public revision. Pilot and operational controls are unchanged.</p></div>
+        <button className="actionButton" type="button" disabled={pending} onClick={() => void validate()}>{pending ? "Checking" : "Validate publish"}</button>
+      </div>
+      <dl className="widgetFacts compactFacts"><div><dt>Draft revision</dt><dd>{draft.revision_number}</dd></div><div><dt>Active published revision</dt><dd>{widget.active_revision_number || "None"}</dd></div><div><dt>Active origins</dt><dd>{origins.filter((origin) => origin.active).length}</dd></div></dl>
+      {validation ? <ValidationSummary validation={validation} /> : <p className="mutedText">Run validation to review blockers, warnings, knowledge readiness, and draft-to-published changes.</p>}
+      <div className="formActions"><button className="actionButton" type="button" disabled={!validation?.publishable || pending} onClick={() => setConfirmOpen(true)}>Publish draft</button></div>
+      {confirmOpen ? <div className="dialogBackdrop" role="presentation"><section className="confirmDialog" role="dialog" aria-modal="true" aria-labelledby="publish-title" aria-describedby="publish-description"><h2 id="publish-title">Publish draft revision {draft.revision_number}?</h2><p id="publish-description">This makes the saved draft available through the public configuration endpoint for approved origins. Pilot enablement remains separate.</p><div className="formActions"><button className="actionButton" type="button" autoFocus onClick={() => setConfirmOpen(false)}>Cancel</button><button className="actionButton" type="button" disabled={pending} onClick={() => void publish()}>{pending ? "Publishing" : "Publish"}</button></div></section></div> : null}
+    </section>
+  );
+}
+
+function HistoryPanel({ session, widget, revisions, onRolledBack, setError, setNotice }: {
+  session: DevelopmentDashboardSession;
+  widget: WidgetDetail;
+  revisions: WidgetRevisionDetail[];
+  onRolledBack: () => Promise<void>;
+  setError: (message: string | null) => void;
+  setNotice: (message: string | null) => void;
+}) {
+  const [detail, setDetail] = useState<WidgetRevisionDetail | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function loadDetail(revisionId: string) {
+    setPending(true);
+    setError(null);
+    try {
+      const response = await getWidgetRevision(session, widget.id, revisionId);
+      setDetail(response.data);
+    } catch (caught) {
+      setError(messageForError(caught, "Revision could not be loaded."));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function rollback(revision: WidgetRevisionDetail) {
+    if (!widget.active_published_revision_id) return;
+    if (!window.confirm(`Roll back by publishing a new revision cloned from revision ${revision.revision_number}?`)) return;
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await rollbackWidget(session, widget.id, { target_revision_id: revision.id, expected_active_revision_id: widget.active_published_revision_id });
+      await onRolledBack();
+      setNotice("Rollback published as a new immutable revision. Historical revisions were not changed.");
+    } catch (caught) {
+      setError(messageForError(caught, "Rollback failed."));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="widgetGrid">
+      <section className="widgetPanel"><h2>Revision history</h2><div className="revisionList" role="list" aria-label="Widget revisions">{revisions.map((revision) => <div className="revisionItem" role="listitem" key={revision.id}><div><strong>Revision {revision.revision_number}</strong><span>{revision.status}{revision.is_active_published ? " - active" : ""} - {formatDate(revision.created_at)}</span></div><div className="formActions compactActions"><button className="smallButton" type="button" disabled={pending} onClick={() => void loadDetail(revision.id)}>View</button>{revision.status === "published" && !revision.is_active_published ? <button className="smallButton" type="button" disabled={pending} onClick={() => void rollback(revision)}>Rollback</button> : null}</div></div>)}</div></section>
+      <section className="widgetPanel"><h2>Revision detail</h2>{detail ? <RevisionDetail revision={detail} /> : <p className="mutedText">Select a revision to inspect immutable configuration.</p>}</section>
+    </div>
+  );
+}
 function DomainsPanel({ session, widgetId, origins, setOrigins, refreshEmbedAndOrigins, setError, setNotice }: {
   session: DevelopmentDashboardSession;
   widgetId: string;
@@ -373,13 +640,15 @@ function DomainsPanel({ session, widgetId, origins, setOrigins, refreshEmbedAndO
   );
 }
 
-function EmbedPanel({ session, widget, setWidget, embed, setEmbed, sdkVersions, setError, setNotice }: {
+function EmbedPanel({ session, widget, setWidget, embed, setEmbed, sdkVersions, installationStatus, refreshInstallationStatus, setError, setNotice }: {
   session: DevelopmentDashboardSession;
   widget: WidgetDetail;
   setWidget: (widget: WidgetDetail) => void;
   embed: WidgetEmbedMetadata;
   setEmbed: (embed: WidgetEmbedMetadata) => void;
   sdkVersions: WidgetSupportedSdkVersionsResponse;
+  installationStatus: WidgetInstallationStatus[];
+  refreshInstallationStatus: () => Promise<void>;
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
 }) {
@@ -483,6 +752,13 @@ function EmbedPanel({ session, widget, setWidget, embed, setEmbed, sdkVersions, 
         </form>
       </section>
 
+      <section className="widgetPanel">
+        <div className="panelHeaderLine">
+          <div><h2>Installation status</h2><p>Observed means the platform has seen a valid widget configuration request from that allowed origin.</p></div>
+          <button className="smallButton" type="button" onClick={() => void refreshInstallationStatus()}>Refresh</button>
+        </div>
+        <InstallationStatusList items={installationStatus} />
+      </section>
       {rotateOpen ? (
         <div className="dialogBackdrop" role="presentation">
           <section className="confirmDialog" role="dialog" aria-modal="true" aria-labelledby="rotate-title" aria-describedby="rotate-description">
@@ -499,6 +775,34 @@ function EmbedPanel({ session, widget, setWidget, embed, setEmbed, sdkVersions, 
   );
 }
 
+function ValidationSummary({ validation }: { validation: WidgetPublishValidationResult }) {
+  return (
+    <div className="validationSummary">
+      <h3>{validation.publishable ? "Ready to publish" : "Publish blockers"}</h3>
+      {validation.errors.length ? <ul className="validationList">{validation.errors.map((item) => <li key={`${item.field}-${item.code}`}>{fieldLabel(item.field)}: {item.message}</li>)}</ul> : <p className="mutedText">No blocking validation errors.</p>}
+      {validation.warnings.length ? <><h3>Warnings</h3><ul className="validationList">{validation.warnings.map((item) => <li key={`${item.field}-${item.code}`}>{fieldLabel(item.field)}: {item.message}</li>)}</ul></> : null}
+      <h3>Changes</h3>
+      <DiffList diff={validation.diff} />
+      <h3>Knowledge readiness</h3>
+      <div className="knowledgeList">{validation.knowledge.length ? validation.knowledge.map((item) => <div className="knowledgeItem static" key={item.id}><span><strong>{item.title}</strong><small>{item.readiness} - {item.indexing_status}</small></span></div>) : <p className="mutedText">No knowledge resources selected.</p>}</div>
+    </div>
+  );
+}
+
+function DiffList({ diff }: { diff: { changed_fields?: string[]; has_published_revision?: boolean } }) {
+  const fields = diff.changed_fields || [];
+  if (!diff.has_published_revision) return <p className="mutedText">This is the first publication for the widget.</p>;
+  if (fields.length === 0) return <p className="mutedText">No field changes detected.</p>;
+  return <ul className="diffList">{fields.map((field) => <li key={field}>{fieldLabel(field)} changed</li>)}</ul>;
+}
+
+function RevisionDetail({ revision }: { revision: WidgetRevisionDetail }) {
+  return <dl className="widgetFacts compactFacts"><div><dt>Status</dt><dd>{revision.status}</dd></div><div><dt>Created</dt><dd>{formatDate(revision.created_at)}</dd></div><div><dt>Published</dt><dd>{revision.published_at ? formatDate(revision.published_at) : "Not published"}</dd></div><div><dt>Bot name</dt><dd>{revision.configuration.bot_name}</dd></div><div><dt>Welcome</dt><dd>{revision.configuration.welcome_message}</dd></div><div><dt>Knowledge resources</dt><dd>{revision.configuration.knowledge_scope_json.length}</dd></div><div><dt>Source revision</dt><dd>{revision.source_revision_id || "None"}</dd></div></dl>;
+}
+
+function InstallationStatusList({ items }: { items: WidgetInstallationStatus[] }) {
+  return <div className="installationList" role="list" aria-label="Installation observations">{items.length === 0 ? <p className="mutedText">No allowed origins are configured.</p> : null}{items.map((item) => <div className="installationItem" role="listitem" key={item.origin}><strong>{item.origin}</strong><span>{item.status}{item.last_seen_at ? ` - last seen ${formatDate(item.last_seen_at)}` : ""}</span><small>{item.sdk_version ? `SDK ${item.sdk_version}` : "SDK not observed"}</small></div>)}</div>;
+}
 type FormPanelProps = {
   form: DraftForm;
   dirty: boolean;
@@ -602,6 +906,28 @@ function pickConversation(form: DraftForm): Partial<DraftForm> {
   };
 }
 
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function fieldLabel(field: string) {
+  return field.replace(/_json$/, "").replace(/_/g, " ");
+}
+
+function escapeText(value: string | null | undefined) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function previewHtml(config: WidgetConfigurationPayload) {
+  const align = config.position === "bottom_left" ? "flex-start" : "flex-end";
+  const suggestions = (config.suggested_questions_json || []).slice(0, 4).map((question) => `<button type="button">${escapeText(question)}</button>`).join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#eef2f7;color:#111827}.shell{min-height:100vh;display:flex;align-items:flex-end;justify-content:${align};padding:24px}.panel{width:min(360px,100%);border:1px solid #d6dde8;border-radius:8px;background:white;box-shadow:0 16px 32px rgba(15,23,42,.16);overflow:hidden}.head{background:${escapeText(config.primary_colour)};color:white;padding:16px}.body{padding:16px;display:grid;gap:12px}.suggestions{display:flex;flex-wrap:wrap;gap:8px}.suggestions button{border:1px solid #cbd5e1;background:#f8fafc;border-radius:999px;padding:8px 10px}.composer{border:1px solid #cbd5e1;border-radius:8px;padding:10px;color:#64748b}</style></head><body><main class="shell" aria-label="Widget draft preview"><section class="panel"><div class="head"><strong>${escapeText(config.bot_name)}</strong></div><div class="body"><p>${escapeText(config.welcome_message)}</p><div class="suggestions">${suggestions}</div><div class="composer">${escapeText(config.launcher_label)}</div></div></section></main></body></html>`;
+}
 function messageForError(error: unknown, fallback: string) {
   if (isDashboardApiError(error)) {
     if (error.kind === "validation") return "The server rejected one or more fields. Check exact origins, URLs, colours, and length limits.";
@@ -620,5 +946,4 @@ function fingerprint(value: string) {
 function isHex(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value);
 }
-
 

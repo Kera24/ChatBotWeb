@@ -42,6 +42,7 @@ def assemble_retrieval_context(
     max_context_chunks: int,
     max_context_chars: int,
     provider: EmbeddingProvider,
+    document_ids: list[str] | None = None,
 ) -> RetrievalContextResult:
     effective_limit = min(search_limit, max_context_chunks)
     matches = search_embedded_chunks(
@@ -51,6 +52,7 @@ def assemble_retrieval_context(
         query=query,
         limit=effective_limit,
         provider=provider,
+        document_ids=document_ids,
     )
     return assemble_context_from_matches(
         query=query,

@@ -484,3 +484,13 @@ Guardrails for future Codex sessions:
 - Embed management renders backend-generated snippets inertly, supports managed-major and approved pinned SDK choices, and shows SRI only when returned by backend metadata.
 - Public-key rotation is available through an accessible confirmation dialog and refreshes the displayed key/snippet after success.
 - Publish UI, preview grants, revision history, rollback UI, knowledge selection, pilot mutation, and global operational controls remain deferred.
+
+## TASK-067B4 Implementation Facts
+
+- Widget administration now supports tenant-scoped knowledge options and draft knowledge-scope saving through `knowledge_scope_json` on configuration revisions.
+- Public message retrieval receives the active published revision's selected document scope; cross-tenant resource IDs are rejected at admin save time.
+- Publish validation is side-effect-free and reports configuration, allowed-origin, and knowledge-readiness blockers before confirmation.
+- Draft preview uses authenticated short-lived preview grants bound to actor, tenant, widget, and draft revision; B4 frontend renders a config-faithful iframe preview without exposing draft through public config.
+- Publish UI, revision history, revision detail, and rollback UI are wired to the immutable revision APIs. Rollback creates a new published revision and does not mutate history.
+- Embed installation verification is passive: valid public configuration requests from approved origins record observed origin, optional SDK/protocol metadata, and last-seen time without storing tokens, messages, answers, or visitor identity.
+- Full authenticated browser E2E, preview message/RAG hardening, expanded accessibility audit, and pilot admin release gate remain deferred to TASK-067B5.
