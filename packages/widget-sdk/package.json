@@ -1,0 +1,40 @@
+{
+    "name":  "@yoranix/widget-sdk",
+    "version":  "0.1.0-foundation.0",
+    "private":  true,
+    "type":  "module",
+    "description":  "Foundation package for the Yoranix embeddable widget loader SDK.",
+    "sideEffects":  false,
+    "files":  [
+                  "dist",
+                  "README.md"
+              ],
+    "main":  "./dist/index.js",
+    "module":  "./dist/index.js",
+    "types":  "./dist/index.d.ts",
+    "browser":  "./dist/yoranix-widget-sdk.global.js",
+    "exports":  {
+                    ".":  {
+                              "types":  "./dist/index.d.ts",
+                              "import":  "./dist/index.js",
+                              "browser":  "./dist/yoranix-widget-sdk.global.js",
+                              "default":  "./dist/index.js"
+                          }
+                },
+    "engines":  {
+                    "node":  "\u003e=20"
+                },
+    "scripts":  {
+                    "build":  "vite build \u0026\u0026 tsc -p tsconfig.build.json \u0026\u0026 node scripts/check-size.mjs",
+                    "lint":  "tsc --noEmit -p tsconfig.json",
+                    "test":  "npm run build \u0026\u0026 vitest run"
+                },
+    "devDependencies":  {
+                            "@types/node":  "latest",
+                            "typescript":  "latest",
+                            "vite":  "latest",
+                            "vitest":  "latest",
+                            "esbuild":  "latest",
+                            "jsdom":  "latest"
+                        }
+}

@@ -1,0 +1,1 @@
+export type MessageLifecycleState = "idle" | "sending" | "sent" | "failed" | "request_in_progress";

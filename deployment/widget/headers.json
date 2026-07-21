@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "description": "Provider-neutral widget delivery headers for adaptation by CDN, object storage, or reverse proxy configuration.",
+  "policies": [
+    {
+      "name": "sdk_immutable_semver",
+      "path_pattern": "/widget-sdk/v{sdk_version}/loader.js",
+      "cache_control": "public, max-age=31536000, immutable",
+      "headers": {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Cross-Origin-Resource-Policy": "cross-origin"
+      }
+    },
+    {
+      "name": "sdk_major_alias",
+      "path_pattern": "/widget-sdk/v{sdk_major}/loader.js",
+      "cache_control": "public, max-age=300, must-revalidate",
+      "headers": {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Cross-Origin-Resource-Policy": "cross-origin"
+      }
+    },
+    {
+      "name": "iframe_html",
+      "path_pattern": "/embed/index.html",
+      "cache_control": "no-cache",
+      "headers": {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src https:; img-src https: data:; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; frame-ancestors https:; upgrade-insecure-requests",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=()",
+        "Cross-Origin-Resource-Policy": "cross-origin"
+      }
+    },
+    {
+      "name": "iframe_hashed_assets",
+      "path_pattern": "/assets/*",
+      "cache_control": "public, max-age=31536000, immutable",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Cross-Origin-Resource-Policy": "cross-origin"
+      }
+    }
+  ],
+  "edge_only_headers": {
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+  },
+  "notes": [
+    "Do not apply immutable caching to iframe HTML.",
+    "Do not use a wildcard Access-Control-Allow-Origin in production public API responses.",
+    "Tenant-specific frame authorization is enforced by runtime origin validation until dynamic per-tenant frame-ancestors policy is implemented."
+  ]
+}

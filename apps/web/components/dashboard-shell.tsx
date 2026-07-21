@@ -36,7 +36,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           <span className="statusDot" aria-hidden="true" />
           <div>
             <p>Foundation mode</p>
-            <span>No backend, auth, or live data connected.</span>
+            <span>Conversation history uses temporary development tenant context.</span>
           </div>
         </div>
       </aside>

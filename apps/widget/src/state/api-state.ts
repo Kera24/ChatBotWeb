@@ -1,0 +1,1 @@
+export type ApiAvailabilityState = "unknown" | "available" | "degraded" | "unavailable";

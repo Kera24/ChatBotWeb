@@ -1,0 +1,99 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/widget/package-lock.json
+            packages/widget-sdk/package-lock.json
+            tests/widget-browser/package-lock.json
+
+      - name: Install API dependencies
+        run: npm run api:install
+
+      - name: Install web dependencies
+        run: npm run web:install
+
+      - name: Install widget SDK dependencies
+        run: npm run widget-sdk:install
+
+      - name: Install widget app dependencies
+        run: npm run widget:install
+
+      - name: Install widget browser test dependencies
+        run: npm --prefix tests/widget-browser install
+
+      - name: Install Playwright Chromium
+        run: npm --prefix tests/widget-browser run install:browsers
+
+      - name: Run verification
+        run: npm run verify
+
+      - name: Run widget pilot verification
+        run: npm run widget:pilot:verify
+
+      - name: Run widget operational validation
+        run: npm run widget:ops:validate
+
+      - name: Run widget pilot readiness
+        run: npm run widget:pilot:readiness
+
+      - name: Upload widget pilot readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-pilot-readiness
+          path: artifacts/widget-pilot-readiness
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload widget pilot verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-pilot-verification
+          path: artifacts/widget-pilot-verification
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload widget release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-release-artifacts
+          path: artifacts/widget-release
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload widget browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-browser-artifacts
+          path: |
+            tests/widget-browser/test-results
+            tests/widget-browser/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,33 @@
+{
+  "name": "@yoranix/widget-app",
+  "version": "0.1.0-handshake.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 4301",
+    "build": "vite build && tsc --noEmit -p tsconfig.json && node scripts/check-size.mjs",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "build:test": "vite build --mode test && tsc --noEmit -p tsconfig.json && node scripts/check-size.mjs",
+    "inspect:production": "node scripts/inspect-production.mjs",
+    "bundle:check": "node scripts/check-size.mjs",
+    "config:validate": "node scripts/validate-release-config.mjs",
+    "release:build": "node scripts/build-release.mjs",
+    "ops:validate": "node scripts/validate-ops-config.mjs",
+    "rollback:plan": "node scripts/rollback-plan.mjs"
+  },
+  "dependencies": {
+    "@yoranix/widget-sdk": "file:../../packages/widget-sdk",
+    "preact": "^10.29.7"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "esbuild": "latest",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/preact": "^3.2.4"
+  }
+}

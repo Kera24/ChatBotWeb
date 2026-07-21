@@ -15,9 +15,24 @@ export const navigationItems = [
     glyph: "CB",
   },
   {
+    label: "Widgets",
+    href: "/widgets",
+    glyph: "WG",
+  },
+  {
     label: "Analytics",
     href: "/analytics",
     glyph: "AN",
+  },
+  {
+    label: "Conversations",
+    href: "/conversations",
+    glyph: "CV",
+  },
+  {
+    label: "Knowledge Gaps",
+    href: "/review/unanswered",
+    glyph: "KG",
   },
   {
     label: "Users",

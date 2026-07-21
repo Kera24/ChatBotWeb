@@ -110,3 +110,136 @@ Every feature must answer three questions:
 3. Can clients manage it without developer involvement?
 
 If the answer is no, redesign the feature.
+
+## Widget SDK Foundation
+
+The repository includes `packages/widget-sdk`, a private TypeScript package foundation for the future embeddable Yoranix widget loader. It currently provides typed configuration validation, environment resolution, version constants, safe SDK error contracts, ESM/IIFE builds, declarations, and tests.
+
+It does not yet mount an iframe, call public APIs, store sessions, expose `window.YoranixWidget`, implement postMessage, or render widget UI.
+
+Root commands:
+
+```bash
+npm run widget-sdk:install
+npm run widget-sdk:test
+npm run widget-sdk:lint
+npm run widget-sdk:build
+```
+
+## Widget Iframe Shell
+
+The repository includes `apps/widget`, a dedicated Vite TypeScript iframe shell for the future embeddable widget. It consumes shared protocol contracts from `packages/widget-sdk`, validates the parent-origin bootstrap, performs the initial secure postMessage handshake, and renders only neutral loading/ready/unavailable states.
+
+Root commands:
+
+```bash
+npm run widget:install
+npm run widget:test
+npm run widget:lint
+npm run widget:build
+```
+
+It does not call public APIs, store sessions, render chat UI, or expose the final `window.YoranixWidget` API.
+
+## Widget SDK Lifecycle Runtime
+
+TASK-064B3 adds lifecycle and mounting support to `packages/widget-sdk` plus a local smoke host under `examples/widget-host`.
+
+Additional root commands remain:
+
+```bash
+npm run widget-sdk:test
+npm run widget-sdk:lint
+npm run widget-sdk:build
+npm run widget:test
+npm run widget:lint
+npm run widget:build
+```
+
+The browser bundle now installs `window.YoranixWidget` when safe and supports the approved lifecycle methods. It still does not call public APIs, store sessions, render the final widget UI, or send messages.
+
+## Widget Iframe API Client
+
+`apps/widget` now contains the iframe-owned public API client and session storage foundation. It loads public configuration after handshake, caches config with ETag support, stores anonymous session tokens only in iframe-origin `sessionStorage` or memory fallback, and has an internal message service for future UI integration.
+
+The host SDK cannot send messages itself and never receives a public session token.
+
+## Widget Browser Security Tests
+
+TASK-064B5 adds Playwright browser tests under `tests/widget-browser`. The required Chromium suite is part of `npm run verify`; the extended Firefox/WebKit suite is available with `npm run widget:e2e:extended`.
+
+### Widget UI foundation
+
+TASK-065B1 adds the Preact-based iframe visual shell and design-token foundation. The shell does not yet include welcome content, messages, composer, citations, or final visual polish.
+
+```bash
+npm run widget:test
+npm run widget:e2e:chromium
+```
+
+### Widget TASK-065B2
+
+The widget iframe now includes the welcome and in-memory conversation presentation layer. Suggested questions can send through the iframe-owned API client; free-text composer and citation disclosure are still deferred.
+
+### Widget TASK-065B3
+
+The widget iframe now supports free-text conversation, citation disclosure, privacy footer, and recovery notices. It still excludes Markdown, streaming, persisted history, uploads, voice, lead capture, telemetry, and backend changes.
+### Widget TASK-065B4
+
+The widget iframe now has responsive/mobile hardening, controlled motion refinements, accessibility and visual-regression browser suites, production bundle inspection, and release-readiness documentation. The current release classification is controlled pilot readiness. General availability still requires production-domain setup, real-backend smoke coverage, operational monitoring, and manual assistive-technology review.
+
+Additional commands:
+
+```bash
+npm run widget:inspect:production
+npm run widget:bundle:check
+npm run widget:e2e:a11y
+npm run widget:e2e:visual
+npm run widget:e2e:visual:update
+npm run widget:release:verify
+```
+## Widget Production Delivery
+
+TASK-066B1 adds provider-neutral widget release artifact generation and delivery policy. It does not deploy production infrastructure.
+
+```bash
+npm run widget:config:validate
+npm run widget:release:build
+npm run widget:e2e:release
+```
+
+Generated release output is ignored under `artifacts/widget-release/`. See `docs/04_Engineering/Widget_Production_Delivery_Security_and_Versioning.md` and `docs/06_Operations/Widget_Deployment_Runbook.md`.
+
+## Widget Pilot Verification
+
+Before controlled pilot deployment, run:
+
+```bash
+npm run widget:pilot:verify
+```
+
+This validates release artifacts and runs the synthetic real-backend config/session/message and tenant-isolation smoke suite. It does not deploy production infrastructure.
+
+## TASK-066B3 Operational Controls
+
+TASK-066B3 adds provider-neutral operational controls for controlled pilot readiness: `/health/live`, `/health/ready`, safe request correlation IDs, privacy-preserving redaction helpers, in-memory operational counters for test evidence, server-side pilot allowlist controls, global/widget/message kill switches, provider-neutral alert definitions, a dry-run rollback planner, and `npm run widget:pilot:readiness`. It does not deploy production infrastructure or add a monitoring vendor.
+
+## Widget Administration Revisioning
+
+Backend widget administration revisioning is documented in `docs/04_Engineering/Widget_Administration_Revisioning_and_Publishing.md`. TASK-067B1 adds server APIs and database revisioning only; admin UI, embed management, public-key rotation, and preview grants remain deferred.
+
+## Widget Origins, Public Key, And Embed Management
+
+TASK-067B2 adds backend APIs for widget allowed origins, immediate public-key rotation, approved SDK embed-version preferences, supported-version listing, and safe embed snippet metadata. See `docs/04_Engineering/Widget_Origins_Public_Key_and_Embed_Management.md`.
+
+Admin UI, preview grants, installation verification, and production deployment remain deferred.
+
+## Widget Administration Frontend
+
+TASK-067B3 adds authenticated dashboard routes for widget list, creation, draft settings, allowed domains, embed setup, SDK version selection, and public-key rotation. See `docs/04_Engineering/Widget_Administration_Frontend_Settings_Domains_and_Embed.md`.
+
+Publish workflow, preview, revision history, rollback, knowledge selection, and installation verification remain deferred.
+
+## Widget Administration TASK-067B4
+
+Widget administration now includes saved-draft knowledge selection, grant-bound draft preview, publish validation and confirmation, immutable revision history, rollback, and passive embed installation evidence. Full authenticated browser hardening remains assigned to TASK-067B5.

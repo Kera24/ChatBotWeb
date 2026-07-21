@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "description": "Provider-neutral widget pilot alert definitions. Adapt thresholds to the selected monitoring backend without logging message content.",
+  "alerts": [
+    {
+      "alert_id": "widget-public-service-unavailable",
+      "severity": "critical",
+      "signal": "liveness or readiness probe failure",
+      "threshold": "3 consecutive failures",
+      "evaluation_window": "5 minutes",
+      "consecutive_failures": 3,
+      "runbook": "docs/06_Operations/Widget_Incident_Response_Runbook.md"
+    },
+    {
+      "alert_id": "widget-public-api-5xx-spike",
+      "severity": "critical",
+      "signal": "public widget API 5xx rate",
+      "threshold": ">5% over baseline",
+      "evaluation_window": "10 minutes",
+      "consecutive_failures": 2,
+      "runbook": "docs/06_Operations/Widget_Incident_Response_Runbook.md"
+    },
+    {
+      "alert_id": "widget-synthetic-smoke-failure",
+      "severity": "incident",
+      "signal": "synthetic pilot verification failure",
+      "threshold": "2 consecutive failed runs",
+      "evaluation_window": "30 minutes",
+      "consecutive_failures": 2,
+      "runbook": "docs/06_Operations/Widget_Pilot_Verification_Runbook.md"
+    },
+    {
+      "alert_id": "widget-message-error-spike",
+      "severity": "incident",
+      "signal": "public message route safe failure category rate",
+      "threshold": ">10% over 15 minutes",
+      "evaluation_window": "15 minutes",
+      "consecutive_failures": 2,
+      "runbook": "docs/06_Operations/Widget_Operational_Runbook.md"
+    },
+    {
+      "alert_id": "widget-origin-denial-spike",
+      "severity": "warning",
+      "signal": "origin_denied operational event rate",
+      "threshold": "environment-tunable abnormal increase",
+      "evaluation_window": "30 minutes",
+      "consecutive_failures": 1,
+      "runbook": "docs/06_Operations/Widget_Operational_Runbook.md"
+    }
+  ]
+}

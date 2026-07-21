@@ -5,3 +5,7 @@ httpx
 SQLAlchemy
 alembic
 psycopg[binary]
+python-multipart
+pypdf
+python-docx
+redis
