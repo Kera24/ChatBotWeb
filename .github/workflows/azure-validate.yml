@@ -1,0 +1,55 @@
+﻿name: Azure Validate
+
+on:
+  pull_request:
+    paths:
+      - "infrastructure/azure/**"
+      - "scripts/azure-*.mjs"
+      - "scripts/build-deployment-release.mjs"
+      - "scripts/publish-azure-widget-release.mjs"
+      - "scripts/validate-deployment-manifest.mjs"
+      - "scripts/validate-azure-infra.mjs"
+      - ".github/workflows/azure-*.yml"
+      - "package.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "infrastructure/azure/**"
+      - "scripts/azure-*.mjs"
+      - "scripts/build-deployment-release.mjs"
+      - "scripts/publish-azure-widget-release.mjs"
+      - "scripts/validate-deployment-manifest.mjs"
+      - "scripts/validate-azure-infra.mjs"
+      - ".github/workflows/azure-*.yml"
+      - "package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Azure IaC and release tooling
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Azure static validation
+        run: npm run infra:azure:validate
+
+      - name: Run Azure release tooling tests
+        run: npm run azure:release:test
+
+      - name: Build Bicep with pinned Azure CLI
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.76.0
+          inlineScript: |
+            az bicep build --file infrastructure/azure/main.bicep

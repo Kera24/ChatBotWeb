@@ -1,0 +1,108 @@
+﻿name: Azure Promote Pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_run_id:
+        description: Workflow run ID that uploaded the azure-staging-deployment artifact
+        required: true
+      approval_note:
+        description: Human-readable approval/change note
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: azure-pilot-deploy
+  cancel-in-progress: false
+
+jobs:
+  promote-pilot:
+    name: Promote staged release to production pilot
+    runs-on: ubuntu-latest
+    environment: production-pilot
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download staged release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: azure-staging-deployment
+          run-id: ${{ inputs.staging_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts
+
+      - name: Validate staged deployment manifest
+        run: node scripts/validate-deployment-manifest.mjs --manifest artifacts/deployment-release/manifest.json --release-dir artifacts/widget-release --expected-source-environment staging
+
+      - name: Extract release image refs
+        id: manifest
+        run: |
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('artifacts/deployment-release/manifest.json','utf8')); console.log('api_image='+m.api_image.ref); console.log('web_image='+m.web_image.ref); console.log('release_id='+m.release_id);" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Production-pilot what-if
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'australiaeast' }}
+          AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
+        run: npm run infra:azure:whatif -- pilot
+
+      - name: Run production-pilot migration job
+        run: node scripts/azure-run-migration.mjs --environment pilot --image "${{ steps.manifest.outputs.api_image }}" --execute
+
+      - name: Deploy production-pilot Container App revisions
+        run: node scripts/azure-deploy-apps.mjs --environment pilot --api-image "${{ steps.manifest.outputs.api_image }}" --web-image "${{ steps.manifest.outputs.web_image }}" --execute
+
+      - name: Publish production-pilot widget static release
+        env:
+          AZURE_WIDGET_STORAGE_ACCOUNT: ${{ vars.AZURE_WIDGET_STORAGE_ACCOUNT }}
+        run: node scripts/publish-azure-widget-release.mjs --environment pilot --release-dir artifacts/widget-release --execute
+
+      - name: Production-pilot deployed smoke
+        env:
+          AZURE_DEPLOYED_BASE_URL: ${{ vars.PILOT_APP_URL }}
+          AZURE_DEPLOYED_API_URL: ${{ vars.PILOT_API_URL }}
+          AZURE_DEPLOYED_WIDGET_URL: ${{ vars.PILOT_WIDGET_URL }}
+          AZURE_DEPLOYED_CDN_URL: ${{ vars.PILOT_CDN_URL }}
+        run: npm run azure:smoke -- --environment pilot
+
+      - name: Summarise release
+        run: |
+          echo "### Production-pilot promotion" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release: ${{ steps.manifest.outputs.release_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "API image: ${{ steps.manifest.outputs.api_image }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Web image: ${{ steps.manifest.outputs.web_image }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Approval note: ${{ inputs.approval_note }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Customer widget enablement remains manual/operational." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload production-pilot deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azure-pilot-deployment
+          path: |
+            artifacts/deployment-release
+            artifacts/azure-deployment/pilot
+          if-no-files-found: ignore
+          retention-days: 30
+
+

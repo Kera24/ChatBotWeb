@@ -123,3 +123,13 @@ npm run widget:pilot:readiness
 
 Production/staging deployments must also run post-deploy real smoke in that environment.
 
+
+## Widget Administration Operational Evidence
+
+TASK-067B5 adds `npm run widget:admin:release:verify` and `artifacts/widget-admin-readiness/report.json`. Operators should keep this report with pilot release evidence when administration workflows are used to configure pilot widgets.
+
+## Azure Runtime Infrastructure Foundation
+
+TASK-068B1 provisions repository IaC for the future Azure runtime foundation. Operators should use the existing `/health/live` and `/health/ready` probes through Azure Container Apps and Front Door only after deployment is explicitly authorized by later TASK-068B work.
+
+No live infrastructure or monitoring integration is created by B1.

@@ -60,3 +60,18 @@ Focused tests cover tenant-scoped knowledge options, cross-tenant scope rejectio
 - Axe/manual accessibility validation for the new admin tabs.
 - Preview message/RAG execution if required after security review.
 - Expanded audit review and pilot admin release gate.
+
+## TASK-067B5 Admin Release Gate Update
+
+TASK-067B5 adds an administration hardening gate for controlled pilot use. The gate combines API hardening tests, admin frontend workflow tests, public widget pilot verification, pilot readiness, and a machine-readable report at `artifacts/widget-admin-readiness/report.json`.
+
+New commands:
+
+```bash
+npm run widget:admin:e2e
+npm run widget:admin:a11y
+npm run widget:admin:security
+npm run widget:admin:release:verify
+```
+
+The current preview remains configuration-faithful. Full conversational/RAG draft preview is deferred until a separate preview session/message boundary is designed and implemented.

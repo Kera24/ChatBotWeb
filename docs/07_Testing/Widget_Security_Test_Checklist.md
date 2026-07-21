@@ -94,3 +94,7 @@ Add security evidence for authenticated origin/key/embed administration: exact-o
 - Installation evidence records no session token, message body, answer text, or visitor identity.
 - Rollback target must belong to the same tenant/widget.
 - Public retrieval uses the active published revision knowledge scope.
+
+## TASK-067B5 Admin Security Gate
+
+Controlled pilot administration now requires `npm run widget:admin:release:verify` in addition to the public widget pilot gates. This gate does not deploy production infrastructure and does not imply GA readiness.

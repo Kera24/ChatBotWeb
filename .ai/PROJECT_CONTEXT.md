@@ -473,7 +473,7 @@ Guardrails for future Codex sessions:
 - Public-key rotation is immediate cutover: the old credential is revoked, active origins are copied to the new credential, the widget identity remains stable, and published revisions are not mutated.
 - Embed delivery preference is stable widget metadata: managed major alias by default, with optional approved pinned SDK semver. Arbitrary SDK URLs and `latest` remain unsupported.
 - Public configuration ETags include public-key cache context to avoid cross-key conditional-cache confusion after rotation.
-- Admin frontend, preview grants, installation verification, and production deployment remain deferred.
+- Admin frontend, preview grants, installation verification, and the admin release gate are now implemented through TASK-067B5. Production deployment remains deferred.
 
 ## TASK-067B3 Implementation Facts
 
@@ -483,7 +483,7 @@ Guardrails for future Codex sessions:
 - Domain management calls the B2 exact-origin APIs and surfaces backend validation/invariant errors.
 - Embed management renders backend-generated snippets inertly, supports managed-major and approved pinned SDK choices, and shows SRI only when returned by backend metadata.
 - Public-key rotation is available through an accessible confirmation dialog and refreshes the displayed key/snippet after success.
-- Publish UI, preview grants, revision history, rollback UI, knowledge selection, pilot mutation, and global operational controls remain deferred.
+- Publish UI, preview grants, revision history, rollback UI, and knowledge selection are now implemented through TASK-067B4/B5. Pilot mutation and global operational controls remain outside ordinary tenant admin UI.
 
 ## TASK-067B4 Implementation Facts
 
@@ -493,4 +493,67 @@ Guardrails for future Codex sessions:
 - Draft preview uses authenticated short-lived preview grants bound to actor, tenant, widget, and draft revision; B4 frontend renders a config-faithful iframe preview without exposing draft through public config.
 - Publish UI, revision history, revision detail, and rollback UI are wired to the immutable revision APIs. Rollback creates a new published revision and does not mutate history.
 - Embed installation verification is passive: valid public configuration requests from approved origins record observed origin, optional SDK/protocol metadata, and last-seen time without storing tokens, messages, answers, or visitor identity.
-- Full authenticated browser E2E, preview message/RAG hardening, expanded accessibility audit, and pilot admin release gate remain deferred to TASK-067B5.
+- TASK-067B5 adds the pilot admin release gate and expanded admin workflow/security tests. Full conversational/RAG draft preview and hosted-auth Playwright navigation remain future hardening items before GA.
+
+## Widget Administration Controlled-Pilot Readiness
+
+As of TASK-067B5, Sprint 3G widget administration implementation is complete at controlled-pilot level. The repository includes revisioned draft/publish administration APIs, origin/public-key/embed management APIs, administration frontend workflows, configuration-faithful draft preview, publish/history/rollback/knowledge workflows, passive installation evidence, and a hardening gate.
+
+The admin release gate is:
+
+```bash
+npm run widget:admin:release:verify
+```
+
+It generates `artifacts/widget-admin-readiness/report.json` and verifies tenant isolation, RBAC, preview-grant security, knowledge-scope isolation, publish/rollback concurrency, key/origin/embed hardening, audit coverage, accessibility-oriented frontend behavior, and public-widget pilot regression via the existing pilot reports.
+
+Production deployment has not occurred. The implemented classification is controlled-pilot administration readiness, not GA readiness. TASK-068A should define controlled pilot deployment, production domain wiring, monitoring integration, and post-deploy validation architecture before any production pilot deployment work.
+
+## Controlled Production Pilot Deployment Architecture
+
+TASK-068A defines the actual controlled-production-pilot hosting and validation architecture.
+
+Implementation facts:
+
+- Sprint 3G is complete at controlled-pilot-admin-ready level.
+- Production deployment has not occurred.
+- TASK-068A selects an Azure-first controlled pilot model: Azure Front Door, Azure Container Apps, Azure Container Registry, Azure Database for PostgreSQL Flexible Server with pgvector, Azure Blob Storage, Azure Key Vault, optional Azure Cache for Redis where required, and Azure Monitor/Application Insights.
+- The production pilot is a production-grade environment with controlled tenant/widget enablement, not GA.
+- Widget static delivery uses the existing B1 versioned SDK, major alias, iframe hashed asset, cache-header, and release-manifest model through Azure Blob Storage plus Azure Front Door.
+- PostgreSQL with pgvector remains the production pilot vector path; a separate vector database is deferred until scale evidence requires it.
+- GitHub Actions remains the planned CI/CD orchestrator with manual production approval, staging smoke, migration job, release artifact publication, post-deploy live FastAPI browser smoke, and rollback planning.
+- GA remains blocked until controlled pilot deployment and observation succeed, including monitoring history, manual accessibility validation, restore drill, rollback drill, security review, support process validation, and pilot feedback.
+
+## TASK-068B1 Implementation Facts
+
+TASK-068B1 implements the Azure infrastructure-as-code and repository configuration foundation for staging and controlled-production-pilot environments.
+
+Implementation facts:
+
+- Bicep is the selected IaC technology for Azure because ADR-0018 selected Azure and the repository had no existing Terraform/Pulumi convention.
+- Azure infrastructure lives under `infrastructure/azure/` with subscription-scope `main.bicep`, reusable modules, and separate staging/pilot parameter files.
+- The foundation defines an environment Resource Group, Azure Container Registry, Azure Container Apps environment, API Container App, web Container App, manual migration job, PostgreSQL Flexible Server, private document Blob Storage, widget static Blob Storage origin, Key Vault, Azure Front Door foundation, optional Redis, and monitoring foundation.
+- `apps/api/Dockerfile` and `apps/web/Dockerfile` now use production startup commands and non-root runtime users. Docker Compose explicitly preserves local development reload/dev commands.
+- Redis remains enabled by default in Azure parameters because current public widget rate limiting uses Redis-backed fail-closed behavior.
+- No production deployment, DNS change, cloud provisioning, or production secret creation has occurred.
+- Front Door custom domain validation, Azure role assignments, private networking validation, image digest promotion, static artifact upload, monitoring rules, staging live smoke, and production pilot enablement remain future TASK-068B work.
+- New validation commands are `npm run infra:azure:validate` and `npm run infra:azure:whatif -- <staging|pilot>`. The what-if helper is non-destructive and exits without deployment when credentials or secure parameters are absent.
+- Next recommended task: TASK-068B2 - Azure CI/CD Deployment Pipeline, Database Migrations, Release Promotion, and Rollback Automation.
+
+## TASK-068B2 Implementation Facts
+
+TASK-068B2 implements the Azure CI/CD release-orchestration foundation without running a live Azure deployment.
+
+Implementation facts:
+
+- GitHub Actions now includes manual Azure staging deployment, protected production-pilot promotion, rollback, and deterministic Azure validation workflows.
+- Azure workflows use OIDC (`id-token: write`) and environment-scoped variables/secrets; no Azure client secret or ACR admin credential is committed.
+- Staging deployment builds API/web images tagged with the Git SHA, pushes them to ACR, resolves image digests, and records them in `artifacts/deployment-release/manifest.json`.
+- Production-pilot promotion consumes a staged deployment artifact and promotes recorded image refs and widget release artifacts without rebuilding.
+- The deployment manifest records Git SHA, image refs/digests, SDK version/checksums/SRI, iframe checksum, protocol major, public API version, Alembic head, and readiness gate statuses.
+- Alembic migrations run through the B1 Container Apps migration job via `npm run azure:migrate`; API replicas do not run migrations on startup.
+- Static widget publication validates B1 checksums, uploads immutable artifacts before mutable aliases, and refuses conflicting immutable overwrites.
+- Azure rollback planning compares deployment manifests and blocks automatic rollback when protocol major, public API version, or database migration head differ.
+- Deployed smoke hooks cover API live/ready, web, widget iframe, and SDK alias availability. Full live FastAPI browser smoke remains TASK-068B4.
+- No production infrastructure, DNS, customer data, or customer pilot widget enablement has occurred.
+- Next recommended task: TASK-068B3 - Azure Monitor/Application Insights Integration, Privacy-Preserving Telemetry, Alerts, Uptime, and Operational Dashboards.

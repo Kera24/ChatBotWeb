@@ -442,3 +442,32 @@ Use `npm run web:build` to verify the dynamic `/widgets`, `/widgets/new`, and `/
 ## Widget Administration B4 Local Notes
 
 For local widget administration testing, use the authenticated development dashboard session, create a widget, add an allowed localhost origin, save a knowledge scope, validate publish, publish, and then call the public config endpoint from the allowed origin to populate installation evidence.
+
+## Widget Administration Verification
+
+Run focused widget administration checks from the repository root:
+
+```bash
+npm run widget:admin:e2e
+npm run widget:admin:a11y
+npm run widget:admin:security
+npm run widget:admin:release:verify
+```
+
+The admin gate uses synthetic tenants and the existing development-only dashboard auth scaffold. It validates tenant/RBAC boundaries and writes `artifacts/widget-admin-readiness/report.json`. Do not use development auth headers as production authentication.
+
+## Azure Infrastructure Validation
+
+TASK-068B1 keeps local development Docker Compose based, but the API and web Dockerfiles now default to production container startup commands. Docker Compose explicitly overrides those commands for local reload/dev server behavior.
+
+Validate the Azure foundation without deploying:
+
+```bash
+npm run infra:azure:validate
+```
+
+The non-destructive Azure what-if helper prints the required command and exits if Azure credentials or secure parameters are not configured:
+
+```bash
+npm run infra:azure:whatif -- staging
+```

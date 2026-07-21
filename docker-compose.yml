@@ -39,6 +39,7 @@
     container_name: chatbotweb-api
     profiles: ["app"]
     restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       DATABASE_URL: ${API_DATABASE_URL:-postgresql+psycopg://postgres:postgres@postgres:5432/chatbotweb}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -62,6 +63,7 @@
     container_name: chatbotweb-web
     profiles: ["app"]
     restart: unless-stopped
+    command: ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     ports:

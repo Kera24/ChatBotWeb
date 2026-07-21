@@ -70,3 +70,13 @@ Pilot enablement assumes the widget has at least one active allowed origin and a
 ## TASK-067B4 Gate Addition
 
 Before pilot enablement, administrators must verify that the widget has a published revision, at least one valid allowed origin, selected knowledge resources are ready where used, and installation evidence is observed from the intended allowed origin after the embed snippet is installed.
+
+## TASK-067B5 Admin Pre-Pilot Gate
+
+Before using the widget administration workflow for controlled pilot setup, run:
+
+```bash
+npm run widget:admin:release:verify
+```
+
+Passing B1 release build and B2/B3 pilot gates is insufficient on its own once tenant administrators will create, configure, publish, rotate keys, or roll back widgets through the dashboard.

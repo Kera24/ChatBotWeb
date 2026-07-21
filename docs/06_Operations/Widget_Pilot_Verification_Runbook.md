@@ -91,3 +91,9 @@ npm run widget:pilot:readiness
 ```
 
 The readiness command confirms operational configuration, production inspection, bundle checks, and the B2 report before a pilot release can proceed.
+
+## Azure Deployment Smoke Hook
+
+TASK-068B2 adds a deployed endpoint smoke hook for Azure staging/pilot URLs. It covers HTTPS availability for API health, web, widget iframe, and SDK alias endpoints.
+
+The deeper real-backend browser smoke and synthetic cross-tenant validation remain mandatory before real pilot enablement and are completed by TASK-068B4/B5 deployment gates.

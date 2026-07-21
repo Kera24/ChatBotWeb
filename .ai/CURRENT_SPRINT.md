@@ -1,14 +1,14 @@
-# Current Sprint
+﻿# Current Sprint
 
 Current phase:
-Sprint 3G - Widget Administration and Publishing
+Sprint 3H - Controlled Production Pilot Deployment
 
 Current task:
-TASK-067B4 - Widget Preview, Publish Workflow, Revision History, Rollback, Knowledge Scope, and Embed Verification
+TASK-068B2 - Azure CI/CD Deployment, Migration, Release Promotion, and Rollback Automation
 
 ## Guardrails
 
-- Implement authenticated widget administration workflow completion only: knowledge scope, draft preview, publish validation/confirmation, publish execution, revision history, rollback, and passive embed installation evidence.
-- Do not implement production deployment, GA, analytics dashboards, product telemetry, arbitrary external crawling, SSRF-prone URL verification, global operational-control UI, streaming, lead capture, or human handoff.
-- Preserve revision immutability, tenant isolation, public/draft separation, pilot/operational separation, exact origins, token isolation, and secure iframe boundaries.
-- Next recommended task: TASK-067B5 - Widget Administration Security Hardening, Authenticated Browser E2E, Accessibility, Audit, and Pilot Admin Release Gate.
+- Implement Azure CI/CD and release orchestration only.
+- Do not deploy production automatically, modify DNS, commit Azure credentials, create customer data, bypass GitHub environment approvals, or enable customer pilot widgets.
+- Preserve Azure Bicep foundation, immutable SDK delivery, pilot/admin gates, tenant isolation, rollback capability, and controlled approval model.
+- Next recommended task: TASK-068B3 - Azure Monitor/Application Insights Integration, Privacy-Preserving Telemetry, Alerts, Uptime, and Operational Dashboards.

@@ -31,6 +31,12 @@ jobs:
             packages/widget-sdk/package-lock.json
             tests/widget-browser/package-lock.json
 
+      - name: Validate Azure infrastructure foundation
+        run: npm run infra:azure:validate
+
+      - name: Run Azure release tooling tests
+        run: npm run azure:release:test
+
       - name: Install API dependencies
         run: npm run api:install
 
@@ -60,6 +66,18 @@ jobs:
 
       - name: Run widget pilot readiness
         run: npm run widget:pilot:readiness
+
+      - name: Run widget admin release gate
+        run: npm run widget:admin:release:verify
+
+      - name: Upload widget admin readiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: widget-admin-readiness
+          path: artifacts/widget-admin-readiness
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload widget pilot readiness report
         if: always()

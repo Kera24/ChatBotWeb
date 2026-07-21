@@ -127,3 +127,13 @@ TASK-066B1 implements repository-local, provider-neutral release artifacts, orig
 - Preview grant is short lived and draft-revision bound.
 - Rollback creates a new revision and does not mutate history.
 - Installation status is observed from an approved origin before pilot enablement.
+
+## Widget Administration Gate
+
+Before controlled pilot administration use, run:
+
+```bash
+npm run widget:admin:release:verify
+```
+
+See `docs/07_Testing/Widget_Admin_Release_Readiness_Checklist.md` for the required evidence set. Passing this gate is controlled-pilot evidence only; production deployment, monitoring integration, manual assistive-technology review, and observed pilot traffic remain GA prerequisites.

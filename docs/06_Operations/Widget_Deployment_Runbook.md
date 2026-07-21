@@ -106,3 +106,40 @@ Before handing a snippet to a pilot customer, use the authenticated widget embed
 ## TASK-067B4 Addition
 
 The deployment runbook now treats publish validation, revision history, rollback readiness, and passive installation evidence as administration gates. Passing release artifact checks alone is not enough to consider a widget ready for pilot traffic.
+
+## Widget Administration Gate
+
+Controlled pilot deployment planning must include the admin gate when dashboard widget administration is part of the release:
+
+```bash
+npm run widget:admin:release:verify
+```
+
+This remains a pre-deployment repository gate. It does not deploy artifacts, mutate DNS, provision infrastructure, or prove production availability.
+
+## Azure Infrastructure Foundation
+
+TASK-068B1 adds the Azure Bicep foundation for the deployment architecture selected in ADR-0018. The foundation is validation-only by default and does not deploy production infrastructure.
+
+Relevant commands:
+
+```bash
+npm run infra:azure:validate
+npm run infra:azure:whatif -- staging
+```
+
+Actual deployment, image promotion, migrations, and rollback automation are deferred to TASK-068B2.
+
+## Azure Release Orchestration
+
+TASK-068B2 adds the Azure CI/CD deployment foundation:
+
+```bash
+npm run azure:release:manifest -- --environment staging
+npm run azure:release:validate -- --manifest artifacts/deployment-release/manifest.json --release-dir artifacts/widget-release
+npm run azure:widget:publish -- --environment staging
+npm run azure:smoke -- --environment staging
+npm run azure:rollback:plan -- --current <current-manifest> --to <target-manifest>
+```
+
+These commands are safe by default. Azure mutation requires explicit `--execute` on the deployment/publish/migration scripts and OIDC-authenticated workflows.

@@ -1,0 +1,115 @@
+﻿name: Azure Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      current_manifest_run_id:
+        description: Workflow run ID containing current deployment manifest artifact
+        required: true
+      target_manifest_run_id:
+        description: Workflow run ID containing known-good target deployment manifest artifact
+        required: true
+      environment:
+        description: Environment to roll back
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - pilot
+      execute:
+        description: Execute rollback after planning
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: azure-${{ inputs.environment }}-rollback
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Plan or execute Azure rollback
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'pilot' && 'production-pilot' || 'staging' }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download current manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: azure-${{ inputs.environment == 'pilot' && 'pilot' || 'staging' }}-deployment
+          run-id: ${{ inputs.current_manifest_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/current
+
+      - name: Download target manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: azure-${{ inputs.environment == 'pilot' && 'pilot' || 'staging' }}-deployment
+          run-id: ${{ inputs.target_manifest_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/target
+
+      - name: Plan rollback
+        run: npm run azure:rollback:plan -- --current artifacts/current/deployment-release/manifest.json --to artifacts/target/deployment-release/manifest.json
+
+      - name: Azure login
+        if: ${{ inputs.execute == 'true' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Extract target image refs
+        if: ${{ inputs.execute == 'true' }}
+        id: target
+        run: |
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('artifacts/target/deployment-release/manifest.json','utf8')); console.log('api_image='+m.api_image.ref); console.log('web_image='+m.web_image.ref);" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Container App revisions by target digest
+        if: ${{ inputs.execute == 'true' }}
+        run: node scripts/azure-deploy-apps.mjs --environment ${{ inputs.environment }} --api-image "${{ steps.target.outputs.api_image }}" --web-image "${{ steps.target.outputs.web_image }}" --execute
+
+      - name: Restore widget static release
+        if: ${{ inputs.execute == 'true' }}
+        env:
+          AZURE_WIDGET_STORAGE_ACCOUNT: ${{ vars.AZURE_WIDGET_STORAGE_ACCOUNT }}
+        run: node scripts/publish-azure-widget-release.mjs --environment ${{ inputs.environment }} --release-dir artifacts/target/widget-release --execute
+
+      - name: Rollback smoke
+        if: ${{ inputs.execute == 'true' }}
+        env:
+          AZURE_DEPLOYED_BASE_URL: ${{ inputs.environment == 'pilot' && vars.PILOT_APP_URL || vars.STAGING_APP_URL }}
+          AZURE_DEPLOYED_API_URL: ${{ inputs.environment == 'pilot' && vars.PILOT_API_URL || vars.STAGING_API_URL }}
+          AZURE_DEPLOYED_WIDGET_URL: ${{ inputs.environment == 'pilot' && vars.PILOT_WIDGET_URL || vars.STAGING_WIDGET_URL }}
+          AZURE_DEPLOYED_CDN_URL: ${{ inputs.environment == 'pilot' && vars.PILOT_CDN_URL || vars.STAGING_CDN_URL }}
+        run: npm run azure:smoke -- --environment ${{ inputs.environment }}
+
+      - name: Upload rollback artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azure-rollback-plan
+          path: artifacts/azure-deployment/rollback-plan.json
+          if-no-files-found: ignore
+          retention-days: 30
+

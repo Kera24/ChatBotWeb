@@ -104,3 +104,9 @@ The authenticated dashboard now includes `/widgets`, `/widgets/new`, and `/widge
 ## TASK-067B4 Update
 
 Draft revisions now include `knowledge_scope_json`; publish validation checks selected resource readiness and public message retrieval receives the active published scope. Rollback clones historical configuration including knowledge scope into a new immutable published revision.
+
+## TASK-067B5 Hardening Evidence
+
+B5 adds stale publish and stale rollback regression tests. It also verifies that historical published revisions cannot be mutated through an admin route and that rollback creates a new immutable publication rather than rewriting history.
+
+The admin release gate is `npm run widget:admin:release:verify`.
