@@ -539,3 +539,21 @@ Implementation facts:
 - Front Door custom domain validation, Azure role assignments, private networking validation, image digest promotion, static artifact upload, monitoring rules, staging live smoke, and production pilot enablement remain future TASK-068B work.
 - New validation commands are `npm run infra:azure:validate` and `npm run infra:azure:whatif -- <staging|pilot>`. The what-if helper is non-destructive and exits without deployment when credentials or secure parameters are absent.
 - Next recommended task: TASK-068B2 - Azure CI/CD Deployment Pipeline, Database Migrations, Release Promotion, and Rollback Automation.
+
+## TASK-068B2 Implementation Facts
+
+TASK-068B2 implements the Azure CI/CD release-orchestration foundation without running a live Azure deployment.
+
+Implementation facts:
+
+- GitHub Actions now includes manual Azure staging deployment, protected production-pilot promotion, rollback, and deterministic Azure validation workflows.
+- Azure workflows use OIDC (`id-token: write`) and environment-scoped variables/secrets; no Azure client secret or ACR admin credential is committed.
+- Staging deployment builds API/web images tagged with the Git SHA, pushes them to ACR, resolves image digests, and records them in `artifacts/deployment-release/manifest.json`.
+- Production-pilot promotion consumes a staged deployment artifact and promotes recorded image refs and widget release artifacts without rebuilding.
+- The deployment manifest records Git SHA, image refs/digests, SDK version/checksums/SRI, iframe checksum, protocol major, public API version, Alembic head, and readiness gate statuses.
+- Alembic migrations run through the B1 Container Apps migration job via `npm run azure:migrate`; API replicas do not run migrations on startup.
+- Static widget publication validates B1 checksums, uploads immutable artifacts before mutable aliases, and refuses conflicting immutable overwrites.
+- Azure rollback planning compares deployment manifests and blocks automatic rollback when protocol major, public API version, or database migration head differ.
+- Deployed smoke hooks cover API live/ready, web, widget iframe, and SDK alias availability. Full live FastAPI browser smoke remains TASK-068B4.
+- No production infrastructure, DNS, customer data, or customer pilot widget enablement has occurred.
+- Next recommended task: TASK-068B3 - Azure Monitor/Application Insights Integration, Privacy-Preserving Telemetry, Alerts, Uptime, and Operational Dashboards.

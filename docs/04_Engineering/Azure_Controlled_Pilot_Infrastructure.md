@@ -299,3 +299,14 @@ Ordinary CI runs static validation only. Production deployment is not automated 
 - Monitoring alert rules and dashboards belong to B3.
 - Staging deployment and live browser smoke belong to B4.
 - Production pilot deployment and customer enablement belong to B5.
+
+## TASK-068B2 Release Orchestration
+
+TASK-068B2 adds CI/CD release orchestration on top of this infrastructure foundation:
+
+- `azure-validate.yml` performs deterministic Azure IaC and release-tool validation.
+- `azure-deploy-staging.yml` builds and pushes immutable API/web images, records digests, runs the migration job, deploys staging revisions, publishes widget static assets, and runs deployed smoke when explicitly invoked.
+- `azure-promote-pilot.yml` promotes a known staged release artifact to the protected `production-pilot` environment without rebuilding.
+- `azure-rollback.yml` plans and optionally executes manifest-compatible rollback.
+
+Deployment wrappers live in `scripts/` and are dry-run capable unless `--execute` is supplied.

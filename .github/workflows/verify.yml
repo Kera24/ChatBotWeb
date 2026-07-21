@@ -1,4 +1,4 @@
-﻿name: Verify
+name: Verify
 
 on:
   pull_request:
@@ -33,6 +33,9 @@ jobs:
 
       - name: Validate Azure infrastructure foundation
         run: npm run infra:azure:validate
+
+      - name: Run Azure release tooling tests
+        run: npm run azure:release:test
 
       - name: Install API dependencies
         run: npm run api:install

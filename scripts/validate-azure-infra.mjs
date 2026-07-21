@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -105,6 +105,24 @@ for (const [name, content] of [["staging.bicepparam", stagingParams], ["pilot.bi
   requireNotContains(name, content, "localhost");
 }
 requireContains("pilot.bicepparam", pilotParams, "<approved-domain-required>");
+const azureWorkflows = [
+  ["azure-validate.yml", read(".github/workflows/azure-validate.yml")],
+  ["azure-deploy-staging.yml", read(".github/workflows/azure-deploy-staging.yml")],
+  ["azure-promote-pilot.yml", read(".github/workflows/azure-promote-pilot.yml")],
+  ["azure-rollback.yml", read(".github/workflows/azure-rollback.yml")],
+];
+for (const [name, content] of azureWorkflows) {
+  requireNotContains(name, content, "pull_request_target");
+  requireNotContains(name, content, ":latest");
+}
+for (const [name, content] of azureWorkflows.filter(([name]) => name !== "azure-validate.yml")) {
+  requireContains(name, content, "id-token: write");
+  requireContains(name, content, "concurrency:");
+  requireContains(name, content, "azure/login@v2");
+}
+requireContains("azure-promote-pilot.yml", read(".github/workflows/azure-promote-pilot.yml"), "environment: production-pilot");
+requireContains("azure-promote-pilot.yml", read(".github/workflows/azure-promote-pilot.yml"), "Download staged release artifact");
+requireContains("azure-rollback.yml", read(".github/workflows/azure-rollback.yml"), "execute");
 
 requireNotContains("apps/api/Dockerfile", apiDockerfile, "--reload");
 requireContains("apps/api/Dockerfile", apiDockerfile, "uvicorn");
@@ -146,4 +164,3 @@ console.log("Azure infrastructure validation passed.");
 for (const warning of warnings) {
   console.warn(`Warning: ${warning}`);
 }
-

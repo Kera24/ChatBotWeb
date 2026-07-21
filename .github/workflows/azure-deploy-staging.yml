@@ -1,0 +1,167 @@
+﻿name: Azure Deploy Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Commit SHA, tag, or branch to deploy to staging
+        required: true
+        default: main
+      deploy_infrastructure:
+        description: Run Bicep what-if and deploy staging infrastructure
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      deploy_application:
+        description: Build/push images, run migration job, deploy app revisions, and publish static artifacts
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: azure-staging-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    name: Deploy staging release candidate
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/widget/package-lock.json
+            packages/widget-sdk/package-lock.json
+            tests/widget-browser/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm run api:install
+          npm run web:install
+          npm run widget-sdk:install
+          npm run widget:install
+          npm --prefix tests/widget-browser install
+          npm --prefix tests/widget-browser run install:browsers
+
+      - name: Repository and controlled-pilot gates
+        run: |
+          npm run verify
+          npm run widget:admin:release:verify
+          npm run widget:pilot:verify
+          npm run widget:pilot:readiness
+          npm run infra:azure:validate
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure infrastructure what-if
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'australiaeast' }}
+          AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
+        run: npm run infra:azure:whatif -- staging
+
+      - name: Deploy staging infrastructure
+        if: ${{ inputs.deploy_infrastructure == 'true' }}
+        env:
+          AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
+        run: |
+          az deployment sub create \
+            --location "${{ vars.AZURE_LOCATION || 'australiaeast' }}" \
+            --template-file infrastructure/azure/main.bicep \
+            --parameters infrastructure/azure/environments/staging.bicepparam \
+            --parameters postgresAdministratorPassword="$AZURE_POSTGRES_ADMIN_PASSWORD"
+
+      - name: Login to ACR
+        if: ${{ inputs.deploy_application == 'true' }}
+        run: az acr login --name "${{ vars.AZURE_ACR_NAME }}"
+
+      - name: Build and push immutable images
+        if: ${{ inputs.deploy_application == 'true' }}
+        id: images
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.AZURE_ACR_LOGIN_SERVER }}
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA}"
+          API_IMAGE="$ACR_LOGIN_SERVER/chatbotweb-api:$SHA"
+          WEB_IMAGE="$ACR_LOGIN_SERVER/chatbotweb-web:$SHA"
+          docker build -f apps/api/Dockerfile -t "$API_IMAGE" .
+          docker build -f apps/web/Dockerfile -t "$WEB_IMAGE" .
+          docker push "$API_IMAGE"
+          docker push "$WEB_IMAGE"
+          API_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$API_IMAGE")"
+          WEB_DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$WEB_IMAGE")"
+          echo "api_image=$API_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "web_image=$WEB_DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Build deployment manifest
+        if: ${{ inputs.deploy_application == 'true' }}
+        run: npm run azure:release:manifest -- --environment staging --api-image "${{ steps.images.outputs.api_image }}" --web-image "${{ steps.images.outputs.web_image }}"
+
+      - name: Run migration job
+        if: ${{ inputs.deploy_application == 'true' }}
+        run: node scripts/azure-run-migration.mjs --environment staging --image "${{ steps.images.outputs.api_image }}" --execute
+
+      - name: Deploy Container App revisions
+        if: ${{ inputs.deploy_application == 'true' }}
+        run: node scripts/azure-deploy-apps.mjs --environment staging --api-image "${{ steps.images.outputs.api_image }}" --web-image "${{ steps.images.outputs.web_image }}" --execute
+
+      - name: Publish widget static release
+        if: ${{ inputs.deploy_application == 'true' }}
+        env:
+          AZURE_WIDGET_STORAGE_ACCOUNT: ${{ vars.AZURE_WIDGET_STORAGE_ACCOUNT }}
+        run: node scripts/publish-azure-widget-release.mjs --environment staging --execute
+
+      - name: Deployed smoke
+        if: ${{ inputs.deploy_application == 'true' }}
+        env:
+          AZURE_DEPLOYED_BASE_URL: ${{ vars.STAGING_APP_URL }}
+          AZURE_DEPLOYED_API_URL: ${{ vars.STAGING_API_URL }}
+          AZURE_DEPLOYED_WIDGET_URL: ${{ vars.STAGING_WIDGET_URL }}
+          AZURE_DEPLOYED_CDN_URL: ${{ vars.STAGING_CDN_URL }}
+        run: npm run azure:smoke -- --environment staging
+
+      - name: Upload Azure deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: azure-staging-deployment
+          path: |
+            artifacts/deployment-release
+            artifacts/azure-deployment/staging
+            artifacts/widget-release
+          if-no-files-found: ignore
+          retention-days: 14
+
+

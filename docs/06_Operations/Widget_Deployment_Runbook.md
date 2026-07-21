@@ -129,3 +129,17 @@ npm run infra:azure:whatif -- staging
 ```
 
 Actual deployment, image promotion, migrations, and rollback automation are deferred to TASK-068B2.
+
+## Azure Release Orchestration
+
+TASK-068B2 adds the Azure CI/CD deployment foundation:
+
+```bash
+npm run azure:release:manifest -- --environment staging
+npm run azure:release:validate -- --manifest artifacts/deployment-release/manifest.json --release-dir artifacts/widget-release
+npm run azure:widget:publish -- --environment staging
+npm run azure:smoke -- --environment staging
+npm run azure:rollback:plan -- --current <current-manifest> --to <target-manifest>
+```
+
+These commands are safe by default. Azure mutation requires explicit `--execute` on the deployment/publish/migration scripts and OIDC-authenticated workflows.

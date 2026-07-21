@@ -44,6 +44,14 @@
     "widget:rollback:plan": "node apps/widget/scripts/rollback-plan.mjs",
     "widget:pilot:readiness": "npm run widget:pilot:verify && python tests/widget-real-backend/run_pilot_readiness.py",
     "infra:azure:validate": "node scripts/validate-azure-infra.mjs",
-    "infra:azure:whatif": "node scripts/azure-infra-whatif.mjs"
+    "infra:azure:whatif": "node scripts/azure-infra-whatif.mjs",
+    "azure:release:manifest": "node scripts/build-deployment-release.mjs",
+    "azure:release:validate": "node scripts/validate-deployment-manifest.mjs",
+    "azure:widget:publish": "node scripts/publish-azure-widget-release.mjs",
+    "azure:migrate": "node scripts/azure-run-migration.mjs",
+    "azure:deploy:apps": "node scripts/azure-deploy-apps.mjs",
+    "azure:smoke": "node scripts/azure-deployed-smoke.mjs",
+    "azure:rollback:plan": "node scripts/azure-rollback-release.mjs",
+    "azure:release:test": "node --test tests/deployment/*.test.mjs"
   }
 }

@@ -264,3 +264,9 @@ npm run infra:azure:whatif -- staging
 ```
 
 The foundation defines Azure Container Apps, Azure Container Registry, PostgreSQL Flexible Server, Blob Storage, Key Vault, Front Door, optional Redis, monitoring foundation, and a migration job. It does not deploy infrastructure, change DNS, or add production secrets.
+
+## Azure CI/CD Foundation
+
+TASK-068B2 adds manual Azure staging, production-pilot promotion, rollback, and validation workflows. These workflows use GitHub OIDC and protected environments; they do not deploy production automatically or enable customer pilot widgets.
+
+See `docs/04_Engineering/Azure_CICD_Release_Promotion_and_Rollback.md` and `docs/06_Operations/Azure_Application_Deployment_Runbook.md`.
