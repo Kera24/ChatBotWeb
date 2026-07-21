@@ -142,3 +142,16 @@ The current snippet generator uses the provider-neutral CDN placeholder from rel
 ## TASK-067B4 Update
 
 Passive installation evidence is recorded from valid public configuration requests and can be shown to administrators as observed/not observed per allowed origin. This is operational evidence, not product analytics.
+
+## Azure Delivery Foundation
+
+TASK-068B1 maps this provider-neutral delivery model onto the Azure controlled-pilot infrastructure foundation:
+
+- Azure Blob Storage provides the static SDK/iframe artifact origin.
+- Azure Front Door applies HTTPS, routing, compression, and cache/header behavior.
+- Immutable SDK semantic versions and hashed iframe assets retain one-year immutable caching.
+- SDK major aliases remain short-lived and rollback-friendly.
+- Iframe HTML remains revalidatable.
+- API session/message routes remain no-store and are not edge-cached.
+
+The Azure foundation is IaC/configuration only. It does not deploy assets, change DNS, or provision production resources.

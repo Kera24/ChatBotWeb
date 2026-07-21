@@ -779,3 +779,9 @@ Provider documentation used during architecture selection:
 - Azure Blob static website hosting: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-static-website-host
 - Azure Storage custom domains with Azure Front Door: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-custom-domain-name
 - Azure Monitor OpenTelemetry/Application Insights: https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable
+
+## TASK-068B1 Azure Infrastructure Foundation
+
+The controlled-pilot Azure foundation now lives under `infrastructure/azure/`. B1 prepares Bicep modules, staging/pilot parameter files, production-ready Dockerfile commands, non-destructive validation scripts, and Azure deployment runbooks.
+
+Production deployment still has not occurred. Front Door custom domains, DNS validation, role assignments, image digest deployment, static artifact publication, monitoring rules, staging live smoke, and production pilot enablement remain TASK-068B2 through TASK-068B5 work.

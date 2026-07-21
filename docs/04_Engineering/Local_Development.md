@@ -455,3 +455,19 @@ npm run widget:admin:release:verify
 ```
 
 The admin gate uses synthetic tenants and the existing development-only dashboard auth scaffold. It validates tenant/RBAC boundaries and writes `artifacts/widget-admin-readiness/report.json`. Do not use development auth headers as production authentication.
+
+## Azure Infrastructure Validation
+
+TASK-068B1 keeps local development Docker Compose based, but the API and web Dockerfiles now default to production container startup commands. Docker Compose explicitly overrides those commands for local reload/dev server behavior.
+
+Validate the Azure foundation without deploying:
+
+```bash
+npm run infra:azure:validate
+```
+
+The non-destructive Azure what-if helper prints the required command and exits if Azure credentials or secure parameters are not configured:
+
+```bash
+npm run infra:azure:whatif -- staging
+```

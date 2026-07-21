@@ -42,6 +42,8 @@
     "widget:admin:security": "npm run api:test -- tests/test_widget_admin_revisioning.py tests/test_widget_admin_origins_embed.py tests/test_widget_admin_b5_hardening.py && npm run web:test -- components/widgets/widget-admin.test.tsx",
     "widget:admin:release:verify": "python -m compileall apps/api/app && npm run api:test -- tests/test_widget_admin_revisioning.py tests/test_widget_admin_origins_embed.py tests/test_widget_admin_b5_hardening.py && npm run web:test -- components/widgets/widget-admin.test.tsx && npm run web:lint && npm run web:build && npm run widget:pilot:verify && npm run widget:pilot:readiness && node scripts/widget-admin-readiness.mjs",
     "widget:rollback:plan": "node apps/widget/scripts/rollback-plan.mjs",
-    "widget:pilot:readiness": "npm run widget:pilot:verify && python tests/widget-real-backend/run_pilot_readiness.py"
+    "widget:pilot:readiness": "npm run widget:pilot:verify && python tests/widget-real-backend/run_pilot_readiness.py",
+    "infra:azure:validate": "node scripts/validate-azure-infra.mjs",
+    "infra:azure:whatif": "node scripts/azure-infra-whatif.mjs"
   }
 }

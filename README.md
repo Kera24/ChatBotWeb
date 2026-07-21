@@ -253,3 +253,14 @@ npm run widget:admin:release:verify
 ```
 
 The gate runs focused admin API hardening tests, admin frontend workflow tests, web lint/build, public widget pilot verification, pilot readiness, and writes `artifacts/widget-admin-readiness/report.json`. It does not deploy production infrastructure and does not declare GA readiness.
+
+## Azure Controlled Pilot Infrastructure
+
+TASK-068B1 adds the Azure infrastructure-as-code foundation for staging and controlled-production-pilot environments. It uses Bicep under `infrastructure/azure/` and provides local validation plus a non-destructive what-if wrapper:
+
+```bash
+npm run infra:azure:validate
+npm run infra:azure:whatif -- staging
+```
+
+The foundation defines Azure Container Apps, Azure Container Registry, PostgreSQL Flexible Server, Blob Storage, Key Vault, Front Door, optional Redis, monitoring foundation, and a migration job. It does not deploy infrastructure, change DNS, or add production secrets.

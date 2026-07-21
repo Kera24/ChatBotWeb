@@ -46,3 +46,9 @@ Restore the previous iframe HTML/release mapping that references known-good hash
 
 Roll back the backend artifact through deployment infrastructure. Validate migrations are rollback-compatible before proceeding.
 
+
+## Azure Rollback Foundation
+
+TASK-068B1 defines Azure deployment units for future rollback automation: API Container App revision, web Container App revision, SDK major alias/static asset publication, iframe static artifact, and migration job. B1 does not execute rollback or deploy a known-good production artifact.
+
+TASK-068B2 must automate rollback planning and release promotion against these units before production pilot deployment.

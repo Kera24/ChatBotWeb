@@ -1,0 +1,50 @@
+﻿name: Azure Infrastructure What-If
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Azure environment to validate
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - pilot
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  what-if:
+    name: Azure ${{ inputs.environment }} what-if
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'pilot' && 'production-pilot' || 'staging' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate Azure infrastructure foundation
+        run: npm run infra:azure:validate
+
+      - name: Azure login
+        if: ${{ vars.AZURE_CLIENT_ID != '' && vars.AZURE_TENANT_ID != '' && vars.AZURE_SUBSCRIPTION_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run non-destructive what-if
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'australiaeast' }}
+          AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
+        run: npm run infra:azure:whatif -- ${{ inputs.environment }}

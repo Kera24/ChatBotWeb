@@ -523,3 +523,19 @@ Implementation facts:
 - PostgreSQL with pgvector remains the production pilot vector path; a separate vector database is deferred until scale evidence requires it.
 - GitHub Actions remains the planned CI/CD orchestrator with manual production approval, staging smoke, migration job, release artifact publication, post-deploy live FastAPI browser smoke, and rollback planning.
 - GA remains blocked until controlled pilot deployment and observation succeed, including monitoring history, manual accessibility validation, restore drill, rollback drill, security review, support process validation, and pilot feedback.
+
+## TASK-068B1 Implementation Facts
+
+TASK-068B1 implements the Azure infrastructure-as-code and repository configuration foundation for staging and controlled-production-pilot environments.
+
+Implementation facts:
+
+- Bicep is the selected IaC technology for Azure because ADR-0018 selected Azure and the repository had no existing Terraform/Pulumi convention.
+- Azure infrastructure lives under `infrastructure/azure/` with subscription-scope `main.bicep`, reusable modules, and separate staging/pilot parameter files.
+- The foundation defines an environment Resource Group, Azure Container Registry, Azure Container Apps environment, API Container App, web Container App, manual migration job, PostgreSQL Flexible Server, private document Blob Storage, widget static Blob Storage origin, Key Vault, Azure Front Door foundation, optional Redis, and monitoring foundation.
+- `apps/api/Dockerfile` and `apps/web/Dockerfile` now use production startup commands and non-root runtime users. Docker Compose explicitly preserves local development reload/dev commands.
+- Redis remains enabled by default in Azure parameters because current public widget rate limiting uses Redis-backed fail-closed behavior.
+- No production deployment, DNS change, cloud provisioning, or production secret creation has occurred.
+- Front Door custom domain validation, Azure role assignments, private networking validation, image digest promotion, static artifact upload, monitoring rules, staging live smoke, and production pilot enablement remain future TASK-068B work.
+- New validation commands are `npm run infra:azure:validate` and `npm run infra:azure:whatif -- <staging|pilot>`. The what-if helper is non-destructive and exits without deployment when credentials or secure parameters are absent.
+- Next recommended task: TASK-068B2 - Azure CI/CD Deployment Pipeline, Database Migrations, Release Promotion, and Rollback Automation.

@@ -116,3 +116,16 @@ npm run widget:admin:release:verify
 ```
 
 This remains a pre-deployment repository gate. It does not deploy artifacts, mutate DNS, provision infrastructure, or prove production availability.
+
+## Azure Infrastructure Foundation
+
+TASK-068B1 adds the Azure Bicep foundation for the deployment architecture selected in ADR-0018. The foundation is validation-only by default and does not deploy production infrastructure.
+
+Relevant commands:
+
+```bash
+npm run infra:azure:validate
+npm run infra:azure:whatif -- staging
+```
+
+Actual deployment, image promotion, migrations, and rollback automation are deferred to TASK-068B2.
