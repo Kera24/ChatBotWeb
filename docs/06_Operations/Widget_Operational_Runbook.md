@@ -123,3 +123,7 @@ npm run widget:pilot:readiness
 
 Production/staging deployments must also run post-deploy real smoke in that environment.
 
+
+## Widget Administration Operational Evidence
+
+TASK-067B5 adds `npm run widget:admin:release:verify` and `artifacts/widget-admin-readiness/report.json`. Operators should keep this report with pilot release evidence when administration workflows are used to configure pilot widgets.

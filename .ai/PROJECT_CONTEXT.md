@@ -473,7 +473,7 @@ Guardrails for future Codex sessions:
 - Public-key rotation is immediate cutover: the old credential is revoked, active origins are copied to the new credential, the widget identity remains stable, and published revisions are not mutated.
 - Embed delivery preference is stable widget metadata: managed major alias by default, with optional approved pinned SDK semver. Arbitrary SDK URLs and `latest` remain unsupported.
 - Public configuration ETags include public-key cache context to avoid cross-key conditional-cache confusion after rotation.
-- Admin frontend, preview grants, installation verification, and production deployment remain deferred.
+- Admin frontend, preview grants, installation verification, and the admin release gate are now implemented through TASK-067B5. Production deployment remains deferred.
 
 ## TASK-067B3 Implementation Facts
 
@@ -483,7 +483,7 @@ Guardrails for future Codex sessions:
 - Domain management calls the B2 exact-origin APIs and surfaces backend validation/invariant errors.
 - Embed management renders backend-generated snippets inertly, supports managed-major and approved pinned SDK choices, and shows SRI only when returned by backend metadata.
 - Public-key rotation is available through an accessible confirmation dialog and refreshes the displayed key/snippet after success.
-- Publish UI, preview grants, revision history, rollback UI, knowledge selection, pilot mutation, and global operational controls remain deferred.
+- Publish UI, preview grants, revision history, rollback UI, and knowledge selection are now implemented through TASK-067B4/B5. Pilot mutation and global operational controls remain outside ordinary tenant admin UI.
 
 ## TASK-067B4 Implementation Facts
 
@@ -493,4 +493,18 @@ Guardrails for future Codex sessions:
 - Draft preview uses authenticated short-lived preview grants bound to actor, tenant, widget, and draft revision; B4 frontend renders a config-faithful iframe preview without exposing draft through public config.
 - Publish UI, revision history, revision detail, and rollback UI are wired to the immutable revision APIs. Rollback creates a new published revision and does not mutate history.
 - Embed installation verification is passive: valid public configuration requests from approved origins record observed origin, optional SDK/protocol metadata, and last-seen time without storing tokens, messages, answers, or visitor identity.
-- Full authenticated browser E2E, preview message/RAG hardening, expanded accessibility audit, and pilot admin release gate remain deferred to TASK-067B5.
+- TASK-067B5 adds the pilot admin release gate and expanded admin workflow/security tests. Full conversational/RAG draft preview and hosted-auth Playwright navigation remain future hardening items before GA.
+
+## Widget Administration Controlled-Pilot Readiness
+
+As of TASK-067B5, Sprint 3G widget administration implementation is complete at controlled-pilot level. The repository includes revisioned draft/publish administration APIs, origin/public-key/embed management APIs, administration frontend workflows, configuration-faithful draft preview, publish/history/rollback/knowledge workflows, passive installation evidence, and a hardening gate.
+
+The admin release gate is:
+
+```bash
+npm run widget:admin:release:verify
+```
+
+It generates `artifacts/widget-admin-readiness/report.json` and verifies tenant isolation, RBAC, preview-grant security, knowledge-scope isolation, publish/rollback concurrency, key/origin/embed hardening, audit coverage, accessibility-oriented frontend behavior, and public-widget pilot regression via the existing pilot reports.
+
+Production deployment has not occurred. The implemented classification is controlled-pilot administration readiness, not GA readiness. TASK-068A should define controlled pilot deployment, production domain wiring, monitoring integration, and post-deploy validation architecture before any production pilot deployment work.

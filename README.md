@@ -242,4 +242,14 @@ Publish workflow, preview, revision history, rollback, knowledge selection, and 
 
 ## Widget Administration TASK-067B4
 
-Widget administration now includes saved-draft knowledge selection, grant-bound draft preview, publish validation and confirmation, immutable revision history, rollback, and passive embed installation evidence. Full authenticated browser hardening remains assigned to TASK-067B5.
+Widget administration now includes saved-draft knowledge selection, grant-bound draft preview, publish validation and confirmation, immutable revision history, rollback, passive embed installation evidence, and the TASK-067B5 controlled-pilot admin release gate.
+
+## Widget Administration Controlled-Pilot Gate
+
+TASK-067B5 adds the widget administration release gate for controlled pilot readiness:
+
+```bash
+npm run widget:admin:release:verify
+```
+
+The gate runs focused admin API hardening tests, admin frontend workflow tests, web lint/build, public widget pilot verification, pilot readiness, and writes `artifacts/widget-admin-readiness/report.json`. It does not deploy production infrastructure and does not declare GA readiness.

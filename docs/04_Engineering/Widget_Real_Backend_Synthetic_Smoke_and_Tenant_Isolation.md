@@ -172,3 +172,7 @@ TASK-066B3 adds provider-neutral operational controls for controlled pilot readi
 ## TASK-067B4 Update
 
 Knowledge scope selection is now revision-bound for administration. Real-backend tenant isolation tests should include selected-scope retrieval and rollback-restored scope in TASK-067B5 hardening.
+
+## TASK-067B5 Admin Gate Cross-Reference
+
+Widget administration controlled-pilot use now has its own gate: `npm run widget:admin:release:verify`. B2 real-backend verification remains the public widget tenant/session/retrieval isolation gate and is consumed by the admin readiness report; it is not replaced by admin UI tests.

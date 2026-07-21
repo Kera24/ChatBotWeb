@@ -37,6 +37,10 @@
     "widget:real-backend:test": "python tests/widget-real-backend/run_pilot_verification.py --api-only",
     "widget:pilot:verify": "npm run widget:release:build && python tests/widget-real-backend/run_pilot_verification.py --api-only",
     "widget:ops:validate": "npm --prefix apps/widget run ops:validate",
+    "widget:admin:e2e": "npm run web:test -- components/widgets/widget-admin.test.tsx",
+    "widget:admin:a11y": "npm run web:test -- components/widgets/widget-admin.test.tsx && npm run widget:e2e:a11y",
+    "widget:admin:security": "npm run api:test -- tests/test_widget_admin_revisioning.py tests/test_widget_admin_origins_embed.py tests/test_widget_admin_b5_hardening.py && npm run web:test -- components/widgets/widget-admin.test.tsx",
+    "widget:admin:release:verify": "python -m compileall apps/api/app && npm run api:test -- tests/test_widget_admin_revisioning.py tests/test_widget_admin_origins_embed.py tests/test_widget_admin_b5_hardening.py && npm run web:test -- components/widgets/widget-admin.test.tsx && npm run web:lint && npm run web:build && npm run widget:pilot:verify && npm run widget:pilot:readiness && node scripts/widget-admin-readiness.mjs",
     "widget:rollback:plan": "node apps/widget/scripts/rollback-plan.mjs",
     "widget:pilot:readiness": "npm run widget:pilot:verify && python tests/widget-real-backend/run_pilot_readiness.py"
   }

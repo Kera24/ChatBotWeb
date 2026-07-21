@@ -184,3 +184,7 @@ The B2 origin/key/embed APIs are now surfaced through authenticated dashboard UI
 ## TASK-067B4 Update
 
 The Embed page now displays passive installation evidence by allowed origin. Evidence is recorded only after a valid public configuration request from an approved origin and stores no session token, message body, answer, visitor identity, or conversation content.
+
+## TASK-067B5 Embed and Key Hardening
+
+B5 verifies that key rotation revokes the old public key, resets current-key installation evidence until the new key is observed, keeps published revisions unchanged, and avoids logging raw public keys in audit metadata. Embed snippets remain server-controlled inert text and never use `latest`.

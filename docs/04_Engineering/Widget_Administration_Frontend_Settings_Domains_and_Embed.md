@@ -135,3 +135,9 @@ The implementation uses semantic headings, labelled inputs, status text, accessi
 ## TASK-067B4 Update
 
 The authenticated administration frontend now includes Knowledge, Preview, Publish, History, and installation-status surfaces. Preview is config-faithful and grant-bound; publish and rollback remain backend-authoritative and do not change pilot or operational controls.
+
+## TASK-067B5 Release-Gate Coverage
+
+The settings, domains, embed, preview, publish, and history UI now have focused admin workflow tests covering save conflicts, knowledge-scope save, preview token non-rendering, sandboxed preview iframe markup, publish confirmation, rollback confirmation, installation status, and inert embed snippets.
+
+`npm run widget:admin:e2e` currently runs the authenticated admin component workflow coverage. Full Playwright navigation against hosted web/auth fixtures remains a future hardening step before GA.

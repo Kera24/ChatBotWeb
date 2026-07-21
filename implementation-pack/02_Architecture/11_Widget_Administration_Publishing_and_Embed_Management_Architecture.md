@@ -909,3 +909,9 @@ The first authenticated widget administration frontend is implemented in the Nex
 ## TASK-067B4 Implementation Note
 
 TASK-067B4 implements the first complete authenticated publish workflow: tenant-scoped knowledge scope on revisions, side-effect-free publish validation, short-lived admin preview grants, publish confirmation UI, revision history/detail, rollback UI integration, and passive installation evidence from valid public configuration requests. Installation verification is intentionally passive rather than crawler-based to avoid SSRF risk. Full authenticated browser E2E and deeper accessibility/security hardening move to TASK-067B5.
+
+## TASK-067B5 Admin Hardening Implementation Fact
+
+The implemented administration model now has a controlled-pilot release gate: `npm run widget:admin:release:verify`. The gate produces `artifacts/widget-admin-readiness/report.json`, consumes the existing pilot verification/readiness reports, and verifies tenant isolation, RBAC, preview grant safety, knowledge-scope isolation, publish/rollback concurrency, key/origin/embed hardening, audit evidence, and admin frontend workflow coverage.
+
+Full conversational/RAG draft preview remains deferred; the implemented preview is configuration-faithful and sandboxed.

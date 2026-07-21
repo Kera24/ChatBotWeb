@@ -442,3 +442,16 @@ Use `npm run web:build` to verify the dynamic `/widgets`, `/widgets/new`, and `/
 ## Widget Administration B4 Local Notes
 
 For local widget administration testing, use the authenticated development dashboard session, create a widget, add an allowed localhost origin, save a knowledge scope, validate publish, publish, and then call the public config endpoint from the allowed origin to populate installation evidence.
+
+## Widget Administration Verification
+
+Run focused widget administration checks from the repository root:
+
+```bash
+npm run widget:admin:e2e
+npm run widget:admin:a11y
+npm run widget:admin:security
+npm run widget:admin:release:verify
+```
+
+The admin gate uses synthetic tenants and the existing development-only dashboard auth scaffold. It validates tenant/RBAC boundaries and writes `artifacts/widget-admin-readiness/report.json`. Do not use development auth headers as production authentication.
