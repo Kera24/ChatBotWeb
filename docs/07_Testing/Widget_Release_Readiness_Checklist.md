@@ -137,3 +137,13 @@ npm run widget:admin:release:verify
 ```
 
 See `docs/07_Testing/Widget_Admin_Release_Readiness_Checklist.md` for the required evidence set. Passing this gate is controlled-pilot evidence only; production deployment, monitoring integration, manual assistive-technology review, and observed pilot traffic remain GA prerequisites.
+
+## TASK-068B3 Azure Observability Readiness
+
+- [ ] `npm run azure:observability:validate` completed.
+- [ ] Application Insights/OpenTelemetry is configured server-side only.
+- [ ] Public widget and SDK public source maps are disabled.
+- [ ] No public widget or admin browser telemetry SDK is included.
+- [ ] KQL queries avoid body, answer, citation, token, draft, prompt, and document fields.
+- [ ] Alert definitions reference runbooks and action-group receivers are parameterized.
+- [ ] Monitoring status is marked configured, not verified-live, until Azure deployment validation occurs.

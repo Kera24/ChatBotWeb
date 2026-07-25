@@ -12,16 +12,26 @@ SENSITIVE_FIELD_NAMES = {
     "cookie",
     "set-cookie",
     "session_token",
+    "preview_grant",
+    "preview_token",
     "token",
     "authorization_header",
     "api_key",
     "provider_key",
+    "connection_string",
     "database_url",
     "message",
     "answer",
+    "assistant_answer",
+    "citation",
     "quoted_text",
+    "draft",
+    "draft_configuration",
     "prompt",
+    "provider_prompt",
     "retrieved_context",
+    "document_contents",
+    "signing_key",
 }
 
 _PUBLIC_KEY_PATTERN = re.compile(r"wpk_[A-Za-z0-9_-]+")
@@ -54,4 +64,3 @@ def redact(value: Any) -> Any:
 
 def log_operational_event(logger: logging.Logger, event: Mapping[str, Any]) -> None:
     logger.info(json.dumps(redact(dict(event)), sort_keys=True, separators=(",", ":")))
-

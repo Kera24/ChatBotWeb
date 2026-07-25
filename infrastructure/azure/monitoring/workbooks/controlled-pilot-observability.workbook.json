@@ -1,0 +1,10 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    { "type": 1, "content": { "json": "# Controlled Pilot Observability\nOperational metadata only. Do not use this workbook for conversation, draft, token, or document content." } },
+    { "type": 3, "name": "API health", "content": { "query": "requests | where timestamp > ago(1h) | summarize total=count(), failures=countif(resultCode startswith '5'), p95=percentile(duration,95) by bin(timestamp, 5m), cloud_RoleName", "size": 0 } },
+    { "type": 3, "name": "Public widget signals", "content": { "query": "traces | where timestamp > ago(2h) | where message has 'widget.' or tostring(customDimensions.event_type) has 'widget.' | summarize count() by event=tostring(customDimensions.event_type), bin(timestamp, 5m)", "size": 0 } },
+    { "type": 3, "name": "Release comparison", "content": { "query": "requests | where timestamp > ago(48h) | summarize total=count(), failures=countif(resultCode startswith '5'), p95=percentile(duration,95) by release=tostring(customDimensions['service.version']), bin(timestamp, 30m)", "size": 0 } },
+    { "type": 3, "name": "Synthetic availability", "content": { "query": "availabilityResults | where timestamp > ago(24h) | summarize availability=avg(toint(success)) by name, bin(timestamp, 15m)", "size": 0 } }
+  ]
+}

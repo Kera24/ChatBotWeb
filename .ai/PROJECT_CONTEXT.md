@@ -557,3 +557,19 @@ Implementation facts:
 - Deployed smoke hooks cover API live/ready, web, widget iframe, and SDK alias availability. Full live FastAPI browser smoke remains TASK-068B4.
 - No production infrastructure, DNS, customer data, or customer pilot widget enablement has occurred.
 - Next recommended task: TASK-068B3 - Azure Monitor/Application Insights Integration, Privacy-Preserving Telemetry, Alerts, Uptime, and Operational Dashboards.
+## TASK-068B3 Implementation Facts
+
+TASK-068B3 implements the Azure observability layer for controlled-pilot readiness without running a live Azure deployment.
+
+Implementation facts:
+
+- Azure Monitor, Log Analytics, and workspace-based Application Insights remain the selected observability stack.
+- FastAPI has optional Azure Monitor OpenTelemetry initialization through `APPLICATIONINSIGHTS_CONNECTION_STRING` and `AZURE_MONITOR_OPEN_TELEMETRY_ENABLED`; telemetry export is fail-open and disabled unless configured.
+- Request telemetry uses normalized route templates, safe request IDs, service name, environment, and release version. Public widget operational events reuse the TASK-066B3 vocabulary.
+- Redaction now explicitly protects preview grants/tokens, draft configuration, provider prompts, connection strings, database URLs, signing keys, messages, answers, citations, and document contents.
+- Public widget and admin browser telemetry SDKs are not added. No session replay, DOM capture, behavioral analytics, message capture, draft capture, answer capture, or citation-content capture exists.
+- Public source maps are disabled for `apps/widget` and `packages/widget-sdk`; private source-map upload remains a future live-environment decision.
+- Azure Bicep now includes action-group and availability-test architecture plus server-side App Insights connection string injection for Container Apps. Diagnostic settings and KQL/workbook assets live under `infrastructure/azure/monitoring/` and `infrastructure/azure/modules/diagnostics.bicep`.
+- `npm run azure:observability:validate` statically verifies alert mapping, workbook/query assets, redaction/source-map policy, and telemetry configuration without Azure credentials. CI runs it with Azure validation.
+- Monitoring is configured in repository code, not verified live. TASK-068B4 must deploy staging, run live full-stack browser smoke, validate Azure telemetry/alerts/workbook behavior, and run the rollback drill.
+- Next recommended task: TASK-068B4 - Azure Staging Deployment, Live Full-Stack Browser Smoke, Synthetic Tenant Isolation, Monitoring Validation, and Rollback Drill.

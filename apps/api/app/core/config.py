@@ -11,6 +11,7 @@ def _get_int(name: str, default: int) -> int:
 
 @dataclass(frozen=True)
 class Settings:
+    APP_ENV: str = getenv("APP_ENV", getenv("NODE_ENV", "development"))
     PROJECT_NAME: str = getenv("PROJECT_NAME", "ChatBotWeb / Yoranix AI Platform")
     PROJECT_DESCRIPTION: str = getenv(
         "PROJECT_DESCRIPTION",
@@ -69,6 +70,10 @@ class Settings:
     PUBLIC_WIDGET_PILOT_ENFORCEMENT_ENABLED: str = getenv("PUBLIC_WIDGET_PILOT_ENFORCEMENT_ENABLED", "false")
     PUBLIC_WIDGET_PILOT_ALLOWLIST: str = getenv("PUBLIC_WIDGET_PILOT_ALLOWLIST", "")
     PUBLIC_WIDGET_DISABLED_WIDGETS: str = getenv("PUBLIC_WIDGET_DISABLED_WIDGETS", "")
+    APPLICATIONINSIGHTS_CONNECTION_STRING: str = getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
+    AZURE_MONITOR_OPEN_TELEMETRY_ENABLED: str = getenv("AZURE_MONITOR_OPEN_TELEMETRY_ENABLED", "false")
+    AZURE_MONITOR_REQUIRE_CONNECTION_STRING: str = getenv("AZURE_MONITOR_REQUIRE_CONNECTION_STRING", "false")
+    AZURE_MONITOR_SAMPLING_RATIO: float = float(getenv("AZURE_MONITOR_SAMPLING_RATIO", "1.0"))
 
 
 settings = Settings()

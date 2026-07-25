@@ -1,4 +1,4 @@
-﻿# Azure Application Deployment Runbook
+# Azure Application Deployment Runbook
 
 ## Purpose
 
@@ -115,3 +115,14 @@ After B2, deployment automation may be ready, but customer enablement remains bl
 - monitoring/alerts in B3
 - staging live smoke and rollback drill in B4
 - production pilot deployment and manual accessibility/security checks in B5
+
+## 13. Observability Gate
+
+Before staging or production-pilot promotion, confirm:
+
+- `npm run azure:observability:validate` passed for the exact SHA.
+- Azure Monitor, Log Analytics, Application Insights, action groups, availability tests, alerts, workbook, and KQL assets are defined.
+- Alert receivers are configured through environment/deployment parameters, not committed personal addresses.
+- API/web runtime has server-side `APPLICATIONINSIGHTS_CONNECTION_STRING` configuration.
+- Public widget/admin browser telemetry remains disabled unless a future privacy-reviewed task changes that decision.
+- Monitoring status is recorded as configured until B4 verifies it live in Azure.

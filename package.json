@@ -45,6 +45,7 @@
     "widget:pilot:readiness": "npm run widget:pilot:verify && python tests/widget-real-backend/run_pilot_readiness.py",
     "infra:azure:validate": "node scripts/validate-azure-infra.mjs",
     "infra:azure:whatif": "node scripts/azure-infra-whatif.mjs",
+    "azure:observability:validate": "node scripts/validate-azure-observability.mjs",
     "azure:release:manifest": "node scripts/build-deployment-release.mjs",
     "azure:release:validate": "node scripts/validate-deployment-manifest.mjs",
     "azure:widget:publish": "node scripts/publish-azure-widget-release.mjs",

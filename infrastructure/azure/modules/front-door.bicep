@@ -1,4 +1,4 @@
-﻿param location string = 'global'
+param location string = 'global'
 param namePrefix string
 param environmentName string
 param appHostName string
@@ -361,3 +361,4 @@ output intendedCustomDomains object = {
   widget: widgetHostName
   cdn: cdnHostName
 }
+output frontDoorProfileId string = profile.id

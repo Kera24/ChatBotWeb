@@ -5,7 +5,7 @@ Foundation package for the future embeddable Yoranix widget loader.
 Current TASK-064B1 status:
 
 - Defines typed configuration, environment resolution, version constants, and SDK error contracts.
-- Builds ESM and browser IIFE artifacts with TypeScript declarations and source maps.
+- Builds ESM and browser IIFE artifacts with TypeScript declarations. Public source maps are disabled for controlled-pilot delivery.
 - Provides unit tests and bundle size checks.
 
 This package does not yet mount an iframe, call public APIs, store sessions, expose the final `window.YoranixWidget` lifecycle API, use postMessage, or render widget UI.

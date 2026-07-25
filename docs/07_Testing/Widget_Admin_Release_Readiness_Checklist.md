@@ -1,4 +1,4 @@
-﻿# Widget Admin Release Readiness Checklist
+# Widget Admin Release Readiness Checklist
 
 Status: Controlled-pilot administration gate
 
@@ -58,3 +58,10 @@ Run before enabling widget administration for controlled pilot use.
 ## Classification
 
 Passing this checklist means widget administration is ready for controlled pilot use. It does not mean GA readiness or production deployment has occurred.
+
+## Azure Observability Gate
+
+- [ ] `npm run azure:observability:validate` completed.
+- [ ] Admin draft values and preview grants are excluded from telemetry/logging.
+- [ ] Admin browser telemetry/session replay remains disabled for controlled pilot.
+- [ ] Server-side web/API errors include release/environment/request ID where available.

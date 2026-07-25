@@ -1,4 +1,4 @@
-﻿param location string
+param location string
 param namePrefix string
 param environmentName string
 param logRetentionDays int
@@ -41,4 +41,6 @@ output logAnalyticsCustomerId string = workspace.properties.customerId
 @secure()
 output logAnalyticsSharedKey string = workspace.listKeys().primarySharedKey
 output applicationInsightsName string = appInsights.name
+output applicationInsightsId string = appInsights.id
+output applicationInsightsConnectionString string = appInsights.properties.ConnectionString
 

@@ -1,4 +1,4 @@
-﻿param location string
+param location string
 param namePrefix string
 param environmentName string
 param tags object
@@ -122,3 +122,5 @@ output widgetStaticStorageAccountName string = widgetStorage.name
 output documentsContainerName string = documentsContainer.name
 output widgetStaticHostName string = replace(replace(widgetStorage.properties.primaryEndpoints.web, 'https://', ''), '/', '')
 output widgetStaticEndpoint string = widgetStorage.properties.primaryEndpoints.web
+output documentStorageAccountId string = documentStorage.id
+output widgetStaticStorageAccountId string = widgetStorage.id

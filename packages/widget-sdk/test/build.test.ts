@@ -8,9 +8,12 @@ import { describe, expect, it } from "vitest";
 describe("build artifacts", () => {
   const dist = join(process.cwd(), "dist");
 
-  it("emits ESM, IIFE, declarations, and source maps", () => {
-    for (const file of ["index.js", "yoranix-widget-sdk.global.js", "index.d.ts", "index.js.map", "yoranix-widget-sdk.global.js.map"]) {
+  it("emits ESM, IIFE, declarations, and no public source maps", () => {
+    for (const file of ["index.js", "yoranix-widget-sdk.global.js", "index.d.ts"]) {
       expect(existsSync(join(dist, file)), `${file} should exist`).toBe(true);
+    }
+    for (const file of ["index.js.map", "yoranix-widget-sdk.global.js.map"]) {
+      expect(existsSync(join(dist, file)), `${file} should not be publicly emitted`).toBe(false);
     }
   });
 

@@ -1,4 +1,4 @@
-﻿param location string
+param location string
 param namePrefix string
 param environmentName string
 param tags object
@@ -25,3 +25,4 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
 
 output keyVaultName string = vault.name
 output keyVaultUri string = vault.properties.vaultUri
+output keyVaultId string = vault.id

@@ -1,0 +1,5 @@
+requests
+| where timestamp > ago(2h)
+| where tostring(customDimensions['request.id']) == '{request_id}' or operation_Id == '{request_id}'
+| project timestamp, name, resultCode, duration, operation_Id, request_id=tostring(customDimensions['request.id']), cloud_RoleName
+| order by timestamp desc

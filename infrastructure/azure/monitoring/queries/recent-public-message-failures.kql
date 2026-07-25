@@ -1,0 +1,5 @@
+requests
+| where timestamp > ago(1h)
+| where name has '/api/v1/widget/' and resultCode startswith '5'
+| summarize failures=count(), p95_duration_ms=percentile(duration, 95) by name, resultCode, cloud_RoleName, bin(timestamp, 5m)
+| order by timestamp desc

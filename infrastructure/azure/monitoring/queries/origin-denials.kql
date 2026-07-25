@@ -1,0 +1,5 @@
+traces
+| where timestamp > ago(2h)
+| where message has 'origin.validation.denied' or tostring(customDimensions.event_type) has 'origin.validation.denied'
+| summarize denials=count() by bin(timestamp, 5m)
+| order by timestamp desc

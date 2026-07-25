@@ -1,0 +1,5 @@
+traces
+| where timestamp > ago(2h)
+| where message has 'rate_limit.denied' or tostring(customDimensions.event_type) has 'rate_limit.denied'
+| summarize denied=count() by tostring(customDimensions.error_code), bin(timestamp, 5m)
+| order by timestamp desc

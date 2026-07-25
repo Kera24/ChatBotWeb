@@ -41,6 +41,7 @@ from app.core.config import settings
 from app.operations.correlation import safe_request_id
 from app.operations.logging import log_operational_event, pseudonymous_identifier
 from app.operations.metrics import metric_name_for_event
+from app.operations.telemetry import record_access_event, telemetry_span
 from app.operations.widget_controls import evaluate_widget_access, resolve_controls
 from app.db.models import Organisation, PublicCredential, Workspace
 from app.services.embeddings import build_embedding_provider
@@ -156,6 +157,7 @@ def _emit(event_sink: InMemoryAccessEventSink, event_type: str, *, request_id: s
             },
         )
 
+    record_access_event(event_type, request_id=request_id, trace_id=trace_id, outcome=outcome, error_code=error_code, latency_ms=latency_ms)
 
 def _cors_headers(origin: str, *, methods: str = "POST, OPTIONS", allowed_headers: str = _ALLOWED_SESSION_CORS_HEADERS) -> dict[str, str]:
     return {
@@ -506,7 +508,8 @@ def get_public_widget_config(public_key: str, request: Request, db: DbSession) -
     raw = _raw_config_gateway_request(public_key, request, request_id)
     origin = request.headers.get("origin")
     try:
-        result = _gateway(request, db, event_sink).validate_access(raw)
+        with telemetry_span("widget.config.resolve", {"operation.name": "public_config_resolution", "request.id": request_id}):
+            result = _gateway(request, db, event_sink).validate_access(raw)
         error = _handle_gateway_error(result, event_sink, request_id=request_id, started=started, event_prefix="widget.config")
         if error is not None:
             db.rollback()
@@ -592,7 +595,8 @@ async def send_public_widget_message(public_key: str, request: Request, db: DbSe
         return _message_error_response(detail, request_id=request_id, cors_origin=cors_origin)
     raw = _raw_message_gateway_request(public_key, request, body, request_id)
     try:
-        result = _gateway(request, db, event_sink).validate_access(raw)
+        with telemetry_span("widget.message.process", {"operation.name": "public_widget_message", "request.id": request_id}):
+            result = _gateway(request, db, event_sink).validate_access(raw)
         if result.response.safe_error is not None:
             db.commit()
             detail = result.response.safe_error
