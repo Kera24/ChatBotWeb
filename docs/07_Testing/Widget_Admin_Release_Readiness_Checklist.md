@@ -65,3 +65,10 @@ Passing this checklist means widget administration is ready for controlled pilot
 - [ ] Admin draft values and preview grants are excluded from telemetry/logging.
 - [ ] Admin browser telemetry/session replay remains disabled for controlled pilot.
 - [ ] Server-side web/API errors include release/environment/request ID where available.
+
+## TASK-068B4 Admin Staging Verification
+
+- [ ] Repository admin gate remains configured through `npm run widget:admin:release:verify`.
+- [ ] Staging admin smoke uses real staging auth or an approved synthetic staging user/session bootstrap.
+- [ ] Staging admin workflow verifies widget list, draft edit/save, origins, knowledge scope, preview, publish validation, publish, history, rollback, embed snippet, and installation observation using synthetic tenants only.
+- [ ] Production-pilot admin enablement remains unverified until staging evidence passes and a separate pilot task is approved.

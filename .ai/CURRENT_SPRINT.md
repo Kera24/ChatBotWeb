@@ -1,14 +1,16 @@
 # Current Sprint
 
 Current phase:
-Sprint 3H - Controlled Production Pilot Deployment
+Sprint 3H — Controlled Production Pilot Deployment
 
 Current task:
-TASK-068B3 - Azure Monitor, Privacy-Preserving Telemetry, Alerts, Uptime, and Operational Dashboards
+TASK-068B4 — Azure Staging Deployment, Live Full-Stack Validation, Monitoring Verification, and Rollback Drill
 
 ## Guardrails
 
-- Implement Azure observability, alerting, uptime, dashboards, and runbooks only.
-- Do not deploy production automatically, mutate DNS, commit Azure credentials, add product analytics, enable session replay, or capture conversations/drafts/tokens/citations.
-- Preserve TASK-066B3 structured logging, request IDs, operational counters/events, health probes, privacy model, controlled-pilot classification, and Azure architecture.
-- Next recommended task: TASK-068B4 - Azure Staging Deployment, Live Full-Stack Browser Smoke, Synthetic Tenant Isolation, Monitoring Validation, and Rollback Drill.
+- Implement TASK-068B4 staging validation and rollback drill orchestration only.
+- Direct B4 execution may target `staging` only; reject `pilot`, `production`, `prod`, and `production-pilot`.
+- Do not deploy production-pilot, modify production DNS, enable real customers, use customer data, weaken auth, or log tokens/conversations/drafts/citations.
+- Do not claim staging, monitoring, alerting, or rollback is live-verified unless Azure staging execution actually occurs.
+- Preserve Azure architecture, immutable artifacts, exact-origin policy, tenant isolation, privacy-preserving telemetry, and controlled approval model.
+- Next recommended task after successful staging validation only: TASK-068B5 — Production-Pilot Domain Wiring, Deployment, Synthetic Validation, Manual Accessibility/Security Gate, and First Pilot Enablement.

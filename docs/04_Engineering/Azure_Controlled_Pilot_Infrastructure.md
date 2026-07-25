@@ -1,4 +1,4 @@
-﻿# Azure Controlled Pilot Infrastructure
+# Azure Controlled Pilot Infrastructure
 
 ## Purpose
 
@@ -310,3 +310,17 @@ TASK-068B2 adds CI/CD release orchestration on top of this infrastructure founda
 - `azure-rollback.yml` plans and optionally executes manifest-compatible rollback.
 
 Deployment wrappers live in `scripts/` and are dry-run capable unless `--execute` is supplied.
+
+## TASK-068B4 Staging Live Validation Harness
+
+TASK-068B4 adds a manual, staging-only validation workflow and scripts:
+
+```bash
+npm run azure:staging:validate
+npm run azure:staging:browser
+npm run azure:staging:telemetry
+npm run azure:staging:alerts
+npm run azure:staging:rollback-drill
+```
+
+Direct B4 execution rejects `pilot`, `production`, `prod`, and `production-pilot`. The harness records redacted evidence under `artifacts/azure-staging-validation/` and classifies missing Azure credentials or secure staging parameters as `staging deployment blocked before execution`. It does not deploy production-pilot or claim live Azure success without credentialed execution.

@@ -98,3 +98,13 @@ Add security evidence for authenticated origin/key/embed administration: exact-o
 ## TASK-067B5 Admin Security Gate
 
 Controlled pilot administration now requires `npm run widget:admin:release:verify` in addition to the public widget pilot gates. This gate does not deploy production infrastructure and does not imply GA readiness.
+
+## TASK-068B4 Live Staging Security Verification
+
+- [ ] Repository B4 scripts reject non-staging direct execution.
+- [ ] Live staging Alpha/Beta synthetic tenants pass positive retrieval and negative cross-tenant retrieval checks.
+- [ ] Cross-widget session tokens are rejected in live staging.
+- [ ] Unauthorized and wrong-host origins are denied by application logic.
+- [ ] Telemetry/log privacy canary text, session token, preview grant, answer, citation excerpt, and draft values are absent from Application Insights and Log Analytics.
+- [ ] Source maps are not publicly served from staging widget/SDK assets.
+- [ ] Production-pilot security remains unverified until a separate approved pilot deployment task runs.

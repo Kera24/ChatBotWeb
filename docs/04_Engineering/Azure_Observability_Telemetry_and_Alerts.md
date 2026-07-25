@@ -1,4 +1,4 @@
-﻿# Azure Observability, Telemetry, and Alerts
+# Azure Observability, Telemetry, and Alerts
 
 Status: TASK-068B3 implemented, not live-verified
 
@@ -64,3 +64,9 @@ npm run infra:azure:validate
 ```
 
 These are static checks and do not require Azure credentials. Live monitoring health is not verified until B4 staging deployment and monitoring validation.
+
+## TASK-068B4 Live Validation Hooks
+
+Live staging validation now has repository commands for telemetry, alert, and browser-smoke evidence. These commands remain staging-only and write redacted artifacts under `artifacts/azure-staging-validation/`.
+
+B4 does not change the B3 browser telemetry decision: public widget and admin browser clients still do not send direct Application Insights telemetry. Live monitoring must be proven by Application Insights/Log Analytics evidence from the deployed staging stack before it is marked verified-live.

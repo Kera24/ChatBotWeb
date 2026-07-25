@@ -147,3 +147,9 @@ See `docs/07_Testing/Widget_Admin_Release_Readiness_Checklist.md` for the requir
 - [ ] KQL queries avoid body, answer, citation, token, draft, prompt, and document fields.
 - [ ] Alert definitions reference runbooks and action-group receivers are parameterized.
 - [ ] Monitoring status is marked configured, not verified-live, until Azure deployment validation occurs.
+
+## TASK-068B4 Staging Validation Gate
+
+Before production-pilot preparation, run the staging live validation workflow or equivalent runbook. Required evidence includes Azure what-if/deployment state, migration result, API/web revision health, widget static publication, Front Door header/cache/CORS validation, live browser smoke, synthetic tenant isolation, telemetry privacy canary, alert routing, availability tests, rollback drill, and roll-forward restoration.
+
+If Azure credentials or secure staging parameters are unavailable, classify the result as `staging deployment blocked before execution` and do not proceed to production-pilot preparation.
