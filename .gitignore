@@ -46,3 +46,4 @@ artifacts/deployment-release/
 artifacts/azure-deployment/
 artifacts/azure-static-publish-test*/
 artifacts/test-azure-release-tools/
+artifacts/azure-staging-validation/

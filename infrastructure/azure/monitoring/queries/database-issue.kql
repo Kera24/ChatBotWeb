@@ -1,0 +1,5 @@
+AzureDiagnostics
+| where TimeGenerated > ago(2h)
+| where ResourceProvider has 'MICROSOFT.DBFORPOSTGRESQL'
+| summarize events=count() by Category, bin(TimeGenerated, 5m)
+| order by TimeGenerated desc

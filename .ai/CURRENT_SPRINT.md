@@ -1,14 +1,16 @@
-﻿# Current Sprint
+# Current Sprint
 
 Current phase:
-Sprint 3H - Controlled Production Pilot Deployment
+Sprint 3H — Controlled Production Pilot Deployment
 
 Current task:
-TASK-068B2 - Azure CI/CD Deployment, Migration, Release Promotion, and Rollback Automation
+TASK-068B4 — Azure Staging Deployment, Live Full-Stack Validation, Monitoring Verification, and Rollback Drill
 
 ## Guardrails
 
-- Implement Azure CI/CD and release orchestration only.
-- Do not deploy production automatically, modify DNS, commit Azure credentials, create customer data, bypass GitHub environment approvals, or enable customer pilot widgets.
-- Preserve Azure Bicep foundation, immutable SDK delivery, pilot/admin gates, tenant isolation, rollback capability, and controlled approval model.
-- Next recommended task: TASK-068B3 - Azure Monitor/Application Insights Integration, Privacy-Preserving Telemetry, Alerts, Uptime, and Operational Dashboards.
+- Implement TASK-068B4 staging validation and rollback drill orchestration only.
+- Direct B4 execution may target `staging` only; reject `pilot`, `production`, `prod`, and `production-pilot`.
+- Do not deploy production-pilot, modify production DNS, enable real customers, use customer data, weaken auth, or log tokens/conversations/drafts/citations.
+- Do not claim staging, monitoring, alerting, or rollback is live-verified unless Azure staging execution actually occurs.
+- Preserve Azure architecture, immutable artifacts, exact-origin policy, tenant isolation, privacy-preserving telemetry, and controlled approval model.
+- Next recommended task after successful staging validation only: TASK-068B5 — Production-Pilot Domain Wiring, Deployment, Synthetic Validation, Manual Accessibility/Security Gate, and First Pilot Enablement.

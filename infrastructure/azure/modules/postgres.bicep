@@ -1,4 +1,4 @@
-﻿param location string
+param location string
 param namePrefix string
 param environmentName string
 param administratorLogin string
@@ -66,3 +66,4 @@ resource sslEnforcement 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
 output postgresServerName string = server.name
 output postgresHostName string = server.properties.fullyQualifiedDomainName
 output postgresDatabaseName string = database.name
+output postgresServerId string = server.id

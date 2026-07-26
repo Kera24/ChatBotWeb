@@ -82,3 +82,9 @@ Actions:
 - avoid logging hostile Origin values verbatim
 - disable message sending globally if provider cost or abuse risk is active
 - keep evidence to safe categories and request IDs
+
+## Azure Monitor Workflow
+
+TASK-068B3 adds Azure Monitor/Application Insights workflows for controlled pilot. Use `docs/06_Operations/Azure_Monitoring_and_Alerting_Runbook.md` for request-ID lookup, release comparison, availability failures, Front Door issues, database pressure, and message/provider incidents.
+
+Azure telemetry is operational metadata only. Any appearance of conversation content, draft configuration, preview grants, session tokens, Authorization headers, provider prompts, or document contents in telemetry is a security/privacy incident.

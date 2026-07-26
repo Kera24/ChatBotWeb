@@ -45,6 +45,7 @@
     "widget:pilot:readiness": "npm run widget:pilot:verify && python tests/widget-real-backend/run_pilot_readiness.py",
     "infra:azure:validate": "node scripts/validate-azure-infra.mjs",
     "infra:azure:whatif": "node scripts/azure-infra-whatif.mjs",
+    "azure:observability:validate": "node scripts/validate-azure-observability.mjs",
     "azure:release:manifest": "node scripts/build-deployment-release.mjs",
     "azure:release:validate": "node scripts/validate-deployment-manifest.mjs",
     "azure:widget:publish": "node scripts/publish-azure-widget-release.mjs",
@@ -52,6 +53,11 @@
     "azure:deploy:apps": "node scripts/azure-deploy-apps.mjs",
     "azure:smoke": "node scripts/azure-deployed-smoke.mjs",
     "azure:rollback:plan": "node scripts/azure-rollback-release.mjs",
-    "azure:release:test": "node --test tests/deployment/*.test.mjs"
+    "azure:release:test": "node --test tests/deployment/*.test.mjs",
+    "azure:staging:validate": "node scripts/azure-staging-validate.mjs",
+    "azure:staging:browser": "node scripts/azure-live-browser-smoke.mjs",
+    "azure:staging:telemetry": "node scripts/azure-telemetry-validate.mjs",
+    "azure:staging:alerts": "node scripts/azure-alert-validate.mjs",
+    "azure:staging:rollback-drill": "node scripts/azure-rollback-drill.mjs"
   }
 }

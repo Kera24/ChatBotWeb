@@ -1,4 +1,4 @@
-﻿# Azure CI/CD Release Promotion and Rollback
+# Azure CI/CD Release Promotion and Rollback
 
 ## Purpose
 
@@ -155,3 +155,9 @@ Rollback does not downgrade databases.
 ## Command Invocation Note
 
 Local npm on Windows may treat unknown forwarded flags as npm configuration and pass values positionally. The Azure scripts support both named and positional arguments for dry-run use. Mutating workflow steps call the Node scripts directly so `--execute` and validation flags are preserved exactly.
+
+## TASK-068B4 Staging Validation Workflow
+
+`azure-validate-staging.yml` is a manual `workflow_dispatch` workflow scoped to GitHub environment `staging`. It runs repository gates, Azure prerequisite/what-if evidence, live browser smoke evidence, telemetry evidence, alert evidence, and optional rollback drill evidence.
+
+The workflow does not run on pull requests and does not target `production-pilot`. Rollback drill execution requires current and known-good staging deployment manifests and preserves the no-automatic-DB-downgrade compatibility policy.

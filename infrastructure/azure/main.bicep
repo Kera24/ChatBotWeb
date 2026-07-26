@@ -1,4 +1,4 @@
-﻿targetScope = 'subscription'
+targetScope = 'subscription'
 
 @allowed([
   'staging'
@@ -89,6 +89,12 @@ param githubRepository string = 'Kera24/ChatBotWeb'
   'pilot'
 ])
 param releaseChannel string = environmentName
+
+@description('Azure Monitor action-group email receivers. Supply through deployment overlays or workflow inputs, not committed personal addresses.')
+param actionGroupEmailReceivers array = []
+
+@description('Future Azure Monitor action-group webhook receivers. Empty by default.')
+param actionGroupWebhookReceivers array = []
 
 var resourceToken = toLower('${namePrefix}-${environmentName}')
 var resourceGroupName = '${resourceToken}-rg'
@@ -208,6 +214,7 @@ module apps 'modules/container-apps.bicep' = {
     enableWorker: enableWorker
     enableRedis: enableRedis
     redisHostName: enableRedis ? redis.outputs.redisHostName : ''
+    applicationInsightsConnectionString: monitoring.outputs.applicationInsightsConnectionString
     tags: tags
   }
 }
@@ -231,6 +238,39 @@ module frontDoor 'modules/front-door.bicep' = {
   }
 }
 
+module diagnostics 'modules/diagnostics.bicep' = {
+  name: '${resourceToken}-diagnostics'
+  scope: environmentResourceGroup
+  params: {
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
+    containerAppsEnvironmentName: apps.outputs.managedEnvironmentName
+    apiContainerAppName: apps.outputs.apiContainerAppName
+    webContainerAppName: apps.outputs.webContainerAppName
+    frontDoorProfileName: frontDoor.outputs.frontDoorProfileName
+    postgresServerName: postgres.outputs.postgresServerName
+    keyVaultName: keyVault.outputs.keyVaultName
+    documentStorageAccountName: storage.outputs.documentStorageAccountName
+    widgetStorageAccountName: storage.outputs.widgetStaticStorageAccountName
+  }
+}
+module monitoringAlerts 'modules/monitoring-alerts.bicep' = {
+  name: '${resourceToken}-monitoring-alerts'
+  scope: environmentResourceGroup
+  params: {
+    location: location
+    namePrefix: namePrefix
+    environmentName: environmentName
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
+    applicationInsightsId: monitoring.outputs.applicationInsightsId
+    actionGroupEmailReceivers: actionGroupEmailReceivers
+    actionGroupWebhookReceivers: actionGroupWebhookReceivers
+    apiHealthUrl: 'https://${apiHostName}/health/live'
+    webUrl: 'https://${appHostName}'
+    widgetIframeUrl: 'https://${widgetHostName}/embed/index.html'
+    sdkAliasUrl: 'https://${cdnHostName}/widget-sdk/v1/loader.js'
+    tags: tags
+  }
+}
 output resourceGroupName string = environmentResourceGroup.name
 output acrLoginServer string = registry.outputs.loginServer
 output apiContainerAppName string = apps.outputs.apiContainerAppName

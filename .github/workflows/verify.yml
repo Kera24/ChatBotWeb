@@ -34,6 +34,9 @@ jobs:
       - name: Validate Azure infrastructure foundation
         run: npm run infra:azure:validate
 
+      - name: Validate Azure observability
+        run: npm run azure:observability:validate
+
       - name: Run Azure release tooling tests
         run: npm run azure:release:test
 

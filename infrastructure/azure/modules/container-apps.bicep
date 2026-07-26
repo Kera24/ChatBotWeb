@@ -1,4 +1,4 @@
-﻿param location string
+param location string
 param namePrefix string
 param environmentName string
 param logAnalyticsCustomerId string
@@ -23,6 +23,8 @@ param initialImageTag string
 param enableWorker bool
 param enableRedis bool
 param redisHostName string
+@secure()
+param applicationInsightsConnectionString string
 param tags object
 
 var envName = '${namePrefix}-${environmentName}-cae'
@@ -99,6 +101,11 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
           keyVaultUrl: '${keyVaultUri}/secrets/preview-grant-signing-secret'
           identity: 'system'
         }
+        {
+          name: 'applicationinsights-connection-string'
+          value: applicationInsightsConnectionString
+        }
+
       ]
       ingress: {
         external: true
@@ -135,6 +142,10 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'PUBLIC_WIDGET_MESSAGES_ENABLED', value: 'true' }
             { name: 'PUBLIC_WIDGET_PILOT_ENFORCEMENT_ENABLED', value: environmentName == 'pilot' ? 'true' : 'false' }
             { name: 'RATE_LIMIT_LOCAL_FALLBACK_ENABLED', value: 'false' }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'applicationinsights-connection-string' }
+            { name: 'AZURE_MONITOR_OPEN_TELEMETRY_ENABLED', value: 'true' }
+            { name: 'AZURE_MONITOR_REQUIRE_CONNECTION_STRING', value: 'true' }
+            { name: 'AZURE_MONITOR_SAMPLING_RATIO', value: environmentName == 'pilot' ? '1.0' : '1.0' }
           ]
           resources: {
             cpu: json(apiCpu)
@@ -199,6 +210,11 @@ resource webApp 'Microsoft.App/containerApps@2023-05-01' = {
           keyVaultUrl: '${keyVaultUri}/secrets/web-auth-secret'
           identity: 'system'
         }
+        {
+          name: 'web-applicationinsights-connection-string'
+          value: applicationInsightsConnectionString
+        }
+
       ]
       ingress: {
         external: true
@@ -224,6 +240,8 @@ resource webApp 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'NEXT_PUBLIC_API_BASE_URL', value: 'https://${apiHostName}' }
             { name: 'NEXT_TELEMETRY_DISABLED', value: '1' }
             { name: 'VERSION', value: initialImageTag }
+            { name: 'APP_ENV', value: environmentName == 'pilot' ? 'production' : 'staging' }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'web-applicationinsights-connection-string' }
           ]
           resources: {
             cpu: json(webCpu)
@@ -285,7 +303,7 @@ resource workerApp 'Microsoft.App/containerApps@2023-05-01' = if (enableWorker) 
             { name: 'REDIS_URL', secretRef: 'redis-url' }
           ]
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
         }
@@ -340,7 +358,7 @@ resource migrationJob 'Microsoft.App/jobs@2023-05-01' = {
             { name: 'DATABASE_URL', secretRef: 'database-url' }
           ]
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
         }
@@ -359,3 +377,7 @@ output apiPrincipalId string = apiApp.identity.principalId
 output webPrincipalId string = webApp.identity.principalId
 output workerPrincipalId string = enableWorker ? workerApp.identity.principalId : ''
 output migrationPrincipalId string = migrationJob.identity.principalId
+output managedEnvironmentId string = managedEnvironment.id
+output apiContainerAppId string = apiApp.id
+output webContainerAppId string = webApp.id
+

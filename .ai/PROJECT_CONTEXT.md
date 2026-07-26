@@ -557,3 +557,36 @@ Implementation facts:
 - Deployed smoke hooks cover API live/ready, web, widget iframe, and SDK alias availability. Full live FastAPI browser smoke remains TASK-068B4.
 - No production infrastructure, DNS, customer data, or customer pilot widget enablement has occurred.
 - Next recommended task: TASK-068B3 - Azure Monitor/Application Insights Integration, Privacy-Preserving Telemetry, Alerts, Uptime, and Operational Dashboards.
+## TASK-068B3 Implementation Facts
+
+TASK-068B3 implements the Azure observability layer for controlled-pilot readiness without running a live Azure deployment.
+
+Implementation facts:
+
+- Azure Monitor, Log Analytics, and workspace-based Application Insights remain the selected observability stack.
+- FastAPI has optional Azure Monitor OpenTelemetry initialization through `APPLICATIONINSIGHTS_CONNECTION_STRING` and `AZURE_MONITOR_OPEN_TELEMETRY_ENABLED`; telemetry export is fail-open and disabled unless configured.
+- Request telemetry uses normalized route templates, safe request IDs, service name, environment, and release version. Public widget operational events reuse the TASK-066B3 vocabulary.
+- Redaction now explicitly protects preview grants/tokens, draft configuration, provider prompts, connection strings, database URLs, signing keys, messages, answers, citations, and document contents.
+- Public widget and admin browser telemetry SDKs are not added. No session replay, DOM capture, behavioral analytics, message capture, draft capture, answer capture, or citation-content capture exists.
+- Public source maps are disabled for `apps/widget` and `packages/widget-sdk`; private source-map upload remains a future live-environment decision.
+- Azure Bicep now includes action-group and availability-test architecture plus server-side App Insights connection string injection for Container Apps. Diagnostic settings and KQL/workbook assets live under `infrastructure/azure/monitoring/` and `infrastructure/azure/modules/diagnostics.bicep`.
+- `npm run azure:observability:validate` statically verifies alert mapping, workbook/query assets, redaction/source-map policy, and telemetry configuration without Azure credentials. CI runs it with Azure validation.
+- Monitoring is configured in repository code, not verified live. TASK-068B4 must deploy staging, run live full-stack browser smoke, validate Azure telemetry/alerts/workbook behavior, and run the rollback drill.
+- Next recommended task: TASK-068B4 - Azure Staging Deployment, Live Full-Stack Browser Smoke, Synthetic Tenant Isolation, Monitoring Validation, and Rollback Drill.
+
+## TASK-068B4 Implementation Facts
+
+TASK-068B4 implements the repository harness for Azure staging live validation and rollback drill orchestration. Live Azure staging execution remains dependent on actual staging credentials, secure parameters, and approved Azure environment configuration.
+
+Implementation facts:
+
+- Added staging-only validation scripts: `azure-staging-validate.mjs`, `azure-live-browser-smoke.mjs`, `azure-telemetry-validate.mjs`, `azure-alert-validate.mjs`, and `azure-rollback-drill.mjs`.
+- Added npm commands: `azure:staging:validate`, `azure:staging:browser`, `azure:staging:telemetry`, `azure:staging:alerts`, and `azure:staging:rollback-drill`.
+- Added manual GitHub workflow `.github/workflows/azure-validate-staging.yml`, scoped to environment `staging` and OIDC; it does not run on pull requests and does not target production-pilot.
+- B4 scripts reject direct execution against `pilot`, `production`, `prod`, and `production-pilot`.
+- B4 scripts write redacted evidence under ignored `artifacts/azure-staging-validation/` and do not print secret values, tokens, connection strings, preview grants, messages, answers, citations, prompts, or draft values.
+- Added regression tests in `tests/deployment/azure-staging-validation.test.mjs` for staging-only execution, evidence redaction, blocked prerequisite reporting, and workflow guardrails.
+- Added `docs/06_Operations/Azure_Staging_Validation_and_Rollback_Drill_Runbook.md` and `docs/04_Engineering/Azure_Staging_Live_Validation_and_Rollback_Evidence.md`.
+- Updated Azure infrastructure, CI/CD, observability, release-readiness, admin-readiness, and security checklist docs to distinguish repository configured, staging verified, and production-pilot verified states.
+- Live staging deployment, Azure what-if, image push, migration job, static publication, telemetry validation, alert routing, and rollback execution must not be marked successful until a credentialed staging run produces evidence.
+- Do not recommend TASK-068B5 as executable until staging passes without unresolved critical blockers.

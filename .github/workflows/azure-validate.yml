@@ -1,4 +1,4 @@
-﻿name: Azure Validate
+name: Azure Validate
 
 on:
   pull_request:
@@ -9,6 +9,8 @@ on:
       - "scripts/publish-azure-widget-release.mjs"
       - "scripts/validate-deployment-manifest.mjs"
       - "scripts/validate-azure-infra.mjs"
+      - "scripts/validate-azure-observability.mjs"
+      - "infrastructure/azure/monitoring/**"
       - ".github/workflows/azure-*.yml"
       - "package.json"
   push:
@@ -21,6 +23,8 @@ on:
       - "scripts/publish-azure-widget-release.mjs"
       - "scripts/validate-deployment-manifest.mjs"
       - "scripts/validate-azure-infra.mjs"
+      - "scripts/validate-azure-observability.mjs"
+      - "infrastructure/azure/monitoring/**"
       - ".github/workflows/azure-*.yml"
       - "package.json"
 
@@ -43,6 +47,9 @@ jobs:
 
       - name: Run Azure static validation
         run: npm run infra:azure:validate
+
+      - name: Run Azure observability validation
+        run: npm run azure:observability:validate
 
       - name: Run Azure release tooling tests
         run: npm run azure:release:test

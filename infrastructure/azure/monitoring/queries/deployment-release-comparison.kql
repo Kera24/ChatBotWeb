@@ -1,0 +1,5 @@
+requests
+| where timestamp > ago(48h)
+| summarize total=count(), failures=countif(resultCode startswith '5'), p95_duration_ms=percentile(duration, 95) by release=tostring(customDimensions['service.version']), name, bin(timestamp, 30m)
+| extend failure_rate=todouble(failures) / todouble(total)
+| order by timestamp desc
