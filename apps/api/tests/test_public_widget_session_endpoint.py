@@ -16,6 +16,7 @@ from app.db.base import Base
 from app.db.models import ChatSession, Organisation, PublicSession, User, WidgetConfiguration, Workspace
 from app.db.session import get_db
 from app.main import create_app
+from route_helpers import route_paths
 
 
 class DenyRateLimitStore:
@@ -254,7 +255,7 @@ def test_rate_limited_and_redis_unavailable_fail_closed_before_session_creation(
 
 
 def test_public_widget_routes_are_limited_to_approved_surface(client: TestClient) -> None:
-    paths = {route.path for route in client.app.routes}
+    paths = route_paths(client.app.routes)
 
     assert "/api/v1/widget/{public_key}/sessions" in paths
     assert "/api/v1/widget/{public_key}/messages" in paths
