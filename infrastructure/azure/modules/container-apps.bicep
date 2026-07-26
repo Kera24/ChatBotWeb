@@ -303,7 +303,7 @@ resource workerApp 'Microsoft.App/containerApps@2023-05-01' = if (enableWorker) 
             { name: 'REDIS_URL', secretRef: 'redis-url' }
           ]
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
         }
@@ -358,7 +358,7 @@ resource migrationJob 'Microsoft.App/jobs@2023-05-01' = {
             { name: 'DATABASE_URL', secretRef: 'database-url' }
           ]
           resources: {
-            cpu: 0.5
+            cpu: json('0.5')
             memory: '1Gi'
           }
         }
@@ -380,3 +380,4 @@ output migrationPrincipalId string = migrationJob.identity.principalId
 output managedEnvironmentId string = managedEnvironment.id
 output apiContainerAppId string = apiApp.id
 output webContainerAppId string = webApp.id
+
