@@ -28,7 +28,7 @@ from app.access.origin_validation.service import OriginValidationService
 from app.access.policies.registry import default_policy_registry
 from app.access.rate_limit.client_ip import extract_client_ip, parse_trusted_proxy_networks
 from app.access.rate_limit.local_fallback import LocalFallbackLimiter
-from app.access.rate_limit.redis_store import create_redis_rate_limit_store
+from app.access.rate_limit.redis_store import InMemoryRateLimitStore, create_redis_rate_limit_store
 from app.access.rate_limit.service import RateLimitService
 from app.access.sessions.service import PublicSessionChecks, PublicSessionService
 from app.ai.rag_orchestrator import RAGOrchestrator, RAGOrchestratorDependencies
@@ -247,7 +247,12 @@ def _session_checks(db: Session) -> PublicSessionChecks:
 def _rate_limit_service(request: Request, event_sink: InMemoryAccessEventSink) -> RateLimitService:
     store = getattr(request.app.state, "public_widget_rate_limit_store", None)
     if store is None:
-        store = create_redis_rate_limit_store(redis_url=settings.REDIS_URL, timeout_seconds=settings.RATE_LIMIT_REDIS_TIMEOUT_SECONDS)
+        redis_url = settings.REDIS_URL.strip()
+        local_default_redis = redis_url == "redis://localhost:6379/0"
+        if settings.APP_ENV in {"development", "test", "testing"} and local_default_redis:
+            store = InMemoryRateLimitStore()
+        else:
+            store = create_redis_rate_limit_store(redis_url=redis_url, timeout_seconds=settings.RATE_LIMIT_REDIS_TIMEOUT_SECONDS)
     return RateLimitService(
         store=store,
         identity_secret=settings.RATE_LIMIT_IDENTITY_SECRET,
