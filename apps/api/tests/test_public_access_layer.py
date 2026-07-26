@@ -17,7 +17,6 @@ from app.access.policies.models import AccessPolicyProfile
 from app.access.policies.registry import AccessPolicyRegistry, DuplicatePolicyError, default_policy_registry
 from app.access.tenant_resolution.service import PublicTenantResolutionService, TenantResolutionChecks
 from app.main import create_app
-from route_helpers import route_paths
 
 
 def credential_record(
@@ -418,19 +417,9 @@ def test_gateway_registries_are_isolated_across_tests():
 
 def test_public_widget_routes_are_limited_to_approved_surface():
     app = create_app()
-    paths = route_paths(app.routes)
+    paths = {route.path for route in app.routes}
 
     assert "/api/v1/widget/{public_key}/sessions" in paths
     assert "/api/v1/widget/{public_key}/messages" in paths
     assert "/api/v1/widget/{public_key}/config" in paths
     assert not any(path.startswith("/api/v1/public-access") for path in paths)
-
-
-def test_route_path_discovery_ignores_non_route_entries():
-    class IncludedRouterLike:
-        pass
-
-    class RouteLike:
-        path = "/api/v1/widget/{public_key}/config"
-
-    assert route_paths([IncludedRouterLike(), RouteLike()]) == {"/api/v1/widget/{public_key}/config"}
