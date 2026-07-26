@@ -1,11 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.routing import APIRoute
 
 from app.ai.dependencies import create_ai_core
 from app.api.health import router as health_router
-from app.api.v1.router import api_v1_router
+from app.api.v1.router import API_V1_ROUTER_REGISTRATIONS
 from app.core.config import settings
 from app.operations.correlation import safe_request_id
 from app.operations.telemetry import configure_azure_monitor, normalise_route
+
+_REQUIRED_PUBLIC_ROUTES = {
+    "/api/v1/widget/{public_key}/config",
+    "/api/v1/widget/{public_key}/messages",
+    "/api/v1/widget/{public_key}/sessions",
+}
 
 
 def create_app() -> FastAPI:
@@ -27,8 +34,9 @@ def create_app() -> FastAPI:
         response.headers.setdefault("X-Request-ID", request_id)
         return response
 
-    app.include_router(health_router)
-    app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
+    _materialise_router(app, health_router)
+    for child_router, prefix, tags in API_V1_ROUTER_REGISTRATIONS:
+        _materialise_router(app, child_router, prefix=f"{settings.API_V1_PREFIX}{prefix}", tags=tags)
 
     @app.get("/health", tags=["system"])
     def health_check() -> dict[str, str]:
@@ -37,7 +45,55 @@ def create_app() -> FastAPI:
             "service": settings.SERVICE_NAME,
         }
 
+    _assert_required_routes(app)
     return app
+
+
+def _materialise_router(app: FastAPI, router: APIRouter, *, prefix: str = "", tags: list[str] | None = None) -> None:
+    normalized_prefix = _normalise_prefix(prefix)
+    for route in router.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        route_tags = [*(tags or []), *[tag for tag in route.tags if tag not in (tags or [])]]
+        app.add_api_route(
+            f"{normalized_prefix}{route.path}",
+            route.endpoint,
+            response_model=route.response_model,
+            status_code=route.status_code,
+            tags=route_tags,
+            dependencies=route.dependencies,
+            summary=route.summary,
+            description=route.description,
+            response_description=route.response_description,
+            responses=route.responses,
+            deprecated=route.deprecated,
+            methods=list(route.methods or []),
+            operation_id=route.operation_id,
+            response_model_include=route.response_model_include,
+            response_model_exclude=route.response_model_exclude,
+            response_model_by_alias=route.response_model_by_alias,
+            response_model_exclude_unset=route.response_model_exclude_unset,
+            response_model_exclude_defaults=route.response_model_exclude_defaults,
+            response_model_exclude_none=route.response_model_exclude_none,
+            include_in_schema=route.include_in_schema,
+            response_class=route.response_class,
+            name=route.name,
+            openapi_extra=route.openapi_extra,
+            generate_unique_id_function=route.generate_unique_id_function,
+        )
+
+
+def _normalise_prefix(prefix: str) -> str:
+    if not prefix:
+        return ""
+    return f"/{prefix.strip('/')}"
+
+
+def _assert_required_routes(app: FastAPI) -> None:
+    paths = {route.path for route in app.routes if isinstance(getattr(route, "path", None), str)}
+    missing = sorted(_REQUIRED_PUBLIC_ROUTES - paths)
+    if missing:
+        raise RuntimeError(f"Public widget route registration failed: {', '.join(missing)}")
 
 
 app = create_app()
