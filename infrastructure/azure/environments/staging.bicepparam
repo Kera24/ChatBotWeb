@@ -1,4 +1,4 @@
-﻿using '../main.bicep'
+using '../main.bicep'
 
 param environmentName = 'staging'
 param location = 'australiaeast'
@@ -20,7 +20,7 @@ param webCpu = '0.5'
 param webMemory = '1Gi'
 param minReplicas = 1
 param maxReplicas = 2
-param enableRedis = true
+param enableRedis = false
 param enableWorker = false
 param initialImageTag = 'bootstrap-placeholder'
 param githubRepository = 'Kera24/ChatBotWeb'

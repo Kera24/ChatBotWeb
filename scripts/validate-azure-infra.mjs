@@ -78,7 +78,10 @@ requireNotContains("postgres.bicep", postgres, "publicNetworkAccess: 'Enabled'")
 
 requireContains("storage.bicep", storage, "allowBlobPublicAccess: false");
 requireContains("storage.bicep", storage, "supportsHttpsTrafficOnly: true");
-requireContains("storage.bicep", storage, "staticWebsite");
+requireContains("storage.bicep", storage, "name: '$web'");
+requireContains("storage.bicep", storage, "primaryEndpoints.blob");
+requireContains("storage.bicep", storage, "widgetStaticOriginPath");
+requireNotContains("storage.bicep", storage, "staticWebsite");
 requireNotContains("storage.bicep", storage, "allowSharedKeyAccess: true");
 
 requireContains("key-vault.bicep", keyVault, "enableRbacAuthorization: true");

@@ -70,7 +70,7 @@ resource widgetStorage 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
   kind: 'StorageV2'
   properties: {
-    allowBlobPublicAccess: false
+    allowBlobPublicAccess: true
     allowSharedKeyAccess: false
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
@@ -90,11 +90,6 @@ resource widgetBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-
   parent: widgetStorage
   name: 'default'
   properties: {
-    staticWebsite: {
-      enabled: true
-      indexDocument: 'index.html'
-      error404Document: 'index.html'
-    }
     cors: {
       corsRules: [
         {
@@ -113,14 +108,15 @@ resource widgetContainer 'Microsoft.Storage/storageAccounts/blobServices/contain
   parent: widgetBlobService
   name: '$web'
   properties: {
-    publicAccess: 'None'
+    publicAccess: 'Blob'
   }
 }
 
 output documentStorageAccountName string = documentStorage.name
 output widgetStaticStorageAccountName string = widgetStorage.name
 output documentsContainerName string = documentsContainer.name
-output widgetStaticHostName string = replace(replace(widgetStorage.properties.primaryEndpoints.web, 'https://', ''), '/', '')
-output widgetStaticEndpoint string = widgetStorage.properties.primaryEndpoints.web
+output widgetStaticHostName string = replace(replace(widgetStorage.properties.primaryEndpoints.blob, 'https://', ''), '/', '')
+output widgetStaticEndpoint string = '${widgetStorage.properties.primaryEndpoints.blob}$web/'
+output widgetStaticOriginPath string = '/$web'
 output documentStorageAccountId string = documentStorage.id
 output widgetStaticStorageAccountId string = widgetStorage.id

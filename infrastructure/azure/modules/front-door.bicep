@@ -9,6 +9,7 @@ param cdnHostName string
 param webContainerAppFqdn string
 param apiContainerAppFqdn string
 param widgetStaticHostName string
+param widgetStaticOriginPath string
 param tags object
 
 var profileName = '${namePrefix}-${environmentName}-afd'
@@ -79,7 +80,7 @@ resource staticOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
       additionalLatencyInMilliseconds: 50
     }
     healthProbeSettings: {
-      probePath: '/'
+      probePath: '${widgetStaticOriginPath}/'
       probeRequestType: 'HEAD'
       probeProtocol: 'Https'
       probeIntervalInSeconds: 120
@@ -125,6 +126,7 @@ resource widgetStaticOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05
     httpPort: 80
     httpsPort: 443
     originHostHeader: widgetStaticHostName
+    originPath: widgetStaticOriginPath
     priority: 1
     weight: 1000
     enabledState: 'Enabled'

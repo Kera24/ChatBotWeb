@@ -71,7 +71,7 @@ param minReplicas int = 1
 @description('Maximum replicas for API and web apps.')
 param maxReplicas int = 3
 
-@description('Provision Azure Cache for Redis for distributed public rate limiting and queues.')
+@description('Provision managed Redis for distributed public rate limiting and queues. Disabled for staging until Azure Managed Redis is wired.')
 param enableRedis bool = true
 
 @description('Provision a no-ingress worker Container App placeholder for future ingestion/embedding jobs.')
@@ -120,7 +120,7 @@ module monitoring 'modules/monitoring.bicep' = {
     location: location
     namePrefix: namePrefix
     environmentName: environmentName
-    logRetentionDays: environmentName == 'pilot' ? 30 : 14
+    logRetentionDays: environmentName == 'pilot' ? 30 : 7
     tags: tags
   }
 }
@@ -133,6 +133,7 @@ module registry 'modules/container-registry.bicep' = {
     namePrefix: namePrefix
     environmentName: environmentName
     tags: tags
+    skuName: environmentName == 'staging' ? 'Basic' : 'Standard'
   }
 }
 
@@ -234,6 +235,7 @@ module frontDoor 'modules/front-door.bicep' = {
     webContainerAppFqdn: apps.outputs.webFqdn
     apiContainerAppFqdn: apps.outputs.apiFqdn
     widgetStaticHostName: storage.outputs.widgetStaticHostName
+    widgetStaticOriginPath: storage.outputs.widgetStaticOriginPath
     tags: tags
   }
 }
