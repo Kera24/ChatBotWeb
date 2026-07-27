@@ -131,11 +131,13 @@ requireNotContains("apps/web/Dockerfile", webDockerfile, "npm run dev");
 requireContains("apps/web/Dockerfile", webDockerfile, "npm run build");
 requireContains("apps/web/Dockerfile", webDockerfile, "USER nextjs");
 
-const outputSecretPattern = /output\s+\w*(secret|password|connectionstring|sharedkey)\w*\s+string/iu;
+const sensitiveOutputPattern = /^\s*output\s+\w*(secret|password|connectionstring|sharedkey)\w*\s+string\b/iu;
 for (const file of requiredFiles.filter((file) => file.endsWith(".bicep"))) {
-  const content = read(file);
-  if (outputSecretPattern.test(content) && !content.includes("@secure()\noutput logAnalyticsSharedKey")) {
-    failures.push(`${file} appears to output a sensitive value without an explicit secure-output exception.`);
+  const lines = read(file).split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    if (sensitiveOutputPattern.test(lines[index]) && !/^\s*@secure\(\)\s*$/.test(lines[index - 1] ?? "")) {
+      failures.push(`${file} appears to output a sensitive value without @secure(): ${lines[index].trim()}`);
+    }
   }
 }
 

@@ -42,5 +42,6 @@ output logAnalyticsCustomerId string = workspace.properties.customerId
 output logAnalyticsSharedKey string = workspace.listKeys().primarySharedKey
 output applicationInsightsName string = appInsights.name
 output applicationInsightsId string = appInsights.id
+@secure()
 output applicationInsightsConnectionString string = appInsights.properties.ConnectionString
 

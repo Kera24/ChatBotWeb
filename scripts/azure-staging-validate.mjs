@@ -1,10 +1,13 @@
 #!/usr/bin/env node
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join, relative } from "node:path";
 import process from "node:process";
 import {
   baseEvidence,
   collectAzurePrerequisites,
   commandResult,
   parseStagingArgs,
+  repoRoot,
   writeStagingEvidence,
 } from "./azure-staging-lib.mjs";
 
@@ -12,6 +15,8 @@ const { args, environment, execute } = parseStagingArgs();
 const prerequisites = collectAzurePrerequisites();
 const deploymentName = String(args["deployment-name"] ?? `task-068b4-staging-${Date.now()}`);
 const resourceGroup = String(process.env.AZURE_RESOURCE_GROUP ?? "yoranix-staging-rg");
+const stagingParameterFile = join(repoRoot, "infrastructure/azure/environments/staging.bicepparam");
+const temporaryParameterDirectory = join(repoRoot, "infrastructure/azure/environments");
 
 const infrastructure = {
   ...baseEvidence("infrastructure", environment),
@@ -37,38 +42,39 @@ const infrastructure = {
 };
 
 if (prerequisites.status === "ready") {
-  const whatIfArgs = [
-    "deployment",
-    "sub",
-    "what-if",
-    "--location",
-    infrastructure.region,
-    "--template-file",
-    "infrastructure/azure/main.bicep",
-    "--parameters",
-    "infrastructure/azure/environments/staging.bicepparam",
-    "--parameters",
-    "postgresAdministratorPassword=$AZURE_POSTGRES_ADMIN_PASSWORD",
-  ];
   if (execute) {
-    const whatIf = commandResult("az", whatIfArgs, { env: process.env });
-    infrastructure.what_if = {
-      status: whatIf.status === 0 ? "completed" : "failed",
-      exit_code: whatIf.status,
-      summary: summarizeWhatIf(whatIf.stdout),
-      error: whatIf.status === 0 ? null : firstLine(whatIf.stderr || whatIf.stdout),
-    };
-    if (whatIf.status !== 0) {
-      infrastructure.deployment.status = "blocked_by_what_if_failure";
-    } else {
-      infrastructure.deployment.status = "not_executed_by_repository_script";
-      infrastructure.deployment.note =
-        "TASK-068B4 repository harness captured what-if evidence. Live deployment remains in the protected workflow/operator runbook.";
+    let temporaryParameterFile = null;
+    try {
+      temporaryParameterFile = createTemporaryStagingParameterFile();
+      const whatIfArgs = buildWhatIfArgs(infrastructure.region, relative(repoRoot, temporaryParameterFile));
+      const whatIf = commandResult("az", whatIfArgs, { env: process.env });
+      const errorContext = commandErrorContext(whatIf.stderr || whatIf.stdout);
+      infrastructure.what_if = {
+        status: whatIf.status === 0 ? "completed" : "failed",
+        exit_code: whatIf.status,
+        summary: summarizeWhatIf(whatIf.stdout),
+        parameter_file: basename(temporaryParameterFile),
+        command: redactCommand(whatIfArgs),
+        error: whatIf.status === 0 ? null : errorContext.final_line,
+        error_context: whatIf.status === 0 ? [] : errorContext.lines,
+      };
+      if (whatIf.status !== 0) {
+        infrastructure.deployment.status = "blocked_by_what_if_failure";
+      } else {
+        infrastructure.deployment.status = "not_executed_by_repository_script";
+        infrastructure.deployment.note =
+          "TASK-068B4 repository harness captured what-if evidence. Live deployment remains in the protected workflow/operator runbook.";
+      }
+    } finally {
+      if (temporaryParameterFile) {
+        rmSync(temporaryParameterFile, { force: true });
+      }
     }
   } else {
     infrastructure.what_if = {
       status: "planned_not_executed",
-      command: redactCommand(whatIfArgs),
+      command: redactCommand(buildWhatIfArgs(infrastructure.region, "<temporary-staging-bicepparam>")),
+      parameter_file: "created at runtime and deleted after what-if",
     };
     infrastructure.deployment.status = "dry_run_only";
   }
@@ -114,6 +120,36 @@ console.log(JSON.stringify(report, null, 2));
 
 if (execute && report.overall_status !== "configured") process.exit(1);
 
+function createTemporaryStagingParameterFile() {
+  if (!existsSync(stagingParameterFile)) {
+    throw new Error(`Staging parameter file not found: ${relative(repoRoot, stagingParameterFile)}`);
+  }
+  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const temporaryParameterFile = join(temporaryParameterDirectory, `.staging-${suffix}.generated.bicepparam`);
+  const baseContent = readFileSync(stagingParameterFile, "utf8").replace(/\s+$/, "");
+  const overlay = [
+    baseContent,
+    "",
+    "param postgresAdministratorPassword =",
+    "  readEnvironmentVariable('AZURE_POSTGRES_ADMIN_PASSWORD')",
+    "",
+  ].join("\n");
+  writeFileSync(temporaryParameterFile, overlay, { encoding: "utf8", flag: "wx" });
+  return temporaryParameterFile;
+}
+
+function buildWhatIfArgs(region, parameterFile) {
+  return [
+    "deployment",
+    "sub",
+    "what-if",
+    "--location",
+    region,
+    "--parameters",
+    parameterFile,
+  ];
+}
+
 function summarizeWhatIf(stdout) {
   const text = String(stdout ?? "");
   return {
@@ -131,9 +167,34 @@ function countWord(text, word) {
 }
 
 function redactCommand(parts) {
-  return ["az", ...parts].map((part) => (String(part).includes("postgresAdministratorPassword=") ? "postgresAdministratorPassword=<redacted>" : part));
+  return ["az", ...parts].map((part) => {
+    const value = String(part);
+    if (value.includes("postgresAdministratorPassword=")) return "postgresAdministratorPassword=<redacted>";
+    if (value.includes("AZURE_POSTGRES_ADMIN_PASSWORD")) return value.replace(/AZURE_POSTGRES_ADMIN_PASSWORD/g, "<redacted-env-var>");
+    return value;
+  });
 }
 
-function firstLine(value) {
-  return String(value ?? "").split(/\r?\n/).find(Boolean)?.trim() ?? "";
+function commandErrorContext(value) {
+  const lines = String(value ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const meaningful = lines.filter((line) => !/^WARNING[:\s]/i.test(line));
+  const selected = (meaningful.length ? meaningful : lines).slice(-8).map((line) => redactSafeLine(line));
+  return {
+    lines: selected,
+    final_line: selected.at(-1) ?? "",
+  };
+}
+
+function redactSafeLine(line) {
+  return String(line)
+    .replace(/(postgresAdministratorPassword\s*=\s*)[^\s]+/gi, "$1<redacted>")
+    .replace(new RegExp(escapeRegExp(process.env.AZURE_POSTGRES_ADMIN_PASSWORD || "__unset_secret__"), "g"), "<redacted>")
+    .replace(/(password|secret|token|connection.?string|authorization|cookie|session|preview|grant|key|credential)=([^\s]+)/gi, "$1=<redacted>");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

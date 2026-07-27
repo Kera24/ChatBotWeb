@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, delimiter } from "node:path";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import test from "node:test";
 
 const root = process.cwd();
 const evidenceRoot = join(root, "artifacts/azure-staging-validation");
+const environmentDir = join(root, "infrastructure/azure/environments");
 
 function run(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -53,6 +55,63 @@ test("B4 validation writes blocked evidence without secret values", () => {
   assert.equal(report.classification, "staging deployment blocked before execution");
 });
 
+test("staging what-if uses a temporary bicepparam file and never shell-expanded password arguments", () => {
+  rmSync(evidenceRoot, { recursive: true, force: true });
+  const fake = createFakeAz("success");
+  const secret = "postgres-password-never-log";
+  const result = run(["scripts/azure-staging-validate.mjs", "--environment", "staging", "--execute"], {
+    env: fakeEnv(fake.binDir, {
+      AZURE_SUBSCRIPTION_ID: "sub-staging",
+      AZURE_TENANT_ID: "tenant-staging",
+      AZURE_POSTGRES_ADMIN_PASSWORD: secret,
+      AZURE_LOCATION: "australiaeast",
+    }),
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+
+  const calls = readFakeAzCalls(fake.callsPath);
+  const whatIf = calls.find((call) => call.args.slice(0, 3).join(" ") === "deployment sub what-if");
+  assert.ok(whatIf, "expected az deployment sub what-if to be invoked");
+  assert.ok(whatIf.args.includes("--parameters"));
+  assert.ok(!whatIf.args.includes("--template-file"));
+  assert.ok(whatIf.args.every((arg) => !arg.includes("$AZURE_POSTGRES_ADMIN_PASSWORD")));
+  assert.ok(whatIf.args.every((arg) => !arg.includes(secret)));
+  assert.ok(whatIf.parameterFile.endsWith(".generated.bicepparam"));
+  assert.equal(whatIf.parameterContent.includes("using '../main.bicep'"), true);
+  assert.equal(whatIf.parameterContent.includes("readEnvironmentVariable('AZURE_POSTGRES_ADMIN_PASSWORD')"), true);
+  assert.equal(existsSync(whatIf.parameterFile), false, "temporary bicepparam should be deleted after what-if");
+  assert.equal(findGeneratedParameterFiles().length, 0);
+
+  const infrastructureText = readFileSync(join(evidenceRoot, "infrastructure.json"), "utf8");
+  assert.doesNotMatch(infrastructureText, new RegExp(secret));
+  assert.doesNotMatch(infrastructureText, /\$AZURE_POSTGRES_ADMIN_PASSWORD/);
+  const infrastructure = JSON.parse(infrastructureText);
+  assert.equal(infrastructure.what_if.status, "completed");
+  assert.ok(infrastructure.what_if.summary.create_count > 0);
+});
+
+test("staging what-if captures final Bicep error context instead of only first warning", () => {
+  rmSync(evidenceRoot, { recursive: true, force: true });
+  const fake = createFakeAz("bcp-error");
+  const secret = "do-not-print-this-password";
+  const result = run(["scripts/azure-staging-validate.mjs", "--environment", "staging", "--execute"], {
+    env: fakeEnv(fake.binDir, {
+      AZURE_SUBSCRIPTION_ID: "sub-staging",
+      AZURE_TENANT_ID: "tenant-staging",
+      AZURE_POSTGRES_ADMIN_PASSWORD: secret,
+    }),
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const infrastructureText = readFileSync(join(evidenceRoot, "infrastructure.json"), "utf8");
+  assert.doesNotMatch(infrastructureText, new RegExp(secret));
+  const infrastructure = JSON.parse(infrastructureText);
+  assert.equal(infrastructure.what_if.status, "failed");
+  assert.match(infrastructure.what_if.error, /BCP035/);
+  assert.ok(infrastructure.what_if.error_context.some((line) => /BCP035/.test(line)));
+  assert.ok(!/^WARNING/.test(infrastructure.what_if.error));
+  assert.equal(findGeneratedParameterFiles().length, 0);
+});
+
 test("live validation wrappers record missing prerequisites safely", () => {
   rmSync(evidenceRoot, { recursive: true, force: true });
   const browser = run(["scripts/azure-live-browser-smoke.mjs", "--environment", "staging"]);
@@ -82,3 +141,70 @@ test("staging validation workflow is manual, staging-scoped, and never productio
   assert.match(content, /npm run azure:staging:validate/);
   assert.match(content, /npm run azure:staging:rollback-drill/);
 });
+
+function createFakeAz(mode) {
+  const dir = join(tmpdir(), `fake-az-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  const binDir = join(dir, "bin");
+  mkdirSync(binDir, { recursive: true });
+  const callsPath = join(dir, "calls.jsonl");
+  const scriptPath = join(binDir, process.platform === "win32" ? "az.cmd" : "az");
+  const nodeScript = join(dir, "fake-az.mjs");
+  writeFileSync(
+    nodeScript,
+    `import { appendFileSync, readFileSync } from "node:fs";\n` +
+      `const callsPath = ${JSON.stringify(callsPath)};\n` +
+      `const mode = ${JSON.stringify(mode)};\n` +
+      `const args = process.argv.slice(2);\n` +
+      `let parameterFile = null;\n` +
+      `let parameterContent = null;\n` +
+      `for (let i = 0; i < args.length; i += 1) {\n` +
+      `  if (args[i] === "--parameters") parameterFile = args[i + 1];\n` +
+      `}\n` +
+      `if (parameterFile && parameterFile.endsWith(".bicepparam")) parameterContent = readFileSync(parameterFile, "utf8");\n` +
+      `appendFileSync(callsPath, JSON.stringify({ args, parameterFile, parameterContent }) + "\\n");\n` +
+      `if (args[0] === "--version") { console.log("azure-cli 2.99.0"); process.exit(0); }\n` +
+      `if (args[0] === "bicep" && args[1] === "version") { console.log("Bicep CLI version 0.99.0"); process.exit(0); }\n` +
+      `if (args[0] === "account" && args[1] === "show") { console.log(JSON.stringify({ id: process.env.AZURE_SUBSCRIPTION_ID, tenantId: process.env.AZURE_TENANT_ID || "tenant", name: "staging" })); process.exit(0); }\n` +
+      `if (args.slice(0, 3).join(" ") === "deployment sub what-if") {\n` +
+      `  if (mode === "success") { console.log("Resource changes: Create api\\nCreate web\\nModify logs"); process.exit(0); }\n` +
+      `  console.error("WARNING: Optional provider metadata was not available.");\n` +
+      `  console.error("WARNING: Another warning that should not hide the error.");\n` +
+      `  console.error("/tmp/main.bicep(40,7) : Error BCP035: The specified parameter postgresAdministratorPassword is required.");\n` +
+      `  process.exit(1);\n` +
+      `}\n` +
+      `console.error("unexpected az args " + args.join(" "));\n` +
+      `process.exit(2);\n`,
+    "utf8",
+  );
+  if (process.platform === "win32") {
+    writeFileSync(scriptPath, `@echo off\n"${process.execPath}" "${nodeScript}" %*\n`, "utf8");
+  } else {
+    writeFileSync(scriptPath, `#!/bin/sh\nexec "${process.execPath}" "${nodeScript}" "$@"\n`, { mode: 0o755 });
+  }
+  return { binDir, callsPath };
+}
+
+function fakeEnv(binDir, values) {
+  return {
+    ...process.env,
+    ...values,
+    PATH: `${binDir}${delimiter}${process.env.PATH}`,
+  };
+}
+
+function readFakeAzCalls(callsPath) {
+  return readFileSync(callsPath, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+function findGeneratedParameterFiles() {
+  return spawnSync(process.execPath, ["-e", `const { readdirSync } = require('node:fs'); const { join } = require('node:path'); const dir = ${JSON.stringify(environmentDir)}; console.log(JSON.stringify(readdirSync(dir).filter((name) => name.endsWith('.generated.bicepparam')).map((name) => join(dir, name))));`], {
+    cwd: root,
+    encoding: "utf8",
+  }).stdout.trim()
+    ? JSON.parse(spawnSync(process.execPath, ["-e", `const { readdirSync } = require('node:fs'); const { join } = require('node:path'); const dir = ${JSON.stringify(environmentDir)}; console.log(JSON.stringify(readdirSync(dir).filter((name) => name.endsWith('.generated.bicepparam')).map((name) => join(dir, name))));`], { cwd: root, encoding: "utf8" }).stdout)
+    : [];
+}
