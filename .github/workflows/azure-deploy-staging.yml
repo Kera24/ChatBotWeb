@@ -1,4 +1,4 @@
-﻿name: Azure Deploy Staging
+name: Azure Deploy Staging
 
 on:
   workflow_dispatch:
@@ -10,19 +10,19 @@ on:
       deploy_infrastructure:
         description: Run Bicep what-if and deploy staging infrastructure
         required: true
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
-      deploy_application:
-        description: Build/push images, run migration job, deploy app revisions, and publish static artifacts
-        required: true
         default: "true"
         type: choice
         options:
           - "true"
           - "false"
+      deploy_application:
+        description: Build/push images, run migration job, deploy app revisions, and publish static artifacts
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: read
@@ -92,27 +92,85 @@ jobs:
         run: npm run infra:azure:whatif -- staging
 
       - name: Deploy staging infrastructure
+        id: infrastructure
         if: ${{ inputs.deploy_infrastructure == 'true' }}
         env:
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'australiaeast' }}
           AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
         run: |
+          set -euo pipefail
+          mkdir -p artifacts/azure-deployment/staging
+          TEMP_BICEPPARAM="$(mktemp infrastructure/azure/environments/.staging-deploy-XXXXXX.generated.bicepparam)"
+          cleanup() {
+            rm -f "$TEMP_BICEPPARAM"
+          }
+          trap cleanup EXIT
+          cp infrastructure/azure/environments/staging.bicepparam "$TEMP_BICEPPARAM"
+          cat >> "$TEMP_BICEPPARAM" <<'BICEP_PARAM_OVERLAY'
+
+          param postgresAdministratorPassword = readEnvironmentVariable('AZURE_POSTGRES_ADMIN_PASSWORD')
+          BICEP_PARAM_OVERLAY
+          OUTPUTS_FILE="artifacts/azure-deployment/staging/infrastructure-outputs.json"
           az deployment sub create \
-            --location "${{ vars.AZURE_LOCATION || 'australiaeast' }}" \
-            --template-file infrastructure/azure/main.bicep \
-            --parameters infrastructure/azure/environments/staging.bicepparam \
-            --parameters postgresAdministratorPassword="$AZURE_POSTGRES_ADMIN_PASSWORD"
+            --location "$AZURE_LOCATION" \
+            --parameters "$TEMP_BICEPPARAM" \
+            --query properties.outputs \
+            -o json > "$OUTPUTS_FILE"
+          ACR_LOGIN_SERVER="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.acrLoginServer?.value || '')" "$OUTPUTS_FILE")"
+          RESOURCE_GROUP="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.resourceGroupName?.value || '')" "$OUTPUTS_FILE")"
+          if [ -z "$ACR_LOGIN_SERVER" ]; then
+            echo "Infrastructure deployment did not return acrLoginServer output." >&2
+            exit 1
+          fi
+          ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+          echo "acr_name=$ACR_NAME" >> "$GITHUB_OUTPUT"
+          echo "acr_login_server=$ACR_LOGIN_SERVER" >> "$GITHUB_OUTPUT"
+          echo "resource_group=$RESOURCE_GROUP" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve staging Azure resources
+        id: azure_resources
+        if: ${{ inputs.deploy_application == 'true' }}
+        env:
+          ACR_NAME: ${{ steps.infrastructure.outputs.acr_name || vars.AZURE_ACR_NAME }}
+          ACR_LOGIN_SERVER: ${{ steps.infrastructure.outputs.acr_login_server || vars.AZURE_ACR_LOGIN_SERVER }}
+          AZURE_RESOURCE_GROUP: ${{ steps.infrastructure.outputs.resource_group || vars.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          ACR_NAME="${ACR_NAME:-}"
+          ACR_LOGIN_SERVER="${ACR_LOGIN_SERVER:-}"
+          if [ -z "$ACR_NAME" ] && [ -n "$ACR_LOGIN_SERVER" ]; then
+            ACR_NAME="${ACR_LOGIN_SERVER%%.*}"
+          fi
+          if [ -z "$ACR_NAME" ]; then
+            echo "AZURE_ACR_NAME is blank and no ACR name was produced by the infrastructure deployment. Run with deploy_infrastructure=true or configure AZURE_ACR_NAME." >&2
+            exit 1
+          fi
+          RESOLVED_LOGIN_SERVER="$(az acr show --name "$ACR_NAME" --query loginServer -o tsv 2>/dev/null || true)"
+          if [ -z "$RESOLVED_LOGIN_SERVER" ] && [ -n "${AZURE_RESOURCE_GROUP:-}" ]; then
+            RESOLVED_LOGIN_SERVER="$(az acr show --resource-group "$AZURE_RESOURCE_GROUP" --name "$ACR_NAME" --query loginServer -o tsv 2>/dev/null || true)"
+          fi
+          if [ -z "$RESOLVED_LOGIN_SERVER" ]; then
+            echo "Azure Container Registry '$ACR_NAME' was not found or is not accessible in the selected subscription." >&2
+            exit 1
+          fi
+          echo "acr_name=$ACR_NAME" >> "$GITHUB_OUTPUT"
+          echo "acr_login_server=$RESOLVED_LOGIN_SERVER" >> "$GITHUB_OUTPUT"
 
       - name: Login to ACR
         if: ${{ inputs.deploy_application == 'true' }}
-        run: az acr login --name "${{ vars.AZURE_ACR_NAME }}"
+        run: az acr login --name "${{ steps.azure_resources.outputs.acr_name }}"
 
       - name: Build and push immutable images
         if: ${{ inputs.deploy_application == 'true' }}
         id: images
         env:
-          ACR_LOGIN_SERVER: ${{ vars.AZURE_ACR_LOGIN_SERVER }}
+          ACR_LOGIN_SERVER: ${{ steps.azure_resources.outputs.acr_login_server }}
         run: |
           set -euo pipefail
+          if [ -z "$ACR_LOGIN_SERVER" ]; then
+            echo "ACR login server was not resolved; refusing to build application images." >&2
+            exit 1
+          fi
           SHA="${GITHUB_SHA}"
           API_IMAGE="$ACR_LOGIN_SERVER/chatbotweb-api:$SHA"
           WEB_IMAGE="$ACR_LOGIN_SERVER/chatbotweb-web:$SHA"
@@ -163,5 +221,3 @@ jobs:
             artifacts/widget-release
           if-no-files-found: ignore
           retention-days: 14
-
-

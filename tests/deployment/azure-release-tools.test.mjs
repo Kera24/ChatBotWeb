@@ -160,3 +160,19 @@ test("Azure deployment workflows keep OIDC, approvals, concurrency, and no lates
   assert.match(pilot, /Download staged release artifact/);
   assert.match(rollback, /execute/);
 });
+
+test("staging deployment workflow defaults to infrastructure-only and uses secure what-if parameters", () => {
+  const staging = readFileSync(join(root, ".github/workflows/azure-deploy-staging.yml"), "utf8");
+  assert.match(staging, /deploy_infrastructure:[\s\S]*?default: "true"/);
+  assert.match(staging, /deploy_application:[\s\S]*?default: "false"/);
+  assert.match(staging, /mktemp infrastructure\/azure\/environments\/\.staging-deploy-XXXXXX\.generated\.bicepparam/);
+  assert.match(staging, /readEnvironmentVariable\('AZURE_POSTGRES_ADMIN_PASSWORD'\)/);
+  assert.match(staging, /trap cleanup EXIT/);
+  assert.match(staging, /az deployment sub create[\s\S]*--parameters "\$TEMP_BICEPPARAM"/);
+  assert.doesNotMatch(staging, /--template-file infrastructure\/azure\/main\.bicep/);
+  assert.doesNotMatch(staging, /postgresAdministratorPassword="?\$AZURE_POSTGRES_ADMIN_PASSWORD/);
+  assert.match(staging, /AZURE_ACR_NAME is blank/);
+  assert.match(staging, /az acr show --name "\$ACR_NAME"/);
+  assert.match(staging, /az acr login --name "\$\{\{ steps\.azure_resources\.outputs\.acr_name \}\}"/);
+  assert.match(staging, /ACR_LOGIN_SERVER: \$\{\{ steps\.azure_resources\.outputs\.acr_login_server \}\}/);
+});
