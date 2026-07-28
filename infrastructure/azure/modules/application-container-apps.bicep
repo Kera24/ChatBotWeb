@@ -13,6 +13,7 @@ param apiHostName string
 param widgetApiHostName string
 param widgetHostName string
 param cdnHostName string
+param enableRedis bool
 param apiCpu string = '1.0'
 param apiMemory string = '2Gi'
 param webCpu string = '0.5'
@@ -25,6 +26,13 @@ var apiName = '${namePrefix}-${environmentName}-ca-api'
 var webName = '${namePrefix}-${environmentName}-ca-web'
 var keyVaultUri = 'https://${keyVaultName}.vault.azure.net'
 var releaseVersion = last(split(apiImage, ':'))
+var redisSecrets = enableRedis ? [
+  { name: 'redis-url', keyVaultUrl: '${keyVaultUri}/secrets/api-redis-url', identity: apiIdentityId }
+] : []
+var redisEnvironment = enableRedis ? [
+  { name: 'REDIS_URL', secretRef: 'redis-url' }
+] : []
+var rateLimitLocalFallbackEnabled = enableRedis ? 'false' : (environmentName == 'staging' ? 'true' : 'false')
 
 resource managedEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: managedEnvironmentName
@@ -50,15 +58,14 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
           identity: apiIdentityId
         }
       ]
-      secrets: [
+      secrets: concat([
         { name: 'database-url', keyVaultUrl: '${keyVaultUri}/secrets/api-database-url', identity: apiIdentityId }
-        { name: 'redis-url', keyVaultUrl: '${keyVaultUri}/secrets/api-redis-url', identity: apiIdentityId }
         { name: 'rate-limit-identity-secret', keyVaultUrl: '${keyVaultUri}/secrets/rate-limit-identity-secret', identity: apiIdentityId }
         { name: 'public-session-token-hash-secret', keyVaultUrl: '${keyVaultUri}/secrets/public-session-token-hash-secret', identity: apiIdentityId }
         { name: 'public-message-idempotency-hash-secret', keyVaultUrl: '${keyVaultUri}/secrets/public-message-idempotency-hash-secret', identity: apiIdentityId }
         { name: 'preview-grant-signing-secret', keyVaultUrl: '${keyVaultUri}/secrets/preview-grant-signing-secret', identity: apiIdentityId }
         { name: 'applicationinsights-connection-string', keyVaultUrl: '${keyVaultUri}/secrets/applicationinsights-connection-string', identity: apiIdentityId }
-      ]
+      ], redisSecrets)
       ingress: {
         external: true
         targetPort: 8000
@@ -72,14 +79,13 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
         {
           name: 'api'
           image: apiImage
-          env: [
+          env: concat([
             { name: 'APP_ENV', value: environmentName == 'pilot' ? 'production' : 'staging' }
             { name: 'PHASE', value: 'controlled-pilot' }
             { name: 'SERVICE_NAME', value: 'chatbotweb-api' }
             { name: 'VERSION', value: releaseVersion }
             { name: 'API_V1_PREFIX', value: '/api/v1' }
             { name: 'DATABASE_URL', secretRef: 'database-url' }
-            { name: 'REDIS_URL', secretRef: 'redis-url' }
             { name: 'RATE_LIMIT_IDENTITY_SECRET', secretRef: 'rate-limit-identity-secret' }
             { name: 'PUBLIC_SESSION_TOKEN_HASH_SECRET', secretRef: 'public-session-token-hash-secret' }
             { name: 'PUBLIC_MESSAGE_IDEMPOTENCY_HASH_SECRET', secretRef: 'public-message-idempotency-hash-secret' }
@@ -87,12 +93,12 @@ resource apiApp 'Microsoft.App/containerApps@2023-05-01' = {
             { name: 'PUBLIC_WIDGETS_ENABLED', value: 'true' }
             { name: 'PUBLIC_WIDGET_MESSAGES_ENABLED', value: 'true' }
             { name: 'PUBLIC_WIDGET_PILOT_ENFORCEMENT_ENABLED', value: environmentName == 'pilot' ? 'true' : 'false' }
-            { name: 'RATE_LIMIT_LOCAL_FALLBACK_ENABLED', value: 'false' }
+            { name: 'RATE_LIMIT_LOCAL_FALLBACK_ENABLED', value: rateLimitLocalFallbackEnabled }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'applicationinsights-connection-string' }
             { name: 'AZURE_MONITOR_OPEN_TELEMETRY_ENABLED', value: 'true' }
             { name: 'AZURE_MONITOR_REQUIRE_CONNECTION_STRING', value: 'true' }
             { name: 'AZURE_MONITOR_SAMPLING_RATIO', value: '1.0' }
-          ]
+          ], redisEnvironment)
           resources: { cpu: json(apiCpu), memory: apiMemory }
           probes: [
             { type: 'Liveness', httpGet: { path: '/health/live', port: 8000, scheme: 'HTTP' }, initialDelaySeconds: 15, periodSeconds: 30, timeoutSeconds: 5, failureThreshold: 3 }

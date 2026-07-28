@@ -101,6 +101,21 @@ requireContains("application-container-apps.bicep", appWorkloads, "/health/live"
 requireContains("application-container-apps.bicep", appWorkloads, "/health/ready");
 requireContains("application-container-apps.bicep", appWorkloads, "keyVaultUrl");
 requireContains("application-container-apps.bicep", appWorkloads, "UserAssigned");
+requireContains("application-container-apps.bicep", appWorkloads, "param enableRedis bool");
+requireContains("application-container-apps.bicep", appWorkloads, "redisSecrets = enableRedis ?");
+requireContains("application-container-apps.bicep", appWorkloads, "redisEnvironment = enableRedis ?");
+requireContains("application-container-apps.bicep", appWorkloads, "rateLimitLocalFallbackEnabled = enableRedis ? 'false' : (environmentName == 'staging' ? 'true' : 'false')");
+const apiSecretBlock = appWorkloads.slice(appWorkloads.indexOf("secrets: concat(["), appWorkloads.indexOf("], redisSecrets)"));
+if (apiSecretBlock.includes("api-redis-url") || apiSecretBlock.includes("redis-url")) {
+  failures.push("application-container-apps.bicep must not include Redis secrets in the base API secret list when staging has Redis disabled.");
+}
+const apiEnvBlock = appWorkloads.slice(appWorkloads.indexOf("env: concat(["), appWorkloads.indexOf("], redisEnvironment)"));
+if (apiEnvBlock.includes("REDIS_URL")) {
+  failures.push("application-container-apps.bicep must not include REDIS_URL in the base API environment list when staging has Redis disabled.");
+}
+requireContains("staging.bicepparam", stagingParams, "param enableRedis = false");
+requireContains("azure-deploy-apps.mjs", read("scripts/azure-deploy-apps.mjs"), "environment === \"staging\" ? \"false\" : \"true\"");
+requireContains("azure-deploy-apps.mjs", read("scripts/azure-deploy-apps.mjs"), "`enableRedis=${enableRedis}`");
 requireContains("migration-job.bicep", migrationJob, "Microsoft.App/jobs");
 requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "AcrPull");
 requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "KeyVaultSecretsUser");

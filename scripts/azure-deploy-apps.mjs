@@ -24,6 +24,7 @@ const apiHostName = String(args["api-host-name"] ?? process.env.STAGING_API_HOST
 const widgetApiHostName = String(args["widget-api-host-name"] ?? process.env.STAGING_WIDGET_API_HOST_NAME ?? "widget-api.staging.example.invalid");
 const widgetHostName = String(args["widget-host-name"] ?? process.env.STAGING_WIDGET_HOST_NAME ?? "widget.staging.example.invalid");
 const cdnHostName = String(args["cdn-host-name"] ?? process.env.STAGING_CDN_HOST_NAME ?? "cdn.staging.example.invalid");
+const enableRedis = parseBoolean(args["enable-redis"] ?? process.env.AZURE_ENABLE_REDIS ?? (environment === "staging" ? "false" : "true"));
 
 const report = {
   schema_version: "1.0",
@@ -38,6 +39,13 @@ const report = {
   web_image: webImage,
   status: "planned",
 };
+
+function parseBoolean(value) {
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes"].includes(normalized)) return true;
+  if (["0", "false", "no"].includes(normalized)) return false;
+  throw new Error(`Invalid boolean value for enableRedis: ${value}`);
+}
 
 function requireValue(value, label) {
   if (!value) throw new Error(`${label} is required for Container App deployment.`);
@@ -69,6 +77,7 @@ if (execute) {
     `widgetApiHostName=${widgetApiHostName}`,
     `widgetHostName=${widgetHostName}`,
     `cdnHostName=${cdnHostName}`,
+    `enableRedis=${enableRedis}`,
     `tags=${JSON.stringify({ environment, service: "chatbotweb", managed_by: "bicep" })}`,
   ], { stdio: "inherit", shell: process.platform === "win32" });
   if (result.status !== 0) throw new Error("Failed to create or update Container Apps.");
