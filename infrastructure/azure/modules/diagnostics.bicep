@@ -1,5 +1,6 @@
 param logAnalyticsWorkspaceId string
 param containerAppsEnvironmentName string
+param enableApplicationDiagnostics bool = true
 param apiContainerAppName string
 param webContainerAppName string
 param frontDoorProfileName string
@@ -12,11 +13,11 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
   name: containerAppsEnvironmentName
 }
 
-resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' existing = {
+resource apiContainerApp 'Microsoft.App/containerApps@2023-05-01' existing = if (enableApplicationDiagnostics) {
   name: apiContainerAppName
 }
 
-resource webContainerApp 'Microsoft.App/containerApps@2023-05-01' existing = {
+resource webContainerApp 'Microsoft.App/containerApps@2023-05-01' existing = if (enableApplicationDiagnostics) {
   name: webContainerAppName
 }
 
@@ -53,7 +54,7 @@ resource containerAppsEnvironmentDiagnostics 'Microsoft.Insights/diagnosticSetti
   }
 }
 
-resource apiDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+resource apiDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (enableApplicationDiagnostics) {
   name: 'send-api-containerapp-to-log-analytics'
   scope: apiContainerApp
   properties: {
@@ -62,7 +63,7 @@ resource apiDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-previe
   }
 }
 
-resource webDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+resource webDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (enableApplicationDiagnostics) {
   name: 'send-web-containerapp-to-log-analytics'
   scope: webContainerApp
   properties: {

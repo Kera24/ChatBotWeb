@@ -8,6 +8,8 @@ const root = process.cwd();
 const requiredFiles = [
   "infrastructure/azure/main.bicep",
   "infrastructure/azure/modules/container-apps.bicep",
+  "infrastructure/azure/modules/application-container-apps.bicep",
+  "infrastructure/azure/modules/migration-job.bicep",
   "infrastructure/azure/modules/container-registry.bicep",
   "infrastructure/azure/modules/front-door.bicep",
   "infrastructure/azure/modules/key-vault.bicep",
@@ -52,6 +54,8 @@ for (const file of requiredFiles) {
 const main = read("infrastructure/azure/main.bicep");
 const acr = read("infrastructure/azure/modules/container-registry.bicep");
 const apps = read("infrastructure/azure/modules/container-apps.bicep");
+const appWorkloads = read("infrastructure/azure/modules/application-container-apps.bicep");
+const migrationJob = read("infrastructure/azure/modules/migration-job.bicep");
 const postgres = read("infrastructure/azure/modules/postgres.bicep");
 const storage = read("infrastructure/azure/modules/storage.bicep");
 const keyVault = read("infrastructure/azure/modules/key-vault.bicep");
@@ -87,12 +91,17 @@ requireNotContains("storage.bicep", storage, "allowSharedKeyAccess: true");
 requireContains("key-vault.bicep", keyVault, "enableRbacAuthorization: true");
 requireContains("key-vault.bicep", keyVault, "enableSoftDelete: true");
 
-requireContains("container-apps.bicep", apps, "/health/live");
-requireContains("container-apps.bicep", apps, "/health/ready");
-requireContains("container-apps.bicep", apps, "keyVaultUrl");
-requireContains("container-apps.bicep", apps, "Microsoft.App/jobs");
+requireContains("container-apps.bicep", apps, "Microsoft.App/managedEnvironments");
+requireContains("container-apps.bicep", apps, "Microsoft.ManagedIdentity/userAssignedIdentities");
+requireContains("application-container-apps.bicep", appWorkloads, "/health/live");
+requireContains("application-container-apps.bicep", appWorkloads, "/health/ready");
+requireContains("application-container-apps.bicep", appWorkloads, "keyVaultUrl");
+requireContains("application-container-apps.bicep", appWorkloads, "UserAssigned");
+requireContains("migration-job.bicep", migrationJob, "Microsoft.App/jobs");
 requireNotContains("container-apps.bicep", apps, "--reload");
 requireNotContains("container-apps.bicep", apps, "npm run dev");
+requireNotContains("application-container-apps.bicep", appWorkloads, "--reload");
+requireNotContains("application-container-apps.bicep", appWorkloads, "npm run dev");
 
 requireContains("front-door.bicep", frontDoor, "Standard_AzureFrontDoor");
 requireContains("front-door.bicep", frontDoor, "HttpsOnly");

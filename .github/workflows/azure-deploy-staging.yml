@@ -8,7 +8,7 @@ on:
         required: true
         default: main
       deploy_infrastructure:
-        description: Run Bicep what-if and deploy staging infrastructure
+        description: Run Bicep what-if and deploy staging shared infrastructure
         required: true
         default: "true"
         type: choice
@@ -91,7 +91,7 @@ jobs:
           AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
         run: npm run infra:azure:whatif -- staging
 
-      - name: Deploy staging infrastructure
+      - name: Deploy staging shared infrastructure
         id: infrastructure
         if: ${{ inputs.deploy_infrastructure == 'true' }}
         env:
@@ -118,6 +118,10 @@ jobs:
             -o json > "$OUTPUTS_FILE"
           ACR_LOGIN_SERVER="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.acrLoginServer?.value || '')" "$OUTPUTS_FILE")"
           RESOURCE_GROUP="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.resourceGroupName?.value || '')" "$OUTPUTS_FILE")"
+          MANAGED_ENVIRONMENT="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.managedEnvironmentName?.value || '')" "$OUTPUTS_FILE")"
+          API_IDENTITY_ID="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.apiManagedIdentityId?.value || '')" "$OUTPUTS_FILE")"
+          WEB_IDENTITY_ID="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.webManagedIdentityId?.value || '')" "$OUTPUTS_FILE")"
+          MIGRATION_IDENTITY_ID="$(node -e "const fs=require('fs'); const o=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); console.log(o.migrationManagedIdentityId?.value || '')" "$OUTPUTS_FILE")"
           if [ -z "$ACR_LOGIN_SERVER" ]; then
             echo "Infrastructure deployment did not return acrLoginServer output." >&2
             exit 1
@@ -126,6 +130,10 @@ jobs:
           echo "acr_name=$ACR_NAME" >> "$GITHUB_OUTPUT"
           echo "acr_login_server=$ACR_LOGIN_SERVER" >> "$GITHUB_OUTPUT"
           echo "resource_group=$RESOURCE_GROUP" >> "$GITHUB_OUTPUT"
+          echo "managed_environment=$MANAGED_ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "api_identity_id=$API_IDENTITY_ID" >> "$GITHUB_OUTPUT"
+          echo "web_identity_id=$WEB_IDENTITY_ID" >> "$GITHUB_OUTPUT"
+          echo "migration_identity_id=$MIGRATION_IDENTITY_ID" >> "$GITHUB_OUTPUT"
 
       - name: Resolve staging Azure resources
         id: azure_resources
@@ -134,6 +142,10 @@ jobs:
           ACR_NAME: ${{ steps.infrastructure.outputs.acr_name || vars.AZURE_ACR_NAME }}
           ACR_LOGIN_SERVER: ${{ steps.infrastructure.outputs.acr_login_server || vars.AZURE_ACR_LOGIN_SERVER }}
           AZURE_RESOURCE_GROUP: ${{ steps.infrastructure.outputs.resource_group || vars.AZURE_RESOURCE_GROUP }}
+          AZURE_CONTAINER_APPS_ENVIRONMENT: ${{ steps.infrastructure.outputs.managed_environment || vars.AZURE_CONTAINER_APPS_ENVIRONMENT }}
+          AZURE_API_IDENTITY_ID: ${{ steps.infrastructure.outputs.api_identity_id || vars.AZURE_API_IDENTITY_ID }}
+          AZURE_WEB_IDENTITY_ID: ${{ steps.infrastructure.outputs.web_identity_id || vars.AZURE_WEB_IDENTITY_ID }}
+          AZURE_MIGRATION_IDENTITY_ID: ${{ steps.infrastructure.outputs.migration_identity_id || vars.AZURE_MIGRATION_IDENTITY_ID }}
         run: |
           set -euo pipefail
           ACR_NAME="${ACR_NAME:-}"
@@ -153,8 +165,19 @@ jobs:
             echo "Azure Container Registry '$ACR_NAME' was not found or is not accessible in the selected subscription." >&2
             exit 1
           fi
+          for required in AZURE_RESOURCE_GROUP AZURE_CONTAINER_APPS_ENVIRONMENT AZURE_API_IDENTITY_ID AZURE_WEB_IDENTITY_ID AZURE_MIGRATION_IDENTITY_ID; do
+            if [ -z "${!required:-}" ]; then
+              echo "$required is required before deploy_application can create staging workloads." >&2
+              exit 1
+            fi
+          done
           echo "acr_name=$ACR_NAME" >> "$GITHUB_OUTPUT"
           echo "acr_login_server=$RESOLVED_LOGIN_SERVER" >> "$GITHUB_OUTPUT"
+          echo "resource_group=$AZURE_RESOURCE_GROUP" >> "$GITHUB_OUTPUT"
+          echo "managed_environment=$AZURE_CONTAINER_APPS_ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "api_identity_id=$AZURE_API_IDENTITY_ID" >> "$GITHUB_OUTPUT"
+          echo "web_identity_id=$AZURE_WEB_IDENTITY_ID" >> "$GITHUB_OUTPUT"
+          echo "migration_identity_id=$AZURE_MIGRATION_IDENTITY_ID" >> "$GITHUB_OUTPUT"
 
       - name: Login to ACR
         if: ${{ inputs.deploy_application == 'true' }}
@@ -187,12 +210,23 @@ jobs:
         if: ${{ inputs.deploy_application == 'true' }}
         run: npm run azure:release:manifest -- --environment staging --api-image "${{ steps.images.outputs.api_image }}" --web-image "${{ steps.images.outputs.web_image }}"
 
-      - name: Run migration job
+      - name: Create migration job and run migration
         if: ${{ inputs.deploy_application == 'true' }}
+        env:
+          AZURE_ACR_LOGIN_SERVER: ${{ steps.azure_resources.outputs.acr_login_server }}
+          AZURE_RESOURCE_GROUP: ${{ steps.azure_resources.outputs.resource_group }}
+          AZURE_CONTAINER_APPS_ENVIRONMENT: ${{ steps.azure_resources.outputs.managed_environment }}
+          AZURE_MIGRATION_IDENTITY_ID: ${{ steps.azure_resources.outputs.migration_identity_id }}
         run: node scripts/azure-run-migration.mjs --environment staging --image "${{ steps.images.outputs.api_image }}" --execute
 
-      - name: Deploy Container App revisions
+      - name: Create or update Container App revisions
         if: ${{ inputs.deploy_application == 'true' }}
+        env:
+          AZURE_ACR_LOGIN_SERVER: ${{ steps.azure_resources.outputs.acr_login_server }}
+          AZURE_RESOURCE_GROUP: ${{ steps.azure_resources.outputs.resource_group }}
+          AZURE_CONTAINER_APPS_ENVIRONMENT: ${{ steps.azure_resources.outputs.managed_environment }}
+          AZURE_API_IDENTITY_ID: ${{ steps.azure_resources.outputs.api_identity_id }}
+          AZURE_WEB_IDENTITY_ID: ${{ steps.azure_resources.outputs.web_identity_id }}
         run: node scripts/azure-deploy-apps.mjs --environment staging --api-image "${{ steps.images.outputs.api_image }}" --web-image "${{ steps.images.outputs.web_image }}" --execute
 
       - name: Publish widget static release

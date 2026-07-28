@@ -1,4 +1,4 @@
-﻿using '../main.bicep'
+using '../main.bicep'
 
 param environmentName = 'pilot'
 param location = 'australiaeast'
@@ -22,6 +22,5 @@ param minReplicas = 1
 param maxReplicas = 3
 param enableRedis = true
 param enableWorker = false
-param initialImageTag = 'bootstrap-placeholder'
 param githubRepository = 'Kera24/ChatBotWeb'
 param releaseChannel = 'pilot'

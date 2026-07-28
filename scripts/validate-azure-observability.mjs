@@ -34,6 +34,7 @@ for (const alert of alertManifest.alerts || []) {
 const main = read("infrastructure/azure/main.bicep");
 const monitoring = read("infrastructure/azure/modules/monitoring.bicep");
 const containerApps = read("infrastructure/azure/modules/container-apps.bicep");
+const appWorkloads = read("infrastructure/azure/modules/application-container-apps.bicep");
 const alerts = read("infrastructure/azure/modules/monitoring-alerts.bicep");
 const diagnostics = read("infrastructure/azure/modules/diagnostics.bicep");
 const apiTelemetry = read("apps/api/app/operations/telemetry.py");
@@ -46,8 +47,8 @@ requireContains("main.bicep", main, "actionGroupEmailReceivers");
 requireContains("monitoring.bicep", monitoring, "Microsoft.OperationalInsights/workspaces");
 requireContains("monitoring.bicep", monitoring, "Microsoft.Insights/components");
 requireContains("monitoring.bicep", monitoring, "retentionInDays");
-requireContains("container-apps.bicep", containerApps, "APPLICATIONINSIGHTS_CONNECTION_STRING");
-requireContains("container-apps.bicep", containerApps, "AZURE_MONITOR_OPEN_TELEMETRY_ENABLED");
+requireContains("application-container-apps.bicep", appWorkloads, "APPLICATIONINSIGHTS_CONNECTION_STRING");
+requireContains("application-container-apps.bicep", appWorkloads, "AZURE_MONITOR_OPEN_TELEMETRY_ENABLED");
 requireContains("monitoring-alerts.bicep", alerts, "Microsoft.Insights/actionGroups");
 requireContains("monitoring-alerts.bicep", alerts, "Microsoft.Insights/webtests");
 requireContains("monitoring-alerts.bicep", alerts, "widget-public-api-5xx-spike");

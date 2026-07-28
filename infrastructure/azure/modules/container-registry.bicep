@@ -28,3 +28,4 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = 
 
 output registryName string = registry.name
 output loginServer string = registry.properties.loginServer
+output registryId string = registry.id

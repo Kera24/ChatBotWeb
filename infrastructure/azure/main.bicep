@@ -77,8 +77,6 @@ param enableRedis bool = true
 @description('Provision a no-ingress worker Container App placeholder for future ingestion/embedding jobs.')
 param enableWorker bool = false
 
-@description('Container image tag or digest placeholder used by initial Container App definitions until CI/CD injects immutable image digests.')
-param initialImageTag string = 'bootstrap-placeholder'
 
 @description('GitHub repository slug used in resource tags and OIDC documentation.')
 param githubRepository string = 'Kera24/ChatBotWeb'
@@ -196,29 +194,49 @@ module apps 'modules/container-apps.bicep' = {
     environmentName: environmentName
     logAnalyticsCustomerId: monitoring.outputs.logAnalyticsCustomerId
     logAnalyticsSharedKey: monitoring.outputs.logAnalyticsSharedKey
-    acrLoginServer: registry.outputs.loginServer
-    keyVaultName: keyVault.outputs.keyVaultName
-    postgresHostName: postgres.outputs.postgresHostName
-    databaseName: postgresDatabaseName
-    appHostName: appHostName
-    apiHostName: apiHostName
-    widgetApiHostName: widgetApiHostName
-    widgetHostName: widgetHostName
-    cdnHostName: cdnHostName
-    apiCpu: apiCpu
-    apiMemory: apiMemory
-    webCpu: webCpu
-    webMemory: webMemory
-    minReplicas: minReplicas
-    maxReplicas: maxReplicas
-    initialImageTag: initialImageTag
-    enableWorker: enableWorker
-    enableRedis: enableRedis
-    redisHostName: enableRedis ? redis.outputs.redisHostName : ''
-    applicationInsightsConnectionString: monitoring.outputs.applicationInsightsConnectionString
     tags: tags
   }
 }
+
+var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+var keyVaultSecretsUserRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6c')
+var storageBlobDataContributorRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+var workloadPrincipals = [
+  apps.outputs.apiPrincipalId
+  apps.outputs.webPrincipalId
+  apps.outputs.migrationPrincipalId
+  apps.outputs.workerPrincipalId
+]
+
+resource acrPullAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in workloadPrincipals: {
+  name: guid(environmentResourceGroup.id, principalId, 'AcrPull')
+  scope: environmentResourceGroup
+  properties: {
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}]
+
+resource keyVaultSecretAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in workloadPrincipals: {
+  name: guid(environmentResourceGroup.id, principalId, 'KeyVaultSecretsUser')
+  scope: environmentResourceGroup
+  properties: {
+    roleDefinitionId: keyVaultSecretsUserRoleDefinitionId
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}]
+
+resource documentStorageAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in [apps.outputs.apiPrincipalId, apps.outputs.migrationPrincipalId, apps.outputs.workerPrincipalId]: {
+  name: guid(environmentResourceGroup.id, principalId, 'StorageBlobDataContributor')
+  scope: environmentResourceGroup
+  properties: {
+    roleDefinitionId: storageBlobDataContributorRoleDefinitionId
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}]
 
 module frontDoor 'modules/front-door.bicep' = {
   name: '${resourceToken}-frontdoor'
@@ -232,8 +250,9 @@ module frontDoor 'modules/front-door.bicep' = {
     widgetApiHostName: widgetApiHostName
     widgetHostName: widgetHostName
     cdnHostName: cdnHostName
-    webContainerAppFqdn: apps.outputs.webFqdn
-    apiContainerAppFqdn: apps.outputs.apiFqdn
+    enableApplicationOrigins: false
+    webContainerAppFqdn: ''
+    apiContainerAppFqdn: ''
     widgetStaticHostName: storage.outputs.widgetStaticHostName
     widgetStaticOriginPath: storage.outputs.widgetStaticOriginPath
     tags: tags
@@ -246,6 +265,7 @@ module diagnostics 'modules/diagnostics.bicep' = {
   params: {
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
     containerAppsEnvironmentName: apps.outputs.managedEnvironmentName
+    enableApplicationDiagnostics: false
     apiContainerAppName: apps.outputs.apiContainerAppName
     webContainerAppName: apps.outputs.webContainerAppName
     frontDoorProfileName: frontDoor.outputs.frontDoorProfileName
@@ -278,6 +298,10 @@ output acrLoginServer string = registry.outputs.loginServer
 output apiContainerAppName string = apps.outputs.apiContainerAppName
 output webContainerAppName string = apps.outputs.webContainerAppName
 output migrationJobName string = apps.outputs.migrationJobName
+output managedEnvironmentName string = apps.outputs.managedEnvironmentName
+output apiManagedIdentityId string = apps.outputs.apiManagedIdentityId
+output webManagedIdentityId string = apps.outputs.webManagedIdentityId
+output migrationManagedIdentityId string = apps.outputs.migrationManagedIdentityId
 output keyVaultName string = keyVault.outputs.keyVaultName
 output postgresHostName string = postgres.outputs.postgresHostName
 output documentStorageAccountName string = storage.outputs.documentStorageAccountName

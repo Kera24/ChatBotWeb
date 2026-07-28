@@ -106,6 +106,7 @@ resource publicApi5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pr
     displayName: 'Widget public API 5xx spike'
     severity: alertSeverity.critical
     enabled: true
+    skipQueryValidation: true
     scopes: [ logAnalyticsWorkspaceId ]
     evaluationFrequency: 'PT5M'
     windowSize: 'PT10M'
@@ -122,6 +123,7 @@ resource originDenialAlert 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pr
     displayName: 'Widget origin denial spike'
     severity: alertSeverity.warning
     enabled: true
+    skipQueryValidation: true
     scopes: [ logAnalyticsWorkspaceId ]
     evaluationFrequency: 'PT15M'
     windowSize: 'PT30M'

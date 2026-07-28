@@ -6,6 +6,7 @@ param apiHostName string
 param widgetApiHostName string
 param widgetHostName string
 param cdnHostName string
+param enableApplicationOrigins bool = true
 param webContainerAppFqdn string
 param apiContainerAppFqdn string
 param widgetStaticHostName string
@@ -34,7 +35,7 @@ resource endpoint 'Microsoft.Cdn/profiles/afdEndpoints@2023-05-01' = {
   }
 }
 
-resource webOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
+resource webOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = if (enableApplicationOrigins) {
   parent: profile
   name: 'web-origin-group'
   properties: {
@@ -52,7 +53,7 @@ resource webOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
   }
 }
 
-resource apiOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
+resource apiOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = if (enableApplicationOrigins) {
   parent: profile
   name: 'api-origin-group'
   properties: {
@@ -88,7 +89,7 @@ resource staticOriginGroup 'Microsoft.Cdn/profiles/originGroups@2023-05-01' = {
   }
 }
 
-resource webOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {
+resource webOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = if (enableApplicationOrigins) {
   parent: webOriginGroup
   name: 'web-container-app'
   properties: {
@@ -103,7 +104,7 @@ resource webOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {
   }
 }
 
-resource apiOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = {
+resource apiOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05-01' = if (enableApplicationOrigins) {
   parent: apiOriginGroup
   name: 'api-container-app'
   properties: {
@@ -293,7 +294,7 @@ resource htmlCacheRule 'Microsoft.Cdn/profiles/ruleSets/rules@2023-05-01' = {
   }
 }
 
-resource webRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = {
+resource webRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = if (enableApplicationOrigins) {
   parent: endpoint
   name: 'web-route'
   dependsOn: [ webOrigin ]
@@ -313,7 +314,7 @@ resource webRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = {
   }
 }
 
-resource apiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = {
+resource apiRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = if (enableApplicationOrigins) {
   parent: endpoint
   name: 'api-route'
   dependsOn: [ apiOrigin ]
