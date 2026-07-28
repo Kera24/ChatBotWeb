@@ -120,7 +120,7 @@ module monitoring 'modules/monitoring.bicep' = {
     location: location
     namePrefix: namePrefix
     environmentName: environmentName
-    logRetentionDays: environmentName == 'pilot' ? 30 : 7
+    logRetentionDays: contains(['staging', 'pilot'], environmentName) ? 30 : 7
     tags: tags
   }
 }
