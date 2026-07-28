@@ -127,7 +127,6 @@ resource widgetStaticOrigin 'Microsoft.Cdn/profiles/originGroups/origins@2023-05
     httpPort: 80
     httpsPort: 443
     originHostHeader: widgetStaticHostName
-    originPath: widgetStaticOriginPath
     priority: 1
     weight: 1000
     enabledState: 'Enabled'
@@ -345,6 +344,7 @@ resource staticRoute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2023-05-01' = {
     supportedProtocols: [ 'Http', 'Https' ]
     patternsToMatch: [ '/*' ]
     forwardingProtocol: 'HttpsOnly'
+    originPath: widgetStaticOriginPath
     linkToDefaultDomain: 'Enabled'
     httpsRedirect: 'Enabled'
     enabledState: 'Enabled'

@@ -112,6 +112,19 @@ requireNotContains("application-container-apps.bicep", appWorkloads, "npm run de
 
 requireContains("front-door.bicep", frontDoor, "Standard_AzureFrontDoor");
 requireContains("front-door.bicep", frontDoor, "HttpsOnly");
+requireContains("front-door.bicep", frontDoor, "originPath: widgetStaticOriginPath");
+const widgetOriginStart = frontDoor.indexOf("resource widgetStaticOrigin");
+const staticRouteStart = frontDoor.indexOf("resource staticRoute");
+const originPathPosition = frontDoor.indexOf("originPath: widgetStaticOriginPath");
+if (widgetOriginStart >= 0 && staticRouteStart > widgetOriginStart) {
+  const widgetOriginBlock = frontDoor.slice(widgetOriginStart, staticRouteStart);
+  if (widgetOriginBlock.includes("originPath")) {
+    failures.push("front-door.bicep must not put originPath on the widget static origin resource.");
+  }
+}
+if (staticRouteStart < 0 || originPathPosition < staticRouteStart) {
+  failures.push("front-door.bicep must put widgetStaticOriginPath on the static route resource.");
+}
 requireContains("front-door.bicep", frontDoor, "immutable");
 requireContains("front-door.bicep", frontDoor, "no-cache, must-revalidate");
 requireNotContains("front-door.bicep", frontDoor, "AllowInsecure");
