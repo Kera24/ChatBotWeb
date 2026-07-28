@@ -10,6 +10,7 @@ const requiredFiles = [
   "infrastructure/azure/modules/container-apps.bicep",
   "infrastructure/azure/modules/application-container-apps.bicep",
   "infrastructure/azure/modules/migration-job.bicep",
+  "infrastructure/azure/modules/workload-role-assignments.bicep",
   "infrastructure/azure/modules/container-registry.bicep",
   "infrastructure/azure/modules/front-door.bicep",
   "infrastructure/azure/modules/key-vault.bicep",
@@ -56,6 +57,7 @@ const acr = read("infrastructure/azure/modules/container-registry.bicep");
 const apps = read("infrastructure/azure/modules/container-apps.bicep");
 const appWorkloads = read("infrastructure/azure/modules/application-container-apps.bicep");
 const migrationJob = read("infrastructure/azure/modules/migration-job.bicep");
+const workloadRoleAssignments = read("infrastructure/azure/modules/workload-role-assignments.bicep");
 const postgres = read("infrastructure/azure/modules/postgres.bicep");
 const storage = read("infrastructure/azure/modules/storage.bicep");
 const keyVault = read("infrastructure/azure/modules/key-vault.bicep");
@@ -69,6 +71,8 @@ requireContains("main.bicep", main, "targetScope = 'subscription'");
 requireContains("main.bicep", main, "Microsoft.Resources/resourceGroups");
 requireContains("main.bicep", main, "modules/postgres.bicep");
 requireContains("main.bicep", main, "modules/front-door.bicep");
+requireContains("main.bicep", main, "modules/workload-role-assignments.bicep");
+requireContains("main.bicep", main, "scope: resourceGroup(resourceGroupName)");
 requireContains("main.bicep", main, "@secure()");
 
 requireContains("container-registry.bicep", acr, "adminUserEnabled: false");
@@ -98,6 +102,9 @@ requireContains("application-container-apps.bicep", appWorkloads, "/health/ready
 requireContains("application-container-apps.bicep", appWorkloads, "keyVaultUrl");
 requireContains("application-container-apps.bicep", appWorkloads, "UserAssigned");
 requireContains("migration-job.bicep", migrationJob, "Microsoft.App/jobs");
+requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "AcrPull");
+requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "KeyVaultSecretsUser");
+requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "StorageBlobDataContributor");
 requireNotContains("container-apps.bicep", apps, "--reload");
 requireNotContains("container-apps.bicep", apps, "npm run dev");
 requireNotContains("application-container-apps.bicep", appWorkloads, "--reload");

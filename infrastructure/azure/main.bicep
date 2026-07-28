@@ -198,46 +198,20 @@ module apps 'modules/container-apps.bicep' = {
   }
 }
 
-var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-var keyVaultSecretsUserRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6c')
-var storageBlobDataContributorRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-var workloadPrincipals = [
-  apps.outputs.apiPrincipalId
-  apps.outputs.webPrincipalId
-  apps.outputs.migrationPrincipalId
-  apps.outputs.workerPrincipalId
-]
-
-resource acrPullAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in workloadPrincipals: {
-  name: guid(environmentResourceGroup.id, principalId, 'AcrPull')
-  scope: environmentResourceGroup
-  properties: {
-    roleDefinitionId: acrPullRoleDefinitionId
-    principalId: principalId
-    principalType: 'ServicePrincipal'
+module workloadRoleAssignments 'modules/workload-role-assignments.bicep' = {
+  name: '${resourceToken}-workload-rbac'
+  scope: resourceGroup(resourceGroupName)
+  params: {
+    resourceGroupName: resourceGroupName
+    acrId: registry.outputs.registryId
+    keyVaultId: keyVault.outputs.keyVaultId
+    storageAccountId: storage.outputs.documentStorageAccountId
+    apiPrincipalId: apps.outputs.apiPrincipalId
+    webPrincipalId: apps.outputs.webPrincipalId
+    migrationPrincipalId: apps.outputs.migrationPrincipalId
+    workerPrincipalId: apps.outputs.workerPrincipalId
   }
-}]
-
-resource keyVaultSecretAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in workloadPrincipals: {
-  name: guid(environmentResourceGroup.id, principalId, 'KeyVaultSecretsUser')
-  scope: environmentResourceGroup
-  properties: {
-    roleDefinitionId: keyVaultSecretsUserRoleDefinitionId
-    principalId: principalId
-    principalType: 'ServicePrincipal'
-  }
-}]
-
-resource documentStorageAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in [apps.outputs.apiPrincipalId, apps.outputs.migrationPrincipalId, apps.outputs.workerPrincipalId]: {
-  name: guid(environmentResourceGroup.id, principalId, 'StorageBlobDataContributor')
-  scope: environmentResourceGroup
-  properties: {
-    roleDefinitionId: storageBlobDataContributorRoleDefinitionId
-    principalId: principalId
-    principalType: 'ServicePrincipal'
-  }
-}]
-
+}
 module frontDoor 'modules/front-door.bicep' = {
   name: '${resourceToken}-frontdoor'
   scope: environmentResourceGroup
