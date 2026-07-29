@@ -227,6 +227,7 @@ jobs:
           AZURE_CONTAINER_APPS_ENVIRONMENT: ${{ steps.azure_resources.outputs.managed_environment }}
           AZURE_API_IDENTITY_ID: ${{ steps.azure_resources.outputs.api_identity_id }}
           AZURE_WEB_IDENTITY_ID: ${{ steps.azure_resources.outputs.web_identity_id }}
+          AZURE_MIGRATION_IDENTITY_ID: ${{ steps.azure_resources.outputs.migration_identity_id }}
         run: node scripts/azure-deploy-apps.mjs --environment staging --api-image "${{ steps.images.outputs.api_image }}" --web-image "${{ steps.images.outputs.web_image }}" --execute
 
       - name: Publish widget static release

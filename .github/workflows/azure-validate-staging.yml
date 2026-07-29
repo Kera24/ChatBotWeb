@@ -126,9 +126,15 @@ jobs:
         env:
           APP_ENV: staging
           WIDGET_STAGING_SYNTHETIC_BOOTSTRAP: "1"
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'australiaeast' }}
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_CONTAINER_APPS_ENVIRONMENT: ${{ vars.AZURE_CONTAINER_APPS_ENVIRONMENT }}
+          AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+          AZURE_ACR_LOGIN_SERVER: ${{ vars.AZURE_ACR_LOGIN_SERVER }}
+          AZURE_MIGRATION_IDENTITY_ID: ${{ vars.AZURE_MIGRATION_IDENTITY_ID }}
           AZURE_SYNTHETIC_WIDGET_BOOTSTRAP_JOB: ${{ vars.AZURE_SYNTHETIC_WIDGET_BOOTSTRAP_JOB }}
           API_IMAGE_REF: ${{ vars.AZURE_API_IMAGE_REF }}
+          STAGING_CDN_HOST_NAME: ${{ vars.STAGING_CDN_HOST_NAME }}
           STAGING_API_URL: ${{ vars.STAGING_API_URL }}
         run: npm run azure:staging:seed-synthetic-widgets:job -- --environment staging --execute
       - name: Live browser smoke evidence

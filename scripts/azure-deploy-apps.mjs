@@ -19,12 +19,14 @@ const keyVaultName = String(args["key-vault"] ?? process.env.AZURE_KEY_VAULT_NAM
 const acrLoginServer = String(args["acr-login-server"] ?? process.env.AZURE_ACR_LOGIN_SERVER ?? apiImage.split("/")[0] ?? "");
 const apiIdentityId = String(args["api-identity-id"] ?? process.env.AZURE_API_IDENTITY_ID ?? "");
 const webIdentityId = String(args["web-identity-id"] ?? process.env.AZURE_WEB_IDENTITY_ID ?? "");
+const migrationIdentityId = String(args["migration-identity-id"] ?? process.env.AZURE_MIGRATION_IDENTITY_ID ?? "");
 const appHostName = String(args["app-host-name"] ?? process.env.STAGING_APP_HOST_NAME ?? "app.staging.example.invalid");
 const apiHostName = String(args["api-host-name"] ?? process.env.STAGING_API_HOST_NAME ?? "api.staging.example.invalid");
 const widgetApiHostName = String(args["widget-api-host-name"] ?? process.env.STAGING_WIDGET_API_HOST_NAME ?? "widget-api.staging.example.invalid");
 const widgetHostName = String(args["widget-host-name"] ?? process.env.STAGING_WIDGET_HOST_NAME ?? "widget.staging.example.invalid");
 const cdnHostName = String(args["cdn-host-name"] ?? process.env.STAGING_CDN_HOST_NAME ?? "cdn.staging.example.invalid");
 const enableRedis = parseBoolean(args["enable-redis"] ?? process.env.AZURE_ENABLE_REDIS ?? (environment === "staging" ? "false" : "true"));
+const enableSyntheticWidgetBootstrapJob = parseBoolean(args["enable-synthetic-widget-bootstrap-job"] ?? process.env.AZURE_ENABLE_SYNTHETIC_WIDGET_BOOTSTRAP_JOB ?? (environment === "staging" ? "true" : "false"));
 
 const report = {
   schema_version: "1.0",
@@ -55,6 +57,7 @@ if (execute) {
   requireValue(acrLoginServer, "ACR login server");
   requireValue(apiIdentityId, "API managed identity id");
   requireValue(webIdentityId, "Web managed identity id");
+  if (enableSyntheticWidgetBootstrapJob) requireValue(migrationIdentityId, "Migration managed identity id");
 
   const result = spawnSync("az", [
     "deployment", "group", "create",
@@ -72,12 +75,14 @@ if (execute) {
     `webImage=${webImage}`,
     `apiIdentityId=${apiIdentityId}`,
     `webIdentityId=${webIdentityId}`,
+    `migrationIdentityId=${migrationIdentityId}`,
     `appHostName=${appHostName}`,
     `apiHostName=${apiHostName}`,
     `widgetApiHostName=${widgetApiHostName}`,
     `widgetHostName=${widgetHostName}`,
     `cdnHostName=${cdnHostName}`,
     `enableRedis=${enableRedis}`,
+    `enableSyntheticWidgetBootstrapJob=${enableSyntheticWidgetBootstrapJob}`,
     `tags=${JSON.stringify({ environment, service: "chatbotweb", managed_by: "bicep" })}`,
   ], { stdio: "inherit", shell: process.platform === "win32" });
   if (result.status !== 0) throw new Error("Failed to create or update Container Apps.");

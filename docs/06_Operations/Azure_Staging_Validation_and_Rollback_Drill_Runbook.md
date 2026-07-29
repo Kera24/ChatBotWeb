@@ -68,11 +68,32 @@ Review proposed deletes or replacements for PostgreSQL, Storage Account, Key Vau
 4. Build API and web images from the approved Git SHA; tag by SHA and record digests.
 5. Generate the deployment release manifest.
 6. Run the migration Container Apps job with `alembic upgrade head`.
-7. Bootstrap only synthetic Alpha/Beta tenants, widgets, origins, and knowledge corpus.
+7. Create/update the staging-only synthetic widget bootstrap Container Apps Job with the immutable API image, migration managed identity, ACR pull identity, and Key Vault database secret reference; then bootstrap only synthetic Alpha/Beta tenants, widgets, origins, and knowledge corpus.
 8. Deploy API and web Container App revisions and validate live readiness before traffic shift.
 9. Publish widget/SDK static artifacts through the safe B2 publication sequence.
 10. Validate Front Door endpoints, cache headers, security headers, CORS, source-map policy, and direct-origin exposure.
 
+
+## Synthetic Widget Bootstrap Job
+
+The staging synthetic bootstrap uses `infrastructure/azure/modules/synthetic-widget-job.bicep` and the command:
+
+```bash
+APP_ENV=staging WIDGET_STAGING_SYNTHETIC_BOOTSTRAP=1 npm run azure:staging:seed-synthetic-widgets:job -- --environment staging --execute
+```
+
+Before start, the wrapper deploys or updates `yoranix-staging-job-synthetic-widgets` with the approved API image digest. The job is manual-trigger only, has no public ingress, uses managed identity for ACR pull and Key Vault secret references, and refuses non-staging execution. Verify both jobs exist before synthetic validation:
+
+```bash
+az containerapp job list --resource-group yoranix-staging-rg --query "[].name" -o tsv
+```
+
+Expected staging jobs:
+
+- `yoranix-staging-job-migrate`
+- `yoranix-staging-job-synthetic-widgets`
+
+The job must not print database URLs, connection strings, tokens, or document contents. Its safe report is `artifacts/azure-staging-validation/synthetic-widgets.json`.
 ## Live Smoke
 
 Run:

@@ -62,6 +62,7 @@ output apiContainerAppName string = apiName
 output webContainerAppName string = webName
 output workerContainerAppName string = workerName
 output migrationJobName string = migrationJobName
+output syntheticWidgetBootstrapJobName string = syntheticWidgetBootstrapJobName
 output apiManagedIdentityId string = apiIdentity.id
 output webManagedIdentityId string = webIdentity.id
 output migrationManagedIdentityId string = migrationIdentity.id

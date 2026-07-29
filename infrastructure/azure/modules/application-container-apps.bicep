@@ -8,12 +8,14 @@ param apiImage string
 param webImage string
 param apiIdentityId string
 param webIdentityId string
+param migrationIdentityId string
 param appHostName string
 param apiHostName string
 param widgetApiHostName string
 param widgetHostName string
 param cdnHostName string
 param enableRedis bool
+param enableSyntheticWidgetBootstrapJob bool
 param apiCpu string = '1.0'
 param apiMemory string = '2Gi'
 param webCpu string = '0.5'
@@ -159,7 +161,23 @@ resource webApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
 }
 
+module syntheticWidgetBootstrapJob 'synthetic-widget-job.bicep' = if (enableSyntheticWidgetBootstrapJob && environmentName == 'staging') {
+  name: '${namePrefix}-${environmentName}-synthetic-widget-job'
+  params: {
+    location: location
+    namePrefix: namePrefix
+    environmentName: environmentName
+    managedEnvironmentName: managedEnvironmentName
+    acrLoginServer: acrLoginServer
+    keyVaultName: keyVaultName
+    syntheticWidgetBootstrapImage: apiImage
+    syntheticWidgetBootstrapIdentityId: migrationIdentityId
+    cdnHostName: cdnHostName
+    tags: tags
+  }
+}
 output apiContainerAppName string = apiApp.name
 output webContainerAppName string = webApp.name
 output apiFqdn string = apiApp.properties.configuration.ingress.fqdn
 output webFqdn string = webApp.properties.configuration.ingress.fqdn
+output syntheticWidgetBootstrapJobName string = enableSyntheticWidgetBootstrapJob && environmentName == 'staging' ? syntheticWidgetBootstrapJob.outputs.syntheticWidgetBootstrapJobName : ''

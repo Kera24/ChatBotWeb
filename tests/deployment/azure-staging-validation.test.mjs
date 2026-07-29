@@ -208,3 +208,29 @@ function findGeneratedParameterFiles() {
     ? JSON.parse(spawnSync(process.execPath, ["-e", `const { readdirSync } = require('node:fs'); const { join } = require('node:path'); const dir = ${JSON.stringify(environmentDir)}; console.log(JSON.stringify(readdirSync(dir).filter((name) => name.endsWith('.generated.bicepparam')).map((name) => join(dir, name))));`], { cwd: root, encoding: "utf8" }).stdout)
     : [];
 }
+test("synthetic widget bootstrap job is staging-only and securely provisioned", () => {
+  const job = readFileSync(join(root, "infrastructure/azure/modules/synthetic-widget-job.bicep"), "utf8");
+  const workloads = readFileSync(join(root, "infrastructure/azure/modules/application-container-apps.bicep"), "utf8");
+  const staging = readFileSync(join(root, "infrastructure/azure/environments/staging.bicepparam"), "utf8");
+  const pilot = readFileSync(join(root, "infrastructure/azure/environments/pilot.bicepparam"), "utf8");
+  const wrapper = readFileSync(join(root, "scripts/azure-run-staging-synthetic-widgets.mjs"), "utf8");
+
+  assert.match(job, /resource syntheticWidgetBootstrapJob 'Microsoft\.App\/jobs@/);
+  assert.match(job, /triggerType: 'Manual'/);
+  assert.match(job, /command: \[ 'python' \]/);
+  assert.match(job, /args: \[ '-m', 'app\.operations\.staging_synthetic_widgets' \]/);
+  assert.match(job, /APP_ENV/);
+  assert.match(job, /WIDGET_STAGING_SYNTHETIC_BOOTSTRAP/);
+  assert.match(job, /keyVaultUrl: '\$\{keyVaultUri\}\/secrets\/api-database-url'/);
+  assert.match(job, /identity: syntheticWidgetBootstrapIdentityId/);
+  assert.match(job, /server: acrLoginServer/);
+  assert.doesNotMatch(job, /adminUserEnabled|registryPassword|DATABASE_URL', value|connectionString/i);
+  assert.match(workloads, /enableSyntheticWidgetBootstrapJob && environmentName == 'staging'/);
+  assert.match(workloads, /syntheticWidgetBootstrapImage: apiImage/);
+  assert.match(workloads, /syntheticWidgetBootstrapIdentityId: migrationIdentityId/);
+  assert.match(staging, /param enableSyntheticWidgetBootstrapJob = true/);
+  assert.match(pilot, /param enableSyntheticWidgetBootstrapJob = false/);
+  assert.match(wrapper, /environment !== "staging"/);
+  assert.match(wrapper, /APP_ENV=staging/);
+  assert.match(wrapper, /WIDGET_STAGING_SYNTHETIC_BOOTSTRAP=1/);
+});

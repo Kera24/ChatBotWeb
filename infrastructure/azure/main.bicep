@@ -77,6 +77,9 @@ param enableRedis bool = true
 @description('Provision a no-ingress worker Container App placeholder for future ingestion/embedding jobs.')
 param enableWorker bool = false
 
+@description('Create the staging-only manual Container Apps Job used to seed synthetic widget fixtures. Defaults on for staging and off for pilot.')
+param enableSyntheticWidgetBootstrapJob bool = environmentName == 'staging'
+
 
 @description('GitHub repository slug used in resource tags and OIDC documentation.')
 param githubRepository string = 'Kera24/ChatBotWeb'
@@ -272,6 +275,7 @@ output acrLoginServer string = registry.outputs.loginServer
 output apiContainerAppName string = apps.outputs.apiContainerAppName
 output webContainerAppName string = apps.outputs.webContainerAppName
 output migrationJobName string = apps.outputs.migrationJobName
+output syntheticWidgetBootstrapJobName string = enableSyntheticWidgetBootstrapJob ? apps.outputs.syntheticWidgetBootstrapJobName : ''
 output managedEnvironmentName string = apps.outputs.managedEnvironmentName
 output apiManagedIdentityId string = apps.outputs.apiManagedIdentityId
 output webManagedIdentityId string = apps.outputs.webManagedIdentityId

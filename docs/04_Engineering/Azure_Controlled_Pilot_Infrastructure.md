@@ -16,6 +16,7 @@ The infrastructure foundation defines:
 - FastAPI API Container App
 - Next.js authenticated web Container App
 - Manual Container Apps migration job
+- Staging-only manual Container Apps synthetic widget bootstrap job
 - PostgreSQL Flexible Server
 - pgvector migration readiness
 - Private document Blob Storage
@@ -39,6 +40,7 @@ infrastructure/azure/
     postgres.bicep
     redis.bicep
     storage.bicep
+    synthetic-widget-job.bicep
   environments/
     staging.bicepparam
     pilot.bicepparam

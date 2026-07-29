@@ -10,6 +10,7 @@ const requiredFiles = [
   "infrastructure/azure/modules/container-apps.bicep",
   "infrastructure/azure/modules/application-container-apps.bicep",
   "infrastructure/azure/modules/migration-job.bicep",
+  "infrastructure/azure/modules/synthetic-widget-job.bicep",
   "infrastructure/azure/modules/workload-role-assignments.bicep",
   "infrastructure/azure/modules/container-registry.bicep",
   "infrastructure/azure/modules/front-door.bicep",
@@ -57,6 +58,7 @@ const acr = read("infrastructure/azure/modules/container-registry.bicep");
 const apps = read("infrastructure/azure/modules/container-apps.bicep");
 const appWorkloads = read("infrastructure/azure/modules/application-container-apps.bicep");
 const migrationJob = read("infrastructure/azure/modules/migration-job.bicep");
+const syntheticWidgetJob = read("infrastructure/azure/modules/synthetic-widget-job.bicep");
 const workloadRoleAssignments = read("infrastructure/azure/modules/workload-role-assignments.bicep");
 const postgres = read("infrastructure/azure/modules/postgres.bicep");
 const storage = read("infrastructure/azure/modules/storage.bicep");
@@ -117,6 +119,29 @@ requireContains("staging.bicepparam", stagingParams, "param enableRedis = false"
 requireContains("azure-deploy-apps.mjs", read("scripts/azure-deploy-apps.mjs"), "environment === \"staging\" ? \"false\" : \"true\"");
 requireContains("azure-deploy-apps.mjs", read("scripts/azure-deploy-apps.mjs"), "`enableRedis=${enableRedis}`");
 requireContains("migration-job.bicep", migrationJob, "Microsoft.App/jobs");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "Microsoft.App/jobs");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "triggerType: 'Manual'");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "python");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "app.operations.staging_synthetic_widgets");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "APP_ENV");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "WIDGET_STAGING_SYNTHETIC_BOOTSTRAP");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "api-database-url");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "keyVaultUrl");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "identity: syntheticWidgetBootstrapIdentityId");
+requireContains("synthetic-widget-job.bicep", syntheticWidgetJob, "registries");
+requireNotContains("synthetic-widget-job.bicep", syntheticWidgetJob, "adminUserEnabled");
+requireNotContains("synthetic-widget-job.bicep", syntheticWidgetJob, "password");
+requireNotContains("synthetic-widget-job.bicep", syntheticWidgetJob, "DATABASE_URL', value");
+requireContains("application-container-apps.bicep", appWorkloads, "module syntheticWidgetBootstrapJob 'synthetic-widget-job.bicep'");
+requireContains("application-container-apps.bicep", appWorkloads, "enableSyntheticWidgetBootstrapJob && environmentName == 'staging'");
+requireContains("application-container-apps.bicep", appWorkloads, "syntheticWidgetBootstrapImage: apiImage");
+requireContains("application-container-apps.bicep", appWorkloads, "syntheticWidgetBootstrapIdentityId: migrationIdentityId");
+requireContains("staging.bicepparam", stagingParams, "param enableSyntheticWidgetBootstrapJob = true");
+requireContains("pilot.bicepparam", pilotParams, "param enableSyntheticWidgetBootstrapJob = false");
+requireContains("azure-deploy-apps.mjs", read("scripts/azure-deploy-apps.mjs"), "environment === \"staging\" ? \"true\" : \"false\"");
+requireContains("azure-run-staging-synthetic-widgets.mjs", read("scripts/azure-run-staging-synthetic-widgets.mjs"), "synthetic-widget-job.bicep");
+requireContains("azure-run-staging-synthetic-widgets.mjs", read("scripts/azure-run-staging-synthetic-widgets.mjs"), "APP_ENV=staging");
+requireContains("azure-run-staging-synthetic-widgets.mjs", read("scripts/azure-run-staging-synthetic-widgets.mjs"), "WIDGET_STAGING_SYNTHETIC_BOOTSTRAP=1");
 requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "AcrPull");
 requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "KeyVaultSecretsUser");
 requireContains("workload-role-assignments.bicep", workloadRoleAssignments, "StorageBlobDataContributor");

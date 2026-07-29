@@ -11,6 +11,7 @@ Deploy and validate the complete platform in an actual Azure staging environment
 ## Scope Implemented
 
 - Added staging-only validation commands for prerequisite, browser smoke, telemetry, alert, and rollback evidence.
+- Added the staging-only synthetic-widget bootstrap Container Apps Job module and workflow/script wiring so Alpha/Beta synthetic fixtures are seeded through the deployed API image and managed identity runtime configuration.
 - Added a manual GitHub Actions workflow for protected staging live validation.
 - Added redacted evidence generation under `artifacts/azure-staging-validation/`.
 - Added regression tests that reject non-staging B4 execution and verify workflow guardrails.
@@ -34,6 +35,8 @@ npm run azure:staging:browser
 npm run azure:staging:telemetry
 npm run azure:staging:alerts
 npm run azure:staging:rollback-drill
+npm run azure:staging:seed-synthetic-widgets
+npm run azure:staging:seed-synthetic-widgets:job
 ```
 
 ## Expected Live Evidence

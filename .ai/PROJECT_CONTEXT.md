@@ -590,3 +590,12 @@ Implementation facts:
 - Updated Azure infrastructure, CI/CD, observability, release-readiness, admin-readiness, and security checklist docs to distinguish repository configured, staging verified, and production-pilot verified states.
 - Live staging deployment, Azure what-if, image push, migration job, static publication, telemetry validation, alert routing, and rollback execution must not be marked successful until a credentialed staging run produces evidence.
 - Do not recommend TASK-068B5 as executable until staging passes without unresolved critical blockers.
+
+## TASK-068B4 synthetic staging bootstrap fact
+
+The Azure staging validation harness includes a staging-only synthetic widget bootstrap path:
+
+- `infrastructure/azure/modules/synthetic-widget-job.bicep` defines the manual Container Apps Job for synthetic Alpha/Beta widget seeding.
+- `scripts/azure-run-staging-synthetic-widgets.mjs` deploys/updates that job with the approved API image and starts it only when `APP_ENV=staging` and `WIDGET_STAGING_SYNTHETIC_BOOTSTRAP=1` are set.
+- The job uses managed identity for ACR pull and Key Vault secret references. It must not use registry admin credentials or print database connection strings.
+- Pilot defaults keep the job disabled; B5 remains blocked until staging live validation, tenant isolation, monitoring, and rollback evidence pass without critical blockers.

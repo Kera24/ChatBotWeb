@@ -22,5 +22,6 @@ param minReplicas = 1
 param maxReplicas = 2
 param enableRedis = false
 param enableWorker = false
+param enableSyntheticWidgetBootstrapJob = true
 param githubRepository = 'Kera24/ChatBotWeb'
 param releaseChannel = 'staging'
