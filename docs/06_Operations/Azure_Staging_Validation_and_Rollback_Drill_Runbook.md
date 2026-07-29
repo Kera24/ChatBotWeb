@@ -82,7 +82,7 @@ The staging synthetic bootstrap uses `infrastructure/azure/modules/synthetic-wid
 APP_ENV=staging WIDGET_STAGING_SYNTHETIC_BOOTSTRAP=1 npm run azure:staging:seed-synthetic-widgets:job -- --environment staging --execute
 ```
 
-Before start, the wrapper deploys or updates `yoranix-staging-job-synthetic-widgets` with the approved API image digest. The job is manual-trigger only, has no public ingress, uses managed identity for ACR pull and Key Vault secret references, and refuses non-staging execution. Verify both jobs exist before synthetic validation:
+Before start, the wrapper deploys or updates `yoranix-staging-synth-widget-job` with the approved API image digest. The job is manual-trigger only, has no public ingress, uses managed identity for ACR pull and Key Vault secret references, and refuses non-staging execution. Verify both jobs exist before synthetic validation:
 
 ```bash
 az containerapp job list --resource-group yoranix-staging-rg --query "[].name" -o tsv
@@ -91,7 +91,7 @@ az containerapp job list --resource-group yoranix-staging-rg --query "[].name" -
 Expected staging jobs:
 
 - `yoranix-staging-job-migrate`
-- `yoranix-staging-job-synthetic-widgets`
+- `yoranix-staging-synth-widget-job`
 
 The job must not print database URLs, connection strings, tokens, or document contents. Its safe report is `artifacts/azure-staging-validation/synthetic-widgets.json`.
 ## Live Smoke

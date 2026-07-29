@@ -9,7 +9,7 @@ param syntheticWidgetBootstrapIdentityId string
 param cdnHostName string
 param tags object
 
-var syntheticWidgetBootstrapJobName = '${namePrefix}-${environmentName}-job-synthetic-widgets'
+var syntheticWidgetBootstrapJobName = '${namePrefix}-${environmentName}-synth-widget-job'
 var keyVaultUri = 'https://${keyVaultName}.vault.azure.net'
 var releaseVersion = last(split(syntheticWidgetBootstrapImage, ':'))
 
