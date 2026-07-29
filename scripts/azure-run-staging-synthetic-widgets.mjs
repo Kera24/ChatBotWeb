@@ -11,16 +11,23 @@ if (process.env.APP_ENV !== "staging") throw new Error("APP_ENV=staging is requi
 if (process.env.WIDGET_STAGING_SYNTHETIC_BOOTSTRAP !== "1") throw new Error("WIDGET_STAGING_SYNTHETIC_BOOTSTRAP=1 is required.");
 
 const execute = Boolean(args.execute || args._.includes("execute"));
-const namePrefix = String(args["name-prefix"] ?? process.env.AZURE_NAME_PREFIX ?? "yoranix");
-const location = String(args.location ?? process.env.AZURE_LOCATION ?? "australiaeast");
-const resourceGroup = String(args["resource-group"] ?? process.env.AZURE_RESOURCE_GROUP ?? `${namePrefix}-staging-rg`);
-const managedEnvironmentName = String(args["managed-environment"] ?? process.env.AZURE_CONTAINER_APPS_ENVIRONMENT ?? `${namePrefix}-staging-cae`);
-const keyVaultName = String(args["key-vault"] ?? process.env.AZURE_KEY_VAULT_NAME ?? `${namePrefix}stagingkv`);
-const jobName = String(args.job ?? process.env.AZURE_SYNTHETIC_WIDGET_BOOTSTRAP_JOB ?? `${namePrefix}-staging-synth-widget-job`);
-const image = String(args.image ?? process.env.API_IMAGE_REF ?? process.env.AZURE_API_IMAGE ?? "");
-const acrLoginServer = String(args["acr-login-server"] ?? process.env.AZURE_ACR_LOGIN_SERVER ?? image.split("/")[0] ?? "");
-const migrationIdentityId = String(args["migration-identity-id"] ?? process.env.AZURE_MIGRATION_IDENTITY_ID ?? "");
-const cdnHostName = String(args["cdn-host-name"] ?? process.env.STAGING_CDN_HOST_NAME ?? "cdn.staging.example.invalid");
+function pick(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim() !== "") return String(value);
+  }
+  return "";
+}
+
+const namePrefix = pick(args["name-prefix"], process.env.AZURE_NAME_PREFIX, "yoranix");
+const location = pick(args.location, process.env.AZURE_LOCATION, "australiaeast");
+const resourceGroup = pick(args["resource-group"], process.env.AZURE_RESOURCE_GROUP, `${namePrefix}-staging-rg`);
+const managedEnvironmentName = pick(args["managed-environment"], process.env.AZURE_CONTAINER_APPS_ENVIRONMENT, `${namePrefix}-staging-cae`);
+const keyVaultName = pick(args["key-vault"], process.env.AZURE_KEY_VAULT_NAME, `${namePrefix}stagingkv`);
+const jobName = pick(args.job, process.env.AZURE_SYNTHETIC_WIDGET_BOOTSTRAP_JOB, `${namePrefix}-staging-synth-widget-job`);
+let image = pick(args.image, process.env.API_IMAGE_REF, process.env.AZURE_API_IMAGE);
+let acrLoginServer = pick(args["acr-login-server"], process.env.AZURE_ACR_LOGIN_SERVER, image.split("/")[0]);
+const migrationIdentityId = pick(args["migration-identity-id"], process.env.AZURE_MIGRATION_IDENTITY_ID);
+const cdnHostName = pick(args["cdn-host-name"], process.env.STAGING_CDN_HOST_NAME, "cdn.staging.example.invalid");
 
 const report = {
   schema_version: "1.0",
@@ -42,7 +49,17 @@ function runAz(commandArgs, message) {
   if (result.status !== 0) throw new Error(message);
 }
 
+function azOutput(commandArgs) {
+  const result = spawnSync("az", commandArgs, { encoding: "utf8", shell: process.platform === "win32" });
+  if (result.status !== 0) return "";
+  return result.stdout.trim();
+}
+
 if (execute) {
+  if (!image) {
+    image = azOutput(["containerapp", "job", "show", "--name", jobName, "--resource-group", resourceGroup, "--query", "properties.template.containers[0].image", "-o", "tsv"]);
+    acrLoginServer = pick(acrLoginServer, image.split("/")[0]);
+  }
   requireValue(image, "API image digest/reference");
   requireValue(acrLoginServer, "ACR login server");
   requireValue(migrationIdentityId, "Migration managed identity id");
