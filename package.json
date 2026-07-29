@@ -58,6 +58,8 @@
     "azure:staging:browser": "node scripts/azure-live-browser-smoke.mjs",
     "azure:staging:telemetry": "node scripts/azure-telemetry-validate.mjs",
     "azure:staging:alerts": "node scripts/azure-alert-validate.mjs",
-    "azure:staging:rollback-drill": "node scripts/azure-rollback-drill.mjs"
+    "azure:staging:rollback-drill": "node scripts/azure-rollback-drill.mjs",
+    "azure:staging:seed-synthetic-widgets": "cd apps/api && python -m app.operations.staging_synthetic_widgets",
+    "azure:staging:seed-synthetic-widgets:job": "node scripts/azure-run-staging-synthetic-widgets.mjs"
   }
 }

@@ -15,6 +15,14 @@ on:
         options:
           - "true"
           - "false"
+      run_synthetic_bootstrap:
+        description: Run staging synthetic widget bootstrap before live validation
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
       run_rollback_drill:
         description: Run staging rollback drill planning/execution path
         required: true
@@ -113,6 +121,16 @@ jobs:
           AZURE_POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
         run: npm run azure:staging:validate -- --environment staging --execute
 
+      - name: Seed staging synthetic widgets
+        if: ${{ inputs.run_synthetic_bootstrap == 'true' }}
+        env:
+          APP_ENV: staging
+          WIDGET_STAGING_SYNTHETIC_BOOTSTRAP: "1"
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_SYNTHETIC_WIDGET_BOOTSTRAP_JOB: ${{ vars.AZURE_SYNTHETIC_WIDGET_BOOTSTRAP_JOB }}
+          API_IMAGE_REF: ${{ vars.AZURE_API_IMAGE_REF }}
+          STAGING_API_URL: ${{ vars.STAGING_API_URL }}
+        run: npm run azure:staging:seed-synthetic-widgets:job -- --environment staging --execute
       - name: Live browser smoke evidence
         if: ${{ inputs.run_live_validation == 'true' }}
         env:
