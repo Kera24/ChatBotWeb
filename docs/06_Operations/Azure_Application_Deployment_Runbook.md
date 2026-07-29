@@ -70,7 +70,7 @@ The workflow runs:
 npm run azure:migrate -- --environment staging --image <api-image-digest> --execute
 ```
 
-If migration fails, stop deployment and keep the previous running release.
+If migration fails, stop deployment and keep the previous running release. The migration image runs `python -m app.operations.database_migration upgrade head`, including an Alembic version-table capacity preflight before `upgrade head`.
 
 ## 7. Verify Health
 

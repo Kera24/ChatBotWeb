@@ -55,7 +55,7 @@ resource migrationJob 'Microsoft.App/jobs@2023-05-01' = {
           name: 'migration'
           image: migrationImage
           command: [ 'python' ]
-          args: [ '-m', 'alembic', 'upgrade', 'head' ]
+          args: [ '-m', 'app.operations.database_migration', 'upgrade', 'head' ]
           env: [
             { name: 'DATABASE_URL', secretRef: 'database-url' }
           ]

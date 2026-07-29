@@ -1,9 +1,14 @@
-from logging.config import fileConfig
+﻿from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
+from app.db.alembic_compat import (
+    ensure_alembic_version_table_compatibility,
+    install_wide_alembic_version_table,
+    required_version_length,
+)
 from app.db.base import Base
 from app.db import models  # noqa: F401
 
@@ -15,6 +20,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+install_wide_alembic_version_table()
 
 
 def run_migrations_offline() -> None:
@@ -37,6 +43,12 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        ensure_alembic_version_table_compatibility(
+            connection,
+            min_length=required_version_length(context.script),
+        )
+        if connection.in_transaction():
+            connection.commit()
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():

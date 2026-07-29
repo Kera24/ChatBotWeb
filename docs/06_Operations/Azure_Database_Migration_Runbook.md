@@ -1,4 +1,4 @@
-﻿# Azure Database Migration Runbook
+# Azure Database Migration Runbook
 
 ## Purpose
 
@@ -73,3 +73,11 @@ If future migrations are not backward-compatible, split them into explicit phase
 5. contract old schema after rollback window
 
 Do not collapse a destructive migration into a single production-pilot deploy.
+
+## Alembic Version Table Compatibility
+
+Before `context.run_migrations()`, `apps/api/alembic/env.py` runs a compatibility check for Alembic's own `alembic_version.version_num` column only. If the table does not exist, it is created with `VARCHAR(128)`. If PostgreSQL already has the historical Alembic default `VARCHAR(32)`, the migration process widens it to `VARCHAR(128)` before applying revisions.
+
+This operation does not stamp, skip, reorder, or rewrite migration history, and it never modifies application tables. SQLite local tests keep existing short version columns because SQLite does not enforce the declared varchar length.
+
+The Azure migration job runs `python -m app.operations.database_migration upgrade head`, which performs the compatibility preflight before invoking Alembic. A preflight failure means the migration must stop; do not manually edit or delete `alembic_version`.

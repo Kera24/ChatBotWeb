@@ -90,7 +90,7 @@ No secrets are included.
 
 `npm run azure:migrate -- --environment staging --image <api-digest> --execute` updates the B1 migration Container Apps Job to the target API image and starts it.
 
-The migration job is manual-triggered and separate from API startup.
+The job command is `python -m app.operations.database_migration upgrade head`. That entry point runs the Alembic version-table compatibility preflight, then invokes Alembic without stamping or reordering revisions. The migration job is manual-triggered and separate from API startup.
 
 ## Container App Revision Deployment
 

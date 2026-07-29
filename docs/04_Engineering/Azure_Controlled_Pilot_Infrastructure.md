@@ -133,7 +133,7 @@ Worker:
 Migration:
 
 - one manual Container Apps Job using the API image
-- runs `python -m alembic upgrade head`
+- runs `python -m app.operations.database_migration upgrade head`, including the Alembic version-table capacity preflight
 - no public ingress
 - not executed by every API replica
 
