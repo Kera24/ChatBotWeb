@@ -89,8 +89,6 @@ if (execute) {
     "--name", jobName,
     "--resource-group", resourceGroup,
     "--image", image,
-    "--command", "python",
-    "--args", "-m", "app.operations.staging_synthetic_widgets",
     "--set-env-vars", ...envVars,
   ], "Failed to update staging synthetic widget bootstrap job. Ensure the job uses managed Key Vault configuration.");
   runAz(["containerapp", "job", "start", "--name", jobName, "--resource-group", resourceGroup], "Failed to start staging synthetic widget bootstrap job.");
