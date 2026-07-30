@@ -78,7 +78,8 @@ test("staging what-if uses a temporary bicepparam file and never shell-expanded 
   assert.ok(whatIf.args.every((arg) => !arg.includes(secret)));
   assert.ok(whatIf.parameterFile.endsWith(".generated.bicepparam"));
   assert.equal(whatIf.parameterContent.includes("using '../main.bicep'"), true);
-  assert.equal(whatIf.parameterContent.includes("readEnvironmentVariable('AZURE_POSTGRES_ADMIN_PASSWORD')"), true);
+  assert.equal(whatIf.parameterContent.includes("param postgresAdministratorPassword = readEnvironmentVariable('AZURE_POSTGRES_ADMIN_PASSWORD')"), true);
+  assert.doesNotMatch(whatIf.parameterContent, /param postgresAdministratorPassword =\s*\r?\n\s*readEnvironmentVariable/);
   assert.equal(existsSync(whatIf.parameterFile), false, "temporary bicepparam should be deleted after what-if");
   assert.equal(findGeneratedParameterFiles().length, 0);
 

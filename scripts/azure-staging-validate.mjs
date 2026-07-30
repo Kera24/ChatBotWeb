@@ -130,8 +130,7 @@ function createTemporaryStagingParameterFile() {
   const overlay = [
     baseContent,
     "",
-    "param postgresAdministratorPassword =",
-    "  readEnvironmentVariable('AZURE_POSTGRES_ADMIN_PASSWORD')",
+    "param postgresAdministratorPassword = readEnvironmentVariable('AZURE_POSTGRES_ADMIN_PASSWORD')",
     "",
   ].join("\n");
   writeFileSync(temporaryParameterFile, overlay, { encoding: "utf8", flag: "wx" });
