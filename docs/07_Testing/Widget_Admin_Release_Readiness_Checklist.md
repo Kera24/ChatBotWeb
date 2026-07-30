@@ -72,3 +72,11 @@ Passing this checklist means widget administration is ready for controlled pilot
 - [ ] Staging admin smoke uses real staging auth or an approved synthetic staging user/session bootstrap.
 - [ ] Staging admin workflow verifies widget list, draft edit/save, origins, knowledge scope, preview, publish validation, publish, history, rollback, embed snippet, and installation observation using synthetic tenants only.
 - [ ] Production-pilot admin enablement remains unverified until staging evidence passes and a separate pilot task is approved.
+
+## TASK-068B5 Production-Pilot Administration Gate
+
+- [ ] `npm run azure:pilot:readiness` passed with B4 staging evidence.
+- [ ] Manual admin accessibility review passed for the pilot workflows used by the first pilot tenant.
+- [ ] Manual admin security review passed with no unresolved critical blockers.
+- [ ] First pilot tenant/widget enablement is approved separately from staging synthetic tenants.
+- [ ] Production-pilot admin use remains disabled for real customers until the protected workflow and deployed smoke complete.

@@ -138,3 +138,44 @@ export type ReviewListParams = {
   limit?: number;
   offset?: number;
 };
+export type RAGCitation = {
+  citation_index: number;
+  chunk_id: string;
+  document_id: string;
+  document_version_id: string;
+  source_title: string;
+  source_type: string;
+  page_number: number | null;
+  section_title: string | null;
+  similarity_score: number | null;
+  quoted_text: string | null;
+};
+
+export type TokenUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+  [key: string]: unknown;
+};
+
+export type RAGAnswerResponse = {
+  conversation_id: string;
+  user_message_id: string;
+  assistant_message_id: string;
+  answer: string;
+  answer_state: AnswerState | string;
+  citations: RAGCitation[];
+  retrieved_chunk_count: number;
+  provider_key: string;
+  model_key: string;
+  provider_model_name: string;
+  prompt_key: string;
+  prompt_version: string;
+  prompt_hash: string;
+  execution_id: string;
+  token_usage: TokenUsage;
+  estimated_cost: string | number;
+  latency_ms: number;
+  finish_reason: string;
+  fallback_used: boolean;
+};

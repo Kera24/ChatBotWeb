@@ -54,3 +54,7 @@ Until a credentialed staging run produces live evidence, the classification is:
 `staging deployment blocked before execution`
 
 This is not production-pilot readiness.
+
+## TASK-068B5 Production-Pilot Readiness Gate
+
+Production-pilot deployment remains manual and protected. Before pilot resources are mutated, operators must provide successful B4 staging evidence and pass `npm run azure:pilot:readiness`. The gate blocks promotion when live staging smoke, tenant isolation, telemetry privacy, alert routing, rollback drill, manual accessibility review, manual security review, domain review, rollback readiness, support readiness, or first-pilot approval is missing.

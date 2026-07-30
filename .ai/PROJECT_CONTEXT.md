@@ -599,3 +599,17 @@ The Azure staging validation harness includes a staging-only synthetic widget bo
 - `scripts/azure-run-staging-synthetic-widgets.mjs` deploys/updates that job with the approved API image and starts it only when `APP_ENV=staging` and `WIDGET_STAGING_SYNTHETIC_BOOTSTRAP=1` are set.
 - The job uses managed identity for ACR pull and Key Vault secret references. It must not use registry admin credentials or print database connection strings.
 - Pilot defaults keep the job disabled; B5 remains blocked until staging live validation, tenant isolation, monitoring, and rollback evidence pass without critical blockers.
+
+## TASK-068B5 production-pilot hardening gate
+
+TASK-068B5 is the final hardening task before product eval work or real pilot enablement. It does not implement dashboard placeholder pages and does not deploy production-pilot automatically.
+
+Implementation facts:
+
+- Added `planning/tasks/TASK-068B5-production-pilot-domain-wiring-deployment-synthetic-validation-first-enable.md`.
+- Added `scripts/validate-production-pilot-readiness.mjs` and `npm run azure:pilot:readiness`.
+- The readiness validator requires a staging deployment manifest, matching widget release artifacts, successful TASK-068B4 staging evidence, live browser/tenant-isolation evidence, telemetry evidence, alert evidence, rollback drill evidence, and a manual production-pilot gate.
+- The validator writes `artifacts/production-pilot-readiness/report.json` and intentionally records statuses/paths only, not approval note text, message content, answers, citations, tokens, credentials, or customer data.
+- `.github/workflows/azure-promote-pilot.yml` now downloads `azure-staging-validation`, records explicit manual approval inputs, and runs `npm run azure:pilot:readiness` before Azure login, pilot what-if, migrations, Container Apps deployment, or widget static publication.
+- The protected `production-pilot` environment remains required. Production-pilot deployment, DNS changes, customer enablement, and live product evals remain unexecuted until the gate passes with live evidence and operator approval.
+- The uncommitted chatbot dashboard implementation is independent of this hardening gate and remains preserved.

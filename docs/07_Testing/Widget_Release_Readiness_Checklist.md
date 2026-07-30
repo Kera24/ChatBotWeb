@@ -153,3 +153,20 @@ See `docs/07_Testing/Widget_Admin_Release_Readiness_Checklist.md` for the requir
 Before production-pilot preparation, run the staging live validation workflow or equivalent runbook. Required evidence includes Azure what-if/deployment state, migration result, API/web revision health, widget static publication, Front Door header/cache/CORS validation, live browser smoke, synthetic tenant isolation, telemetry privacy canary, alert routing, availability tests, rollback drill, and roll-forward restoration.
 
 If Azure credentials or secure staging parameters are unavailable, classify the result as `staging deployment blocked before execution` and do not proceed to production-pilot preparation.
+
+## TASK-068B5 Production-Pilot Gate
+
+Before production-pilot promotion, require:
+
+- [ ] `npm run azure:pilot:readiness` completed with live B4 evidence.
+- [ ] `azure-staging-validation` evidence exists for the same reviewed staged release.
+- [ ] Live browser smoke and tenant isolation passed.
+- [ ] Telemetry privacy and alert routing validation passed.
+- [ ] Staging rollback drill passed.
+- [ ] Manual accessibility review passed.
+- [ ] Manual security review passed.
+- [ ] Production-pilot domain/header plan reviewed.
+- [ ] Rollback operator and support receiver path ready.
+- [ ] First pilot tenant/widget enablement explicitly approved.
+
+Do not start product evals or enable real customer widgets until this gate and the protected production-pilot workflow complete successfully.

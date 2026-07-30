@@ -1,20 +1,21 @@
 # Current Sprint
 
 Current phase:
-Sprint 3H â€” Controlled Production Pilot Deployment
+Sprint 3H - Controlled Production Pilot Deployment
 
 Current task:
-TASK-068B4 â€” Azure Staging Deployment, Live Full-Stack Validation, Monitoring Verification, and Rollback Drill
+TASK-068B5 - Production-Pilot Domain Wiring, Deployment, Synthetic Validation, Manual Accessibility/Security Gate, and First Pilot Enablement
 
 ## Guardrails
 
-- Implement TASK-068B4 staging validation and rollback drill orchestration only.
-- Direct B4 execution may target `staging` only; reject `pilot`, `production`, `prod`, and `production-pilot`.
+- Implement TASK-068B5 repository hardening and promotion gating only.
 - Do not deploy production-pilot, modify production DNS, enable real customers, use customer data, weaken auth, or log tokens/conversations/drafts/citations.
-- Do not claim staging, monitoring, alerting, or rollback is live-verified unless Azure staging execution actually occurs.
-- Preserve Azure architecture, immutable artifacts, exact-origin policy, tenant isolation, privacy-preserving telemetry, and controlled approval model.
-- Next recommended task after successful staging validation only: TASK-068B5 â€” Production-Pilot Domain Wiring, Deployment, Synthetic Validation, Manual Accessibility/Security Gate, and First Pilot Enablement.
+- Do not start product eval work until the application is hardened, deployed, monitored, and usable.
+- Preserve the existing uncommitted chatbot dashboard implementation.
+- Preserve Azure architecture, immutable artifacts, exact-origin policy, tenant isolation, privacy-preserving telemetry, protected approvals, and rollback model.
 
 ## Current implementation note
 
-- TASK-068B4 now includes a staging-only synthetic widget bootstrap Container Apps Job definition and wrapper. The job is named `yoranix-staging-synth-widget-job` for staging, is disabled by default for pilot, uses the immutable API image and migration managed identity, and must be live-verified in Azure before B5 is treated as executable.
+- TASK-068B5 adds an explicit production-pilot readiness validator and protected workflow gate before Azure login or pilot mutation.
+- The gate requires successful TASK-068B4 staging validation evidence, live browser/tenant-isolation evidence, telemetry and alert evidence, rollback drill evidence, and manual accessibility/security/domain/rollback/support/first-pilot approvals.
+- Live production-pilot execution remains manual through the protected `production-pilot` GitHub environment and has not been performed by this repository change.

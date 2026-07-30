@@ -1,14 +1,62 @@
-﻿name: Azure Promote Pilot
+name: Azure Promote Pilot
 
 on:
   workflow_dispatch:
     inputs:
       staging_run_id:
-        description: Workflow run ID that uploaded the azure-staging-deployment artifact
+        description: Workflow run ID that uploaded the azure-staging-deployment and azure-staging-validation artifacts
         required: true
       approval_note:
         description: Human-readable approval/change note
         required: true
+      manual_accessibility_review_passed:
+        description: Manual assistive-technology/accessibility review passed for pilot scope
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      manual_security_review_passed:
+        description: Manual security review passed with no unresolved critical blockers
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      production_domain_plan_reviewed:
+        description: Production-pilot domain, TLS, DNS, and header plan reviewed
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      rollback_operator_ready:
+        description: Operator confirmed rollback runbook, known-good manifest, and support path
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      support_contact_ready:
+        description: Pilot support contact and alert receiver path are ready
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      first_pilot_tenant_approved:
+        description: First pilot tenant/widget enablement is approved and contains no customer data in validation evidence
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: read
@@ -44,8 +92,35 @@ jobs:
           github-token: ${{ github.token }}
           path: artifacts
 
+      - name: Download staging validation evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: azure-staging-validation
+          run-id: ${{ inputs.staging_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/azure-staging-validation
+
       - name: Validate staged deployment manifest
         run: node scripts/validate-deployment-manifest.mjs --manifest artifacts/deployment-release/manifest.json --release-dir artifacts/widget-release --expected-source-environment staging
+
+      - name: Record manual production-pilot gate
+        env:
+          APPROVAL_NOTE: ${{ inputs.approval_note }}
+          APPROVED_BY: ${{ github.actor }}
+          MANUAL_ACCESSIBILITY_REVIEW_PASSED: ${{ inputs.manual_accessibility_review_passed }}
+          MANUAL_SECURITY_REVIEW_PASSED: ${{ inputs.manual_security_review_passed }}
+          PRODUCTION_DOMAIN_PLAN_REVIEWED: ${{ inputs.production_domain_plan_reviewed }}
+          ROLLBACK_OPERATOR_READY: ${{ inputs.rollback_operator_ready }}
+          SUPPORT_CONTACT_READY: ${{ inputs.support_contact_ready }}
+          FIRST_PILOT_TENANT_APPROVED: ${{ inputs.first_pilot_tenant_approved }}
+        run: |
+          mkdir -p artifacts/production-pilot-readiness
+          node -e "const fs=require('fs'); const bool=(v)=>v==='true'; const gate={schema_version:'1.0', approved_by:process.env.APPROVED_BY, approved_at:new Date().toISOString(), approval_note_length:(process.env.APPROVAL_NOTE||'').length, manual_accessibility_review_passed:bool(process.env.MANUAL_ACCESSIBILITY_REVIEW_PASSED), manual_security_review_passed:bool(process.env.MANUAL_SECURITY_REVIEW_PASSED), production_domain_plan_reviewed:bool(process.env.PRODUCTION_DOMAIN_PLAN_REVIEWED), rollback_operator_ready:bool(process.env.ROLLBACK_OPERATOR_READY), support_contact_ready:bool(process.env.SUPPORT_CONTACT_READY), first_pilot_tenant_approved:bool(process.env.FIRST_PILOT_TENANT_APPROVED), no_customer_data_in_validation:true}; fs.writeFileSync('artifacts/production-pilot-readiness/manual-gate.json', JSON.stringify(gate,null,2)+'\n');"
+
+      - name: Validate production-pilot readiness gate
+        env:
+          PILOT_APPROVAL_NOTE: ${{ inputs.approval_note }}
+        run: npm run azure:pilot:readiness -- --manifest artifacts/deployment-release/manifest.json --release-dir artifacts/widget-release --staging-report artifacts/azure-staging-validation/report.json --browser-smoke artifacts/azure-staging-validation/browser-smoke.json --telemetry artifacts/azure-staging-validation/telemetry.json --alerts artifacts/azure-staging-validation/alerts.json --rollback artifacts/azure-staging-validation/rollback.json --manual-gate artifacts/production-pilot-readiness/manual-gate.json
 
       - name: Extract release image refs
         id: manifest
@@ -102,7 +177,6 @@ jobs:
           path: |
             artifacts/deployment-release
             artifacts/azure-deployment/pilot
+            artifacts/production-pilot-readiness
           if-no-files-found: ignore
           retention-days: 30
-
-

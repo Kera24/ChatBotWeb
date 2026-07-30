@@ -108,3 +108,12 @@ Controlled pilot administration now requires `npm run widget:admin:release:verif
 - [ ] Telemetry/log privacy canary text, session token, preview grant, answer, citation excerpt, and draft values are absent from Application Insights and Log Analytics.
 - [ ] Source maps are not publicly served from staging widget/SDK assets.
 - [ ] Production-pilot security remains unverified until a separate approved pilot deployment task runs.
+
+## TASK-068B5 Production-Pilot Security Gate
+
+- [ ] `npm run azure:pilot:readiness` passed before any production-pilot Azure mutation.
+- [ ] B4 live tenant isolation, token isolation, origin isolation, telemetry privacy, alert routing, and rollback evidence passed.
+- [ ] Manual security review passed with no unresolved critical blockers.
+- [ ] Production-pilot domain/TLS/header/CORS/cache plan reviewed.
+- [ ] No customer data appears in staging or pilot validation evidence.
+- [ ] Product evals and real customer widgets remain blocked until production-pilot deployed smoke and monitoring evidence pass.

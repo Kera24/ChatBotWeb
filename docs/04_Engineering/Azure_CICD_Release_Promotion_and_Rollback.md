@@ -161,3 +161,15 @@ Local npm on Windows may treat unknown forwarded flags as npm configuration and 
 `azure-validate-staging.yml` is a manual `workflow_dispatch` workflow scoped to GitHub environment `staging`. It runs repository gates, Azure prerequisite/what-if evidence, live browser smoke evidence, telemetry evidence, alert evidence, and optional rollback drill evidence.
 
 The workflow does not run on pull requests and does not target `production-pilot`. Rollback drill execution requires current and known-good staging deployment manifests and preserves the no-automatic-DB-downgrade compatibility policy.
+
+## TASK-068B5 Production-Pilot Promotion Gate
+
+Production-pilot promotion now has a repository-enforced readiness gate before Azure login or mutation:
+
+```bash
+npm run azure:pilot:readiness
+```
+
+The protected `azure-promote-pilot.yml` workflow downloads both `azure-staging-deployment` and `azure-staging-validation` artifacts from the selected staging run, records explicit manual gate inputs, and runs the readiness validator before pilot what-if, migration, app deployment, or static publication. The gate requires B4 staging validation, live browser/tenant-isolation evidence, telemetry and alert evidence, rollback drill evidence, and manual accessibility/security/domain/rollback/support/first-pilot approvals.
+
+This does not deploy production-pilot automatically and does not enable customer widgets. Product evals remain blocked until the protected workflow completes and the deployed pilot environment is smoke-tested and monitored.

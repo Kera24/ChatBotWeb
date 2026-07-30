@@ -48,6 +48,7 @@
     "azure:observability:validate": "node scripts/validate-azure-observability.mjs",
     "azure:release:manifest": "node scripts/build-deployment-release.mjs",
     "azure:release:validate": "node scripts/validate-deployment-manifest.mjs",
+    "azure:pilot:readiness": "node scripts/validate-production-pilot-readiness.mjs",
     "azure:widget:publish": "node scripts/publish-azure-widget-release.mjs",
     "azure:migrate": "node scripts/azure-run-migration.mjs",
     "azure:deploy:apps": "node scripts/azure-deploy-apps.mjs",
