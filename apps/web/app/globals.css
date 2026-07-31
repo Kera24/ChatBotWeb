@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color-scheme: light;
   --ink: #17120f;
   --muted: #625b54;
@@ -1910,5 +1910,353 @@ code {
   .knowledgeUploadForm .actionButton,
   .knowledgePanel .smallButton {
     width: 100%;
+  }
+}
+
+/* Overview dashboard */
+.overviewPage {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.overviewHero,
+.overviewQuickActions,
+.overviewPanel,
+.overviewMetricCard {
+  background: #ffffff;
+  border: 1px solid #d9e2ee;
+  box-shadow: 0 16px 40px rgba(7, 27, 58, 0.08);
+}
+
+.overviewHero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 8px;
+}
+
+.overviewHero h2 {
+  margin: 8px 0;
+  color: #071b3a;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.08;
+}
+
+.overviewHero p:last-child {
+  max-width: 760px;
+  margin: 0;
+  color: #536172;
+  line-height: 1.65;
+}
+
+.overviewHeroAside {
+  min-width: 180px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 8px;
+  background: #071b3a;
+  color: #ffffff;
+  text-transform: capitalize;
+}
+
+.overviewHeroAside strong {
+  font-size: 1.45rem;
+}
+
+.overviewHeroAside span {
+  color: #d9e2ee;
+}
+
+.overviewMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overviewMetricCard {
+  min-height: 138px;
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.overviewMetricCard span {
+  display: block;
+  color: #536172;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.overviewMetricCard strong {
+  display: block;
+  margin-top: 10px;
+  color: #071b3a;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.overviewMetricCard p {
+  margin: 12px 0 0;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.overviewLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.8fr);
+  gap: 18px;
+}
+
+.overviewPanel,
+.overviewQuickActions {
+  border-radius: 8px;
+  padding: 22px;
+}
+
+.overviewPanelHeader,
+.overviewQuickActions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.overviewPanel h3,
+.overviewQuickActions h3,
+.overviewEmptyState h4,
+.overviewAlert h4,
+.overviewHealthItem h4 {
+  margin: 4px 0 0;
+  color: #071b3a;
+}
+
+.overviewHealthBadge {
+  border-radius: 999px;
+  padding: 7px 10px;
+  border: 1px solid #d9e2ee;
+  color: #071b3a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.overview-health-healthy {
+  background: #eafaf1;
+  border-color: #a7e3bd;
+}
+
+.overview-health-warning {
+  background: #fff7df;
+  border-color: #f0d17a;
+}
+
+.overview-health-danger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.overviewHealthList,
+.overviewAlertList {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.overviewHealthItem,
+.overviewAlert {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e4ebf3;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fafc;
+}
+
+.overviewHealthItem {
+  justify-content: flex-start;
+}
+
+.overviewHealthItem p,
+.overviewAlert p,
+.overviewEmptyState p,
+.overviewTimeline p {
+  margin: 6px 0 0;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.overviewStatusDot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.overview-status-healthy {
+  background: #16a34a;
+}
+
+.overview-status-warning {
+  background: #d97706;
+}
+
+.overview-status-danger {
+  background: #dc2626;
+}
+
+.overview-status-idle {
+  background: #64748b;
+}
+
+.overviewFacts {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+}
+
+.overviewFacts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e4ebf3;
+}
+
+.overviewFacts dt {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.overviewFacts dd {
+  margin: 0;
+  color: #071b3a;
+  font-weight: 800;
+  text-align: right;
+}
+
+.overviewActionList {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.overviewTimeline {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.overviewTimeline li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #e4ebf3;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.overviewTimeline a {
+  color: #071b3a;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.overviewTimeline a:hover {
+  text-decoration: underline;
+}
+
+.overviewTimeline time {
+  color: #64748b;
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.overviewAlert {
+  background: #ffffff;
+}
+
+.overview-alert-danger {
+  border-color: #fecdd3;
+}
+
+.overview-alert-warning {
+  border-color: #f0d17a;
+}
+
+.overviewEmptyState {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.overviewSkeletonBlock {
+  position: relative;
+  overflow: hidden;
+}
+
+.overviewSkeletonBlock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 27, 58, 0.05);
+  animation: overviewSkeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes overviewSkeleton {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (max-width: 1100px) {
+  .overviewMetricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overviewLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .overviewHero,
+  .overviewPanelHeader,
+  .overviewQuickActions,
+  .overviewTimeline li,
+  .overviewFacts div {
+    flex-direction: column;
+  }
+
+  .overviewHeroAside {
+    min-width: 0;
+  }
+
+  .overviewMetricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .overviewActionList {
+    justify-content: flex-start;
+  }
+
+  .overviewTimeline time,
+  .overviewFacts dd {
+    text-align: left;
   }
 }
