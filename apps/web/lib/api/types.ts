@@ -1,4 +1,4 @@
-export type ApiEnvelope<TData, TMeta = Record<string, unknown>> = {
+﻿export type ApiEnvelope<TData, TMeta = Record<string, unknown>> = {
   success: boolean;
   data: TData;
   meta?: TMeta;
@@ -87,6 +87,8 @@ export type ConversationListMeta = {
 export type ConversationListParams = {
   status?: string;
   channel?: string;
+  started_after?: string;
+  started_before?: string;
   limit?: number;
   offset?: number;
 };

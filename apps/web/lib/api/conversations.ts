@@ -1,4 +1,4 @@
-import { dashboardApiGet } from "./client";
+﻿import { dashboardApiGet } from "./client";
 import type {
   ConversationDetail,
   ConversationListMeta,
@@ -18,6 +18,8 @@ export async function listConversations(
       organisation_id: session.organisationId,
       status: params.status,
       channel: params.channel,
+      started_after: params.started_after,
+      started_before: params.started_before,
       limit: params.limit ?? 20,
       offset: params.offset ?? 0,
     },

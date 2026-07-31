@@ -2260,3 +2260,382 @@ code {
     text-align: left;
   }
 }
+
+/* Analytics dashboard */
+.analyticsPage {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.analyticsHero,
+.analyticsFilters,
+.analyticsNotice,
+.analyticsPanel,
+.analyticsMetricCard {
+  background: #ffffff;
+  border: 1px solid #d9e2ee;
+  box-shadow: 0 16px 40px rgba(7, 27, 58, 0.08);
+}
+
+.analyticsHero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 8px;
+}
+
+.analyticsHero h2 {
+  margin: 8px 0;
+  color: #071b3a;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.08;
+}
+
+.analyticsHero p:last-child {
+  max-width: 780px;
+  margin: 0;
+  color: #536172;
+  line-height: 1.65;
+}
+
+.analyticsHeroAside {
+  min-width: 190px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 8px;
+  background: #071b3a;
+  color: #ffffff;
+}
+
+.analyticsHeroAside strong {
+  font-size: 2rem;
+}
+
+.analyticsHeroAside span {
+  color: #d9e2ee;
+}
+
+.analyticsFilters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr)) auto;
+  gap: 14px;
+  align-items: end;
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.analyticsFilters label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #071b3a;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.analyticsFilters input,
+.analyticsFilters select {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 11px;
+  color: #071b3a;
+  background: #ffffff;
+}
+
+.analyticsFilters input:focus,
+.analyticsFilters select:focus {
+  outline: 3px solid rgba(7, 27, 58, 0.16);
+  border-color: #071b3a;
+}
+
+.analyticsFilterActions,
+.analyticsPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.analyticsFilterActions {
+  align-items: flex-end;
+}
+
+.analyticsNotice {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 8px;
+  color: #536172;
+}
+
+.analyticsNotice strong {
+  color: #071b3a;
+}
+
+.analyticsNotice p,
+.analyticsCaveat {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.analyticsMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.analyticsMetricCard {
+  min-height: 132px;
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.analyticsMetricCard span {
+  display: block;
+  color: #536172;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.analyticsMetricCard strong {
+  display: block;
+  margin-top: 10px;
+  color: #071b3a;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.analyticsMetricCard p {
+  margin: 12px 0 0;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.analyticsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
+  gap: 18px;
+}
+
+.analyticsPanel {
+  border-radius: 8px;
+  padding: 22px;
+}
+
+.analyticsPanel h3,
+.analyticsPanel h4,
+.analyticsEmptyState h4,
+.analyticsInsight h4 {
+  margin: 4px 0 0;
+  color: #071b3a;
+}
+
+.analyticsSplit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.analyticsBarList {
+  display: grid;
+  gap: 13px;
+  margin-top: 18px;
+}
+
+.analyticsBarItem {
+  display: grid;
+  gap: 7px;
+}
+
+.analyticsBarLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #071b3a;
+  font-weight: 800;
+}
+
+.analyticsBarTrack {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e4ebf3;
+}
+
+.analyticsBarTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #071b3a;
+}
+
+.analyticsFacts {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.analyticsFacts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e4ebf3;
+}
+
+.analyticsFacts dt {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.analyticsFacts dd {
+  margin: 0;
+  color: #071b3a;
+  font-weight: 900;
+  text-align: right;
+}
+
+.analyticsTableWrap {
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.analyticsTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 440px;
+}
+
+.analyticsTable th,
+.analyticsTable td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #e4ebf3;
+  text-align: left;
+  vertical-align: top;
+}
+
+.analyticsTable th {
+  color: #536172;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.analyticsTable a {
+  color: #071b3a;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.analyticsTable a:hover {
+  text-decoration: underline;
+}
+
+.compactTable .analyticsTable {
+  min-width: 360px;
+}
+
+.analyticsInsightList {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.analyticsInsight {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e4ebf3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.analytics-insight-danger {
+  border-color: #fecdd3;
+}
+
+.analytics-insight-warning {
+  border-color: #f0d17a;
+}
+
+.analyticsInsight p,
+.analyticsEmptyState p {
+  margin: 6px 0 0;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.analyticsEmptyState {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.analyticsSkeletonBlock {
+  position: relative;
+  overflow: hidden;
+}
+
+.analyticsSkeletonBlock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 27, 58, 0.05);
+  animation: analyticsSkeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes analyticsSkeleton {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (max-width: 1180px) {
+  .analyticsFilters,
+  .analyticsMetricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analyticsFilterActions {
+    justify-content: flex-start;
+  }
+
+  .analyticsLayout,
+  .analyticsSplit {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .analyticsHero,
+  .analyticsPanelHeader,
+  .analyticsInsight,
+  .analyticsFacts div {
+    flex-direction: column;
+  }
+
+  .analyticsHeroAside {
+    min-width: 0;
+  }
+
+  .analyticsFilters,
+  .analyticsMetricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .analyticsFacts dd {
+    text-align: left;
+  }
+}
