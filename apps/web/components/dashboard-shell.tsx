@@ -13,11 +13,11 @@ export function DashboardShell({ children }: DashboardShellProps) {
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="brandBlock">
           <div className="brandMark" aria-hidden="true">
-            YA
+            YX
           </div>
           <div>
-            <p className="brandKicker">Yoranix</p>
-            <p className="brandName">AI Platform</p>
+            <p className="brandKicker">Yuranix</p>
+            <p className="brandName">Knowledge Platform</p>
           </div>
         </div>
 

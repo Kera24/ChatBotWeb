@@ -1,4 +1,4 @@
-﻿import { developmentDashboardHeaders, type DevelopmentDashboardSession } from "../auth/development-session";
+import { developmentDashboardHeaders, type DevelopmentDashboardSession } from "../auth/development-session";
 import { DashboardApiError, apiErrorKindFromStatus } from "./errors";
 import type { ApiEnvelope } from "./types";
 
@@ -20,6 +20,10 @@ type DashboardApiMutationRequest = DashboardApiRequest & {
   body?: Record<string, unknown>;
 };
 
+type DashboardApiFormRequest = DashboardApiRequest & {
+  formData: FormData;
+};
+
 export async function dashboardApiGet<TData, TMeta = Record<string, unknown>>({
   path,
   session,
@@ -36,6 +40,15 @@ export async function dashboardApiPost<TData, TMeta = Record<string, unknown>>({
   body = {},
 }: DashboardApiMutationRequest): Promise<ApiEnvelope<TData, TMeta>> {
   return dashboardApiRequest<TData, TMeta>({ method: "POST", path, session, searchParams, body, cache: "no-store" });
+}
+
+export async function dashboardApiPostForm<TData, TMeta = Record<string, unknown>>({
+  path,
+  session,
+  searchParams,
+  formData,
+}: DashboardApiFormRequest): Promise<ApiEnvelope<TData, TMeta>> {
+  return dashboardApiRequest<TData, TMeta>({ method: "POST", path, session, searchParams, formData, cache: "no-store" });
 }
 
 export async function dashboardApiPatch<TData, TMeta = Record<string, unknown>>({
@@ -61,8 +74,9 @@ async function dashboardApiRequest<TData, TMeta = Record<string, unknown>>({
   session,
   searchParams,
   body,
+  formData,
   cache = "no-store",
-}: DashboardApiRequest & { method: "GET" | "POST" | "PATCH" | "DELETE"; body?: Record<string, unknown> }): Promise<ApiEnvelope<TData, TMeta>> {
+}: DashboardApiRequest & { method: "GET" | "POST" | "PATCH" | "DELETE"; body?: Record<string, unknown>; formData?: FormData }): Promise<ApiEnvelope<TData, TMeta>> {
   const url = new URL(`${getDashboardApiBaseUrl()}${path}`);
   for (const [key, value] of Object.entries(searchParams ?? {})) {
     if (value !== undefined && value !== null && value !== "") {
@@ -79,7 +93,7 @@ async function dashboardApiRequest<TData, TMeta = Record<string, unknown>>({
         ...(body ? { "Content-Type": "application/json" } : {}),
         ...developmentDashboardHeaders(session),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? JSON.stringify(body) : formData,
       cache,
     });
   } catch (error) {
