@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import { render, screen } from "../../test/test-utils";
 import { AccessDeniedState, EmptyState, ErrorState, LoadingState, MissingTenantConfiguration } from "./state-panels";
@@ -9,13 +9,13 @@ describe("conversation state panels", () => {
     expect(screen.getByRole("heading", { name: "Loading conversations" })).toBeTruthy();
 
     rerender(<EmptyState />);
-    expect(screen.getByRole("heading", { name: "The room is quiet" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "No conversations have been recorded" })).toBeTruthy();
 
     rerender(<AccessDeniedState />);
-    expect(screen.getByRole("heading", { name: "This development user cannot view this workspace" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "You cannot view this workspace" })).toBeTruthy();
   });
 
-  it("renders missing and invalid tenant variables without values", () => {
+  it("renders missing and invalid workspace configuration without developer details", () => {
     render(
       <MissingTenantConfiguration
         missing={["NEXT_PUBLIC_DEVELOPMENT_ORGANISATION_ID"]}
@@ -23,9 +23,10 @@ describe("conversation state panels", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Tenant context is missing" })).toBeTruthy();
-    expect(screen.getByText("NEXT_PUBLIC_DEVELOPMENT_ORGANISATION_ID")).toBeTruthy();
-    expect(screen.getByText("NEXT_PUBLIC_DEVELOPMENT_ROLE")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Workspace access is not ready" })).toBeTruthy();
+    expect(screen.getByText("2 configuration items need attention.")).toBeTruthy();
+    expect(screen.queryByText("NEXT_PUBLIC_DEVELOPMENT_ORGANISATION_ID")).toBeNull();
+    expect(screen.queryByText("NEXT_PUBLIC_DEVELOPMENT_ROLE")).toBeNull();
     expect(screen.queryByText("owner@example.test")).toBeNull();
   });
 

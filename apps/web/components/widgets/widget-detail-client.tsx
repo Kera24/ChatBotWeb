@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -744,7 +744,7 @@ function EmbedPanel({ session, widget, setWidget, embed, setEmbed, sdkVersions, 
           </select>
           <dl className="widgetFacts compactFacts">
             <div><dt>Selected loader</dt><dd>{embed.selected_loader_path}</dd></div>
-            <div><dt>API version</dt><dd>{embed.api_version}</dd></div>
+            <div><dt>Embed version</dt><dd>{embed.api_version}</dd></div>
             <div><dt>SRI</dt><dd>{embed.sri || "Not used"}</dd></div>
             <div><dt>Release channel</dt><dd>{embed.release_channel}</dd></div>
           </dl>
@@ -946,4 +946,5 @@ function fingerprint(value: string) {
 function isHex(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value);
 }
+
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import type { OverviewData } from "../../lib/api/overview";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
@@ -86,8 +86,8 @@ export function OverviewDashboard({ session, data, environment }: OverviewDashbo
             </div>
           </div>
           <dl className="overviewFacts">
-            <div><dt>Organisation</dt><dd>{shorten(session.organisationId)}</dd></div>
-            <div><dt>Workspace</dt><dd>{shorten(session.workspaceId)}</dd></div>
+            <div><dt>Platform</dt><dd>Yuranix Knowledge Platform</dd></div>
+            <div><dt>Workspace status</dt><dd>Active</dd></div>
             <div><dt>Member role</dt><dd>{session.role.replace("_", " ")}</dd></div>
             <div><dt>Environment</dt><dd>{environment}</dd></div>
             <div><dt>Latest knowledge update</dt><dd>{latestKnowledgeUpdate ? formatDate(latestKnowledgeUpdate) : "None yet"}</dd></div>
@@ -323,6 +323,6 @@ function minutesSince(value: string) {
   return (Date.now() - new Date(value).getTime()) / 60_000;
 }
 
-function shorten(value: string) {
-  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value;
-}
+
+
+

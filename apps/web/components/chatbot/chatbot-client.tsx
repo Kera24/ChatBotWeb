@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useMemo, useRef, useState, type FormEvent } from "react";
@@ -150,9 +150,9 @@ export function ChatbotClient({ session }: ChatbotClientProps) {
             <Link className="actionButton" href="/knowledge">Manage knowledge</Link>
           </div>
           <dl className="widgetFacts compactFacts">
-            <div><dt>Workspace</dt><dd>{session.workspaceId}</dd></div>
-            <div><dt>Organisation</dt><dd>{session.organisationId}</dd></div>
-            <div><dt>Channel</dt><dd>dashboard_test</dd></div>
+            <div><dt>Mode</dt><dd>Dashboard test</dd></div>
+            <div><dt>Knowledge scope</dt><dd>Workspace sources</dd></div>
+            <div><dt>Channel</dt><dd>dashboard test</dd></div>
           </dl>
         </aside>
       </div>
@@ -239,3 +239,5 @@ function messageForChatbotError(error: unknown) {
   }
   return "The chatbot request could not be completed.";
 }
+
+

@@ -1,4 +1,9 @@
+﻿"use client";
+
+import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { navigationItems } from "../lib/navigation";
@@ -8,52 +13,87 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ children }: DashboardShellProps) {
+  const pathname = usePathname();
+
   return (
     <div className="shell">
-      <aside className="sidebar" aria-label="Primary navigation">
-        <div className="brandBlock">
-          <div className="brandMark" aria-hidden="true">
-            YX
-          </div>
+      <motion.aside
+        className="sidebar"
+        aria-label="Primary navigation"
+        initial={{ opacity: 0, x: -16 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <Link className="brandBlock" href="/" aria-label="Yuranix overview">
+          <Image className="brandMark" src="/brand/yuranix-logo.png" alt="" aria-hidden="true" width={52} height={52} priority />
           <div>
             <p className="brandKicker">Yuranix</p>
             <p className="brandName">Knowledge Platform</p>
           </div>
-        </div>
+        </Link>
 
         <nav className="navList">
-          {navigationItems.map((item) => (
-            <Link className="navLink" href={item.href} key={item.href}>
-              <span className="navGlyph" aria-hidden="true">
-                {item.glyph}
-              </span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {navigationItems.map((item, index) => {
+            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            return (
+              <motion.div
+                key={item.href}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.26, delay: 0.03 * index }}
+              >
+                <Link className={`navLink${active ? " navLinkActive" : ""}`} href={item.href} aria-current={active ? "page" : undefined}>
+                  <span className="navGlyph" aria-hidden="true">
+                    {item.glyph}
+                  </span>
+                  <span>{item.label}</span>
+                </Link>
+              </motion.div>
+            );
+          })}
         </nav>
 
-        <div className="sidebarNote" aria-label="Foundation status">
+        <div className="sidebarNote" aria-label="Workspace status">
           <span className="statusDot" aria-hidden="true" />
           <div>
-            <p>Foundation mode</p>
-            <span>Conversation history uses temporary development tenant context.</span>
+            <p>Workspace ready</p>
+            <span>Knowledge, testing, deployment, and analytics are managed from one secure operating surface.</span>
           </div>
         </div>
-      </aside>
+      </motion.aside>
 
       <main className="mainArea">
-        <div className="topbar">
+        <motion.div
+          className="topbar"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        >
           <div>
-            <p className="workspaceLabel">Client workspace</p>
-            <h1>Admissions Assistant</h1>
+            <p className="workspaceLabel">AI Knowledge Platform</p>
+            <h1>Yuranix Command Center</h1>
           </div>
           <div className="trustBadge" aria-label="Trust guardrails">
             Source-grounded by design
           </div>
-        </div>
+        </motion.div>
 
-        {children}
+        <motion.div
+          className="pageMotion"
+          key={pathname}
+          initial={{ opacity: 0, y: 14, scale: 0.995 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {children}
+        </motion.div>
       </main>
     </div>
   );
 }
+
+
+
+
+
+

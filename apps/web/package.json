@@ -11,6 +11,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "framer-motion": "^12.43.0",
+    "lucide-react": "^1.28.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"

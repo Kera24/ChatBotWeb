@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -128,7 +128,7 @@ export function SettingsDashboardClient({ session, initialSettings }: SettingsDa
             {validationError ? <p className="formError" role="alert">{validationError}</p> : null}
             <dl className="settingsFacts">
               <div><dt>Workspace slug</dt><dd>{settings.workspace.slug}</dd></div>
-              <div><dt>Workspace ID</dt><dd><code>{settings.workspace.id}</code></dd></div>
+              <div><dt>Visibility</dt><dd>Private workspace</dd></div>
               <div><dt>Updated</dt><dd>{formatDateTime(settings.workspace.updated_at)}</dd></div>
             </dl>
             <div className="formActions">
@@ -143,7 +143,7 @@ export function SettingsDashboardClient({ session, initialSettings }: SettingsDa
           <div className="settingsPanelHeader">
             <div>
               <p className="sectionKicker">Organisation</p>
-              <h3 id="organisation-settings-title">Read-only tenant context</h3>
+              <h3 id="organisation-settings-title">Read-only account context</h3>
             </div>
           </div>
           <dl className="settingsFacts">
@@ -151,7 +151,7 @@ export function SettingsDashboardClient({ session, initialSettings }: SettingsDa
             <div><dt>Slug</dt><dd>{settings.organisation.slug}</dd></div>
             <div><dt>Status</dt><dd>{settings.organisation.status}</dd></div>
             <div><dt>Plan</dt><dd>{settings.organisation.plan_key}</dd></div>
-            <div><dt>Organisation ID</dt><dd><code>{settings.organisation.id}</code></dd></div>
+            <div><dt>Access model</dt><dd>Role-based access</dd></div>
           </dl>
           <Link className="smallButton" href="/users">Manage access</Link>
         </section>
@@ -279,4 +279,5 @@ function formatCapability(value: string) {
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
+
 
