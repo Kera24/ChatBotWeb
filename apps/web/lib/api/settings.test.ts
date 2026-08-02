@@ -27,7 +27,8 @@ describe("settings API helpers", () => {
     const parsed = new URL(String(url));
     expect(parsed.pathname).toBe("/api/v1/workspaces/workspace-1/settings");
     expect(parsed.searchParams.get("organisation_id")).toBe("org-1");
-    expect(init.headers).toMatchObject({ "X-Development-User-Email": "admin@example.test", "X-Development-Role": "client_admin" });
+    expect(init.headers).not.toHaveProperty("X-Development-User-Email");
+    expect(init.credentials).toBe("include");
   });
 
   it("updates only supported workspace settings", async () => {

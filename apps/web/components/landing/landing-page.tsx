@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
@@ -35,7 +35,7 @@ const features = [
 ];
 
 const steps = [
-  { title: "Create account", description: "Start a secure Yuranix workspace for your team.", icon: UsersRound },
+  { title: "Create account", description: "Start a secure Yoranix workspace for your team.", icon: UsersRound },
   { title: "Upload knowledge", description: "Add the documents your assistant should understand.", icon: UploadCloud },
   { title: "Train AI", description: "Process sources into a searchable, citation-ready knowledge layer.", icon: Network },
   { title: "Deploy widget", description: "Publish a customer-facing assistant when your team is ready.", icon: MousePointerClick },
@@ -56,7 +56,7 @@ const pricing = [
     description: "For small teams proving the value of source-grounded AI support.",
     features: ["1 workspace", "Knowledge uploads", "Chatbot testing", "Basic analytics"],
     cta: "Get Started Free",
-    href: "/knowledge",
+    href: "/register",
   },
   {
     name: "Professional",
@@ -75,14 +75,14 @@ const pricing = [
     description: "For organisations that need rollout planning, security review, and dedicated support.",
     features: ["Custom deployment", "Security review", "Priority support", "Workspace governance"],
     cta: "Book Demo",
-    href: "mailto:hello@yuranix.com?subject=Book%20a%20Yuranix%20demo",
+    href: "mailto:hello@yoranix.com?subject=Book%20a%20Yoranix%20demo",
   },
 ];
 
 const faqs = [
   {
-    question: "What does Yuranix use as its knowledge source?",
-    answer: "Yuranix is designed around the documents and workspace sources your team uploads, so the assistant can answer from business-specific knowledge instead of generic content.",
+    question: "What does Yoranix use as its knowledge source?",
+    answer: "Yoranix is designed around the documents and workspace sources your team uploads, so the assistant can answer from business-specific knowledge instead of generic content.",
   },
   {
     question: "Can we test answers before deploying?",
@@ -93,7 +93,7 @@ const faqs = [
     answer: "No. This page is a static product surface. It does not create accounts, send forms, or call backend services.",
   },
   {
-    question: "How does Yuranix support enterprise teams?",
+    question: "How does Yoranix support enterprise teams?",
     answer: "The platform focuses on isolated workspaces, role-based access, source-grounded answers, analytics, review workflows, and controlled widget deployment.",
   },
 ];
@@ -129,15 +129,15 @@ function HeroSection() {
         <Reveal className="landingHeroCopy">
           <div className="landingPill"><Sparkles size={16} aria-hidden="true" /> Enterprise AI knowledge platform</div>
           <h1 id="landing-hero-title">Build AI Chatbots That Know Your Business</h1>
-          <p>Yuranix turns your trusted business knowledge into secure, source-grounded AI assistants that can be tested, deployed, and measured from one premium workspace.</p>
+          <p>Yoranix turns your trusted business knowledge into secure, source-grounded AI assistants that can be tested, deployed, and measured from one premium workspace.</p>
           <div className="landingHeroActions">
-            <Link className="landingButton landingButtonPrimary" href="/knowledge">Get Started Free <ArrowRight size={18} aria-hidden="true" /></Link>
-            <a className="landingButton landingButtonSecondary" href="mailto:hello@yuranix.com?subject=Book%20a%20Yuranix%20demo">Book Demo</a>
+            <Link className="landingButton landingButtonPrimary" href="/register">Get Started Free <ArrowRight size={18} aria-hidden="true" /></Link>
+            <a className="landingButton landingButtonSecondary" href="mailto:hello@yoranix.com?subject=Book%20a%20Yoranix%20demo">Book Demo</a>
           </div>
         </Reveal>
         <Reveal className="landingHeroVisual" delay={0.12}>
           <motion.div className="floatingLogo" animate={{ y: [0, -10, 0] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}>
-            <Image src="/brand/yuranix-logo.png" alt="Yuranix" width={80} height={80} priority />
+            <Image src="/brand/yoranix-logo.png" alt="Yoranix" width={80} height={80} priority />
           </motion.div>
           <DashboardMockup compact />
         </Reveal>
@@ -149,9 +149,9 @@ function HeroSection() {
 function LandingNav() {
   return (
     <nav className="landingNav" aria-label="Landing navigation">
-      <Link className="landingBrand" href="/" aria-label="Yuranix home">
-        <Image src="/brand/yuranix-logo.png" alt="" width={34} height={34} aria-hidden="true" />
-        <span>Yuranix</span>
+      <Link className="landingBrand" href="/" aria-label="Yoranix home">
+        <Image src="/brand/yoranix-logo.png" alt="" width={34} height={34} aria-hidden="true" />
+        <span>Yoranix</span>
       </Link>
       <div className="landingNavLinks">
         <a href="#features">Features</a>
@@ -159,7 +159,7 @@ function LandingNav() {
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>
       </div>
-      <Link className="landingNavCta" href="/knowledge">Get Started</Link>
+      <div className="landingNavActions"><Link className="landingLoginLink" href="/login">Log in</Link><Link className="landingNavCta" href="/register">Get Started</Link></div>
     </nav>
   );
 }
@@ -216,7 +216,7 @@ function FeatureCard({ title, description, icon: Icon, delay }: (typeof features
 function HowItWorks() {
   return (
     <section className="landingSection" aria-labelledby="workflow-title">
-      <SectionHeader kicker="How it works" title="From account to deployed widget in four focused steps" description="Yuranix keeps the customer journey clear without exposing implementation details." />
+      <SectionHeader kicker="How it works" title="From account to deployed widget in four focused steps" description="Yoranix keeps the customer journey clear without exposing implementation details." />
       <div className="workflowGrid">
         {steps.map((step, index) => {
           const Icon = step.icon;
@@ -254,10 +254,10 @@ function DashboardPreview() {
 
 function DashboardMockup({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`dashboardMockup${compact ? " dashboardMockupCompact" : ""}`} aria-label="Yuranix dashboard preview">
+    <div className={`dashboardMockup${compact ? " dashboardMockupCompact" : ""}`} aria-label="Yoranix dashboard preview">
       <div className="mockupTopbar">
         <div><span /> <span /> <span /></div>
-        <strong>Yuranix Workspace</strong>
+        <strong>Yoranix Workspace</strong>
       </div>
       <div className="mockupBody">
         <aside className="mockupSidebar">
@@ -342,7 +342,7 @@ function FAQ() {
 
   return (
     <section id="faq" className="landingSection faqSection" aria-labelledby="faq-title">
-      <SectionHeader kicker="FAQ" title="Questions teams ask before deploying Yuranix" description="Clear answers for product, operations, support, and security stakeholders." />
+      <SectionHeader kicker="FAQ" title="Questions teams ask before deploying Yoranix" description="Clear answers for product, operations, support, and security stakeholders." />
       <div className="faqList">
         {faqs.map((faq, index) => {
           const expanded = open === index;
@@ -371,9 +371,9 @@ function Footer() {
   return (
     <footer className="landingFooter">
       <div>
-        <Link className="landingBrand" href="/" aria-label="Yuranix home">
-          <Image src="/brand/yuranix-logo.png" alt="" width={34} height={34} aria-hidden="true" />
-          <span>Yuranix</span>
+        <Link className="landingBrand" href="/" aria-label="Yoranix home">
+          <Image src="/brand/yoranix-logo.png" alt="" width={34} height={34} aria-hidden="true" />
+          <span>Yoranix</span>
         </Link>
         <p>Enterprise AI knowledge platform for source-grounded customer assistants.</p>
       </div>
@@ -381,7 +381,7 @@ function Footer() {
         <a href="#features">Features</a>
         <a href="#security">Security</a>
         <a href="#pricing">Pricing</a>
-        <a href="mailto:hello@yuranix.com">Contact</a>
+        <a href="mailto:hello@yoranix.com">Contact</a>
       </div>
     </footer>
   );
@@ -411,6 +411,4 @@ function Reveal({ children, className, delay = 0 }: { children: ReactNode; class
     </motion.div>
   );
 }
-
-
 

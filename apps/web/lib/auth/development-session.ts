@@ -1,63 +1,59 @@
-export type DevelopmentRole = "super_admin" | "org_owner" | "client_admin" | "contributor" | "viewer";
+export type DashboardRole = "super_admin" | "org_owner" | "client_admin" | "contributor" | "viewer";
 
-export type DevelopmentDashboardSession = {
+export type DashboardSession = {
   organisationId: string;
   workspaceId: string;
   userEmail: string;
-  role: DevelopmentRole;
+  fullName: string | null;
+  role: DashboardRole;
+  onboardingComplete: boolean;
+  organisationName: string;
+  workspaceName: string;
+};
+
+export type DevelopmentRole = DashboardRole;
+export type DevelopmentDashboardSession = DashboardSession;
+
+export type AuthContext = {
+  user: {
+    id: string;
+    email: string;
+    full_name: string | null;
+    status: string;
+    email_verified: boolean;
+    onboarding_complete: boolean;
+  };
+  organisation: { name: string; slug: string; plan_key: string; status: string };
+  workspace: { name: string; slug: string; status: string };
+  membership: { role: DashboardRole; status: string };
+  organisation_id: string;
+  workspace_id: string;
+  role: DashboardRole;
+  onboarding_complete: boolean;
 };
 
 export type DevelopmentTenantConfigResult =
-  | { configured: true; session: DevelopmentDashboardSession }
+  | { configured: true; session: DashboardSession }
   | { configured: false; missing: string[]; invalid: string[] };
 
-const DEVELOPMENT_ROLES: DevelopmentRole[] = [
-  "super_admin",
-  "org_owner",
-  "client_admin",
-  "contributor",
-  "viewer",
-];
+export function dashboardSessionFromAuthContext(context: AuthContext): DashboardSession {
+  return {
+    organisationId: context.organisation_id,
+    workspaceId: context.workspace_id,
+    userEmail: context.user.email,
+    fullName: context.user.full_name,
+    role: context.role,
+    onboardingComplete: context.onboarding_complete,
+    organisationName: context.organisation.name,
+    workspaceName: context.workspace.name,
+  };
+}
+
+export function developmentDashboardHeaders(_session?: DashboardSession): HeadersInit {
+  void _session;
+  return {};
+}
 
 export function getDevelopmentDashboardSession(): DevelopmentTenantConfigResult {
-  const organisationId = process.env.NEXT_PUBLIC_DEVELOPMENT_ORGANISATION_ID;
-  const workspaceId = process.env.NEXT_PUBLIC_DEVELOPMENT_WORKSPACE_ID;
-  const userEmail = process.env.NEXT_PUBLIC_DEVELOPMENT_USER_EMAIL;
-  const role = process.env.NEXT_PUBLIC_DEVELOPMENT_ROLE;
-
-  const requiredValues: Array<[string, string | undefined]> = [
-    ["NEXT_PUBLIC_DEVELOPMENT_ORGANISATION_ID", organisationId],
-    ["NEXT_PUBLIC_DEVELOPMENT_WORKSPACE_ID", workspaceId],
-    ["NEXT_PUBLIC_DEVELOPMENT_USER_EMAIL", userEmail],
-    ["NEXT_PUBLIC_DEVELOPMENT_ROLE", role],
-  ];
-  const missing = requiredValues
-    .filter(([, value]) => !value)
-    .map(([name]) => name);
-  const invalid = role && !isDevelopmentRole(role) ? ["NEXT_PUBLIC_DEVELOPMENT_ROLE"] : [];
-
-  if (missing.length > 0 || invalid.length > 0) {
-    return { configured: false, missing, invalid };
-  }
-
-  return {
-    configured: true,
-    session: {
-      organisationId: organisationId as string,
-      workspaceId: workspaceId as string,
-      userEmail: userEmail as string,
-      role: role as DevelopmentRole,
-    },
-  };
-}
-
-export function developmentDashboardHeaders(session: DevelopmentDashboardSession): HeadersInit {
-  return {
-    "X-Development-User-Email": session.userEmail,
-    "X-Development-Role": session.role,
-  };
-}
-
-function isDevelopmentRole(value: string): value is DevelopmentRole {
-  return DEVELOPMENT_ROLES.includes(value as DevelopmentRole);
+  return { configured: false, missing: [], invalid: [] };
 }

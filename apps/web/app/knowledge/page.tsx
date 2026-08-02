@@ -1,25 +1,22 @@
-import { AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../components/conversations/state-panels";
+import { AccessDeniedState, ErrorState } from "../../components/conversations/state-panels";
 import { KnowledgeBaseClient } from "../../components/knowledge/knowledge-base-client";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../lib/api/errors";
 import { listDocuments } from "../../lib/api/documents";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import { requireDashboardSession } from "../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function KnowledgePage() {
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadDocuments(tenant.session);
+  const result = await loadDocuments(session);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
     return <ErrorState message={messageForApiError(result.error)} retryHref="/knowledge" />;
   }
 
-  return <KnowledgeBaseClient session={tenant.session} initialDocuments={result.data} />;
+  return <KnowledgeBaseClient session={session} initialDocuments={result.data} />;
 }
 
 async function loadDocuments(session: DevelopmentDashboardSession) {

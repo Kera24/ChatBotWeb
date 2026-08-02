@@ -1,4 +1,4 @@
-﻿import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { listMemberships, updateMembershipRole, updateMembershipStatus } from "./users";
 import type { DevelopmentDashboardSession } from "../auth/development-session";
@@ -27,7 +27,8 @@ describe("users API helpers", () => {
     const parsed = new URL(String(url));
     expect(parsed.pathname).toBe("/api/v1/workspaces/workspace-1/memberships");
     expect(parsed.searchParams.get("organisation_id")).toBe("org-1");
-    expect(init.headers).toMatchObject({ "X-Development-User-Email": "admin@example.test", "X-Development-Role": "client_admin" });
+    expect(init.headers).not.toHaveProperty("X-Development-User-Email");
+    expect(init.credentials).toBe("include");
   });
 
   it("patches membership role through the authenticated dashboard client", async () => {

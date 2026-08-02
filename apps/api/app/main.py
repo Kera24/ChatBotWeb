@@ -1,4 +1,4 @@
-from fastapi import APIRouter, FastAPI, Request
+﻿from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.routing import APIRoute
 
 from app.ai.dependencies import create_ai_core
@@ -30,8 +30,13 @@ def create_app() -> FastAPI:
         request_id = safe_request_id(request.headers.get("x-request-id"))
         request.state.request_id = request_id
         request.state.telemetry_route = normalise_route(request)
-        response = await call_next(request)
+        if _is_auth_preflight(request):
+            response = Response(status_code=204)
+        else:
+            response = await call_next(request)
         response.headers.setdefault("X-Request-ID", request_id)
+        if request.url.path.startswith(f"{settings.API_V1_PREFIX}/auth"):
+            _apply_auth_cors(response)
         return response
 
     _materialise_router(app, health_router)
@@ -47,6 +52,18 @@ def create_app() -> FastAPI:
 
     _assert_required_routes(app)
     return app
+
+
+def _is_auth_preflight(request: Request) -> bool:
+    return request.method == "OPTIONS" and request.url.path.startswith(f"{settings.API_V1_PREFIX}/auth")
+
+
+def _apply_auth_cors(response: Response) -> None:
+    response.headers.setdefault("Access-Control-Allow-Origin", settings.WEB_ORIGIN)
+    response.headers.setdefault("Access-Control-Allow-Credentials", "true")
+    response.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    response.headers.setdefault("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")
+    response.headers.setdefault("Vary", "Origin")
 
 
 def _materialise_router(app: FastAPI, router: APIRouter, *, prefix: str = "", tags: list[str] | None = None) -> None:

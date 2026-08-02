@@ -1,64 +1,34 @@
-import { describe, expect, it, vi } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
-import { developmentDashboardHeaders, getDevelopmentDashboardSession } from "./development-session";
+import { developmentDashboardHeaders, getDevelopmentDashboardSession, dashboardSessionFromAuthContext } from "./development-session";
 
-function setCompleteEnv() {
-  vi.stubEnv("NEXT_PUBLIC_DEVELOPMENT_ORGANISATION_ID", "org-1");
-  vi.stubEnv("NEXT_PUBLIC_DEVELOPMENT_WORKSPACE_ID", "workspace-1");
-  vi.stubEnv("NEXT_PUBLIC_DEVELOPMENT_USER_EMAIL", "owner@example.test");
-  vi.stubEnv("NEXT_PUBLIC_DEVELOPMENT_ROLE", "org_owner");
-}
-
-describe("development dashboard session", () => {
-  it("returns a complete development configuration", () => {
-    setCompleteEnv();
-
-    const result = getDevelopmentDashboardSession();
-
-    expect(result.configured).toBe(true);
-    if (result.configured) {
-      expect(result.session).toEqual({
-        organisationId: "org-1",
-        workspaceId: "workspace-1",
-        userEmail: "owner@example.test",
-        role: "org_owner",
-      });
-      expect(developmentDashboardHeaders(result.session)).toEqual({
-        "X-Development-User-Email": "owner@example.test",
-        "X-Development-Role": "org_owner",
-      });
-    }
-  });
-
-  it.each([
-    ["NEXT_PUBLIC_DEVELOPMENT_ORGANISATION_ID"],
-    ["NEXT_PUBLIC_DEVELOPMENT_WORKSPACE_ID"],
-    ["NEXT_PUBLIC_DEVELOPMENT_USER_EMAIL"],
-    ["NEXT_PUBLIC_DEVELOPMENT_ROLE"],
-  ])("reports missing %s without leaking configured values", (missingKey) => {
-    setCompleteEnv();
-    vi.stubEnv(missingKey, "");
-
+describe("dashboard auth session compatibility", () => {
+  it("does not resolve dashboard sessions from NEXT_PUBLIC development variables", () => {
     const result = getDevelopmentDashboardSession();
 
     expect(result.configured).toBe(false);
     if (!result.configured) {
-      expect(result.missing).toContain(missingKey);
-      expect(JSON.stringify(result)).not.toContain("owner@example.test");
-      expect(JSON.stringify(result)).not.toContain("workspace-1");
+      expect(result.missing).toEqual([]);
+      expect(result.invalid).toEqual([]);
     }
   });
 
-  it("reports an invalid role safely", () => {
-    setCompleteEnv();
-    vi.stubEnv("NEXT_PUBLIC_DEVELOPMENT_ROLE", "admin-but-not-real");
+  it("does not emit development authentication headers", () => {
+    expect(developmentDashboardHeaders()).toEqual({});
+  });
 
-    const result = getDevelopmentDashboardSession();
+  it("maps authenticated API context into the dashboard session shape", () => {
+    const session = dashboardSessionFromAuthContext({
+      user: { id: "user-1", email: "owner@example.test", full_name: "Owner", status: "active", email_verified: false, onboarding_complete: true },
+      organisation: { name: "Acme", slug: "acme", plan_key: "starter", status: "active" },
+      workspace: { name: "Default workspace", slug: "default", status: "active" },
+      membership: { role: "org_owner", status: "active" },
+      organisation_id: "org-1",
+      workspace_id: "workspace-1",
+      role: "org_owner",
+      onboarding_complete: true,
+    });
 
-    expect(result.configured).toBe(false);
-    if (!result.configured) {
-      expect(result.invalid).toEqual(["NEXT_PUBLIC_DEVELOPMENT_ROLE"]);
-      expect(JSON.stringify(result)).not.toContain("admin-but-not-real");
-    }
+    expect(session).toMatchObject({ organisationId: "org-1", workspaceId: "workspace-1", userEmail: "owner@example.test", role: "org_owner", onboardingComplete: true });
   });
 });

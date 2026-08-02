@@ -1,8 +1,9 @@
-﻿import { AnalyticsDashboard } from "../../components/analytics/analytics-dashboard";
-import { AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../components/conversations/state-panels";
+import { AnalyticsDashboard } from "../../components/analytics/analytics-dashboard";
+import { AccessDeniedState, ErrorState } from "../../components/conversations/state-panels";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../lib/api/errors";
 import { loadAnalyticsData, type AnalyticsFilters } from "../../lib/api/analytics";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import { requireDashboardSession } from "../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +19,10 @@ type AnalyticsPageProps = {
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const params = await searchParams;
-  const tenant = getDevelopmentDashboardSession();
-
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
+  const session = await requireDashboardSession();
 
   const filters = normaliseFilters(params);
-  const result = await loadAnalytics(tenant.session, filters);
+  const result = await loadAnalytics(session, filters);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
     return <ErrorState message={messageForApiError(result.error)} retryHref="/analytics" />;

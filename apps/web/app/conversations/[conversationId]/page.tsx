@@ -3,10 +3,11 @@ import Link from "next/link";
 import { ConversationStatusBadge } from "../../../components/conversations/conversation-status-badge";
 import { formatDate, formatEnum } from "../../../components/conversations/conversation-list";
 import { MessageThread } from "../../../components/conversations/message-thread";
-import { AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../../components/conversations/state-panels";
+import { AccessDeniedState, ErrorState } from "../../../components/conversations/state-panels";
 import { getConversationDetail } from "../../../lib/api/conversations";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../../lib/api/errors";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../../lib/auth/development-session";
+import { requireDashboardSession } from "../../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +17,9 @@ type ConversationDetailPageProps = {
 
 export default async function ConversationDetailPage({ params }: ConversationDetailPageProps) {
   const { conversationId } = await params;
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadConversationDetail(tenant.session, conversationId);
+  const result = await loadConversationDetail(session, conversationId);
 
   if (!result.ok) {
     if (result.error.kind === "forbidden") {

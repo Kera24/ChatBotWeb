@@ -1,4 +1,4 @@
-﻿import { render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AnalyticsDashboard, AnalyticsSkeleton, calculateAnalyticsMetrics } from "./analytics-dashboard";
@@ -272,7 +272,7 @@ describe("AnalyticsDashboard", () => {
   it("renders the loading skeleton", () => {
     render(<AnalyticsSkeleton />);
 
-    expect(screen.getByRole("heading", { name: "Loading Yuranix analytics" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Loading Yoranix analytics" })).toBeInTheDocument();
     expect(screen.getByText("Collecting tenant-scoped operational metrics.")).toBeInTheDocument();
   });
 });

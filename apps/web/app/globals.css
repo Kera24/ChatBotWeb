@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: light;
   --ink: #17120f;
   --muted: #625b54;
@@ -1591,9 +1591,9 @@ code {
 .knowledgeBasePage {
   display: grid;
   gap: 22px;
-  --yuranix-navy: #071b3a;
-  --yuranix-navy-soft: #0d2a55;
-  --yuranix-accent: #2f80ed;
+  --yoranix-navy: #071b3a;
+  --yoranix-navy-soft: #0d2a55;
+  --yoranix-accent: #2f80ed;
 }
 
 .knowledgeHero {
@@ -1611,7 +1611,7 @@ code {
 .knowledgeHero h2 {
   max-width: 980px;
   margin: 8px 0 14px;
-  color: var(--yuranix-navy);
+  color: var(--yoranix-navy);
   font-size: clamp(2rem, 5vw, 4.6rem);
   line-height: 0.95;
 }
@@ -1630,7 +1630,7 @@ code {
   min-height: 165px;
   padding: 18px;
   border-radius: 8px;
-  background: linear-gradient(155deg, var(--yuranix-navy), var(--yuranix-navy-soft));
+  background: linear-gradient(155deg, var(--yoranix-navy), var(--yoranix-navy-soft));
   color: #ffffff;
 }
 
@@ -1671,7 +1671,7 @@ code {
 }
 
 .knowledgeMetric strong {
-  color: var(--yuranix-navy);
+  color: var(--yoranix-navy);
   font-size: clamp(1.9rem, 4vw, 3.4rem);
   line-height: 1;
 }
@@ -1698,7 +1698,7 @@ code {
 .knowledgePanel h3,
 .knowledgePanel h4 {
   margin: 6px 0 12px;
-  color: var(--yuranix-navy);
+  color: var(--yoranix-navy);
 }
 
 .knowledgeUploadForm {
@@ -1726,7 +1726,7 @@ code {
 .knowledgePrimaryButton {
   border-color: rgba(7, 27, 58, 0.32);
   background: rgba(7, 27, 58, 0.08);
-  color: var(--yuranix-navy);
+  color: var(--yoranix-navy);
 }
 
 .knowledgePrimaryButton:hover {
@@ -1739,7 +1739,7 @@ code {
   border: 1px solid rgba(47, 128, 237, 0.28);
   border-radius: 999px;
   background: rgba(47, 128, 237, 0.08);
-  color: var(--yuranix-navy);
+  color: var(--yoranix-navy);
   font-size: 0.78rem;
   font-weight: 900;
 }
@@ -1754,7 +1754,7 @@ code {
 
 .knowledgeCapabilityList li {
   padding: 12px;
-  border-left: 4px solid var(--yuranix-navy);
+  border-left: 4px solid var(--yoranix-navy);
   border-radius: 0 8px 8px 0;
   background: rgba(7, 27, 58, 0.06);
   color: #26384f;
@@ -1819,7 +1819,7 @@ code {
 }
 
 .knowledgeDetailPanel {
-  border-left: 6px solid var(--yuranix-navy);
+  border-left: 6px solid var(--yoranix-navy);
 }
 
 .knowledgeFacts {
@@ -3183,7 +3183,7 @@ code {
   }
 }
 
-/* Yuranix design system: final brand layer */
+/* Yoranix design system: final brand layer */
 :root {
   color-scheme: light;
   --brand-primary: #1b2a4a;
@@ -3584,10 +3584,10 @@ textarea:hover {
 .analyticsSkeletonBlock::after,
 .usersSkeletonBlock::after {
   background: linear-gradient(90deg, transparent, rgba(27, 42, 74, 0.08), transparent) !important;
-  animation: yuranixSkeleton 1.2s ease-in-out infinite;
+  animation: yoranixSkeleton 1.2s ease-in-out infinite;
 }
 
-@keyframes yuranixSkeleton {
+@keyframes yoranixSkeleton {
   0% { transform: translateX(-100%); opacity: 0.55; }
   100% { transform: translateX(100%); opacity: 0.9; }
 }
@@ -3672,7 +3672,7 @@ p {
 }
 
 
-/* Yuranix landing page */
+/* Yoranix landing page */
 .landingPage {
   min-height: 100vh;
   overflow: hidden;
@@ -4448,5 +4448,349 @@ p {
 
   .landingFooter {
     display: grid;
+  }
+}
+
+/* Yoranix authentication pages */
+.landingNavActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landingLoginLink {
+  color: #1b2a4a;
+  font-weight: 850;
+}
+
+.authPage {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(360px, 0.82fr) minmax(420px, 1fr);
+  background:
+    radial-gradient(circle at 18% -12%, rgba(27, 42, 74, 0.1), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f7f5f0 100%);
+  color: #101827;
+}
+
+.authPanel {
+  display: grid;
+  align-content: center;
+  gap: 28px;
+  width: min(100%, 560px);
+  min-height: 100vh;
+  padding: clamp(24px, 5vw, 56px);
+  justify-self: end;
+}
+
+.authBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #1b2a4a;
+  font-weight: 900;
+}
+
+.authBrand img {
+  border: 1px solid rgba(27, 42, 74, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 4px;
+}
+
+.authHeader {
+  display: grid;
+  gap: 10px;
+}
+
+.authHeader h1 {
+  margin: 0;
+  color: #071225;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: 1;
+}
+
+.authHeader p,
+.authSwitch,
+.authFormLinks a {
+  margin: 0;
+  color: #5e6a7d;
+  line-height: 1.65;
+}
+
+.authForm {
+  display: grid;
+  gap: 16px;
+}
+
+.authField {
+  display: grid;
+  gap: 7px;
+  color: #26384f;
+  font-weight: 800;
+}
+
+.authField > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid rgba(27, 42, 74, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 24px rgba(27, 42, 74, 0.06);
+}
+
+.authField svg {
+  color: #1b2a4a;
+}
+
+.authField input {
+  width: 100%;
+  min-height: 44px;
+  border: 0 !important;
+  background: transparent !important;
+  color: #071225 !important;
+  outline: 0 !important;
+}
+
+.authField button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #1b2a4a;
+  cursor: pointer;
+}
+
+.authSubmit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 50px;
+  border: 1px solid rgba(27, 42, 74, 0.2);
+  border-radius: 8px;
+  background: #1b2a4a;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  box-shadow: 0 16px 32px rgba(27, 42, 74, 0.2);
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.authSubmit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #243a66;
+  box-shadow: 0 20px 40px rgba(27, 42, 74, 0.24);
+}
+
+.authSubmit:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.authCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #26384f;
+  font-weight: 750;
+}
+
+.authCheckbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #1b2a4a;
+}
+
+.authSwitch a,
+.authFormLinks a {
+  color: #1b2a4a;
+  font-weight: 850;
+}
+
+.authFormLinks {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.authError,
+.authNotice {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.authError {
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #991b1b;
+}
+
+.authNotice {
+  border: 1px solid #d8deea;
+  background: #f4f7fb;
+  color: #1b2a4a;
+}
+
+.passwordStrength {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.passwordStrength span {
+  height: 5px;
+  border-radius: 999px;
+  background: #d8deea;
+}
+
+.passwordStrength span[data-active="true"] {
+  background: #1b2a4a;
+}
+
+.passwordStrength p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #5e6a7d;
+  font-size: 0.86rem;
+}
+
+.authPreview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: clamp(24px, 6vw, 72px);
+  background:
+    linear-gradient(180deg, rgba(27, 42, 74, 0.97), rgba(7, 18, 37, 0.98)),
+    #1b2a4a;
+  overflow: hidden;
+}
+
+.authPreview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 92%);
+}
+
+.authPreviewCard {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+  max-width: 520px;
+  padding: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.authPreviewCard span {
+  color: #c9d4e5;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.authPreviewCard strong {
+  max-width: 440px;
+  color: #ffffff;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1;
+}
+
+.authPreviewCard div,
+.onboardingList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e8edf5;
+  font-weight: 800;
+}
+
+.onboardingList {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboardingList li {
+  color: #1b2a4a;
+}
+
+@media (max-width: 900px) {
+  .authPage {
+    grid-template-columns: 1fr;
+  }
+
+  .authPanel {
+    justify-self: center;
+    min-height: auto;
+  }
+
+  .authPreview {
+    min-height: 360px;
+  }
+}
+
+@media (max-width: 760px) {
+  .landingNavActions {
+    margin-left: auto;
+  }
+
+  .landingLoginLink {
+    display: none;
+  }
+}
+
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logoutButton {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(27, 42, 74, 0.14);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1b2a4a;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  box-shadow: 0 10px 24px rgba(27, 42, 74, 0.08);
+}
+
+.logoutButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+@media (max-width: 760px) {
+  .topbarActions {
+    width: 100%;
+    justify-content: space-between;
   }
 }

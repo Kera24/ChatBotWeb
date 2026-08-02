@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -90,7 +90,7 @@ export function SettingsDashboardClient({ session, initialSettings }: SettingsDa
     <section className="settingsPage" aria-labelledby="settings-title">
       <div className="settingsHero">
         <div>
-          <p className="eyebrow">Yuranix settings</p>
+          <p className="eyebrow">Yoranix settings</p>
           <h2 id="settings-title">Workspace controls and operational posture</h2>
           <p>Manage the settings that are persisted for this workspace and inspect read-only platform configuration without exposing secrets.</p>
         </div>
@@ -235,7 +235,7 @@ export function SettingsSkeleton() {
       <div className="settingsHero settingsSkeletonBlock">
         <div>
           <p className="eyebrow">Loading</p>
-          <h2>Loading Yuranix settings</h2>
+          <h2>Loading Yoranix settings</h2>
           <p>Collecting tenant-scoped workspace and operational configuration.</p>
         </div>
       </div>

@@ -59,7 +59,8 @@ describe("review API helpers", () => {
     const [url, init] = mock.mock.calls[0];
     expect(new URL(String(url)).pathname).toBe("/api/v1/workspaces/workspace-1/review/unanswered/message-1");
     expect(init.method).toBe("PATCH");
-    expect(init.headers).toMatchObject({ "X-Development-User-Email": "admin@example.test", "X-Development-Role": "client_admin" });
+    expect(init.headers).not.toHaveProperty("X-Development-User-Email");
+    expect(init.credentials).toBe("include");
     expect(JSON.parse(String(init.body))).toEqual({ review_status: "reviewed", reviewer_note: "Checked" });
   });
 });

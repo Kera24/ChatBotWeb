@@ -77,12 +77,15 @@ async function dashboardApiRequest<TData, TMeta = Record<string, unknown>>({
   formData,
   cache = "no-store",
 }: DashboardApiRequest & { method: "GET" | "POST" | "PATCH" | "DELETE"; body?: Record<string, unknown>; formData?: FormData }): Promise<ApiEnvelope<TData, TMeta>> {
+  void session;
   const url = new URL(`${getDashboardApiBaseUrl()}${path}`);
   for (const [key, value] of Object.entries(searchParams ?? {})) {
     if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, String(value));
     }
   }
+
+  const serverCookieHeader = await readServerCookieHeader();
 
   let response: Response;
   try {
@@ -91,8 +94,10 @@ async function dashboardApiRequest<TData, TMeta = Record<string, unknown>>({
       headers: {
         Accept: "application/json",
         ...(body ? { "Content-Type": "application/json" } : {}),
-        ...developmentDashboardHeaders(session),
+        ...(serverCookieHeader ? { Cookie: serverCookieHeader } : {}),
+        ...developmentDashboardHeaders(),
       },
+      credentials: "include",
       body: body ? JSON.stringify(body) : formData,
       cache,
     });
@@ -109,6 +114,17 @@ async function dashboardApiRequest<TData, TMeta = Record<string, unknown>>({
   }
 
   return payload as ApiEnvelope<TData, TMeta>;
+}
+
+async function readServerCookieHeader(): Promise<string> {
+  if (typeof window !== "undefined") return "";
+  try {
+    const mod = await import("next/headers");
+    const cookieStore = await mod.cookies();
+    return cookieStore.toString();
+  } catch {
+    return "";
+  }
 }
 
 async function readPayload(response: Response): Promise<unknown> {

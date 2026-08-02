@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 
 import type { AnalyticsData, AnalyticsFilters } from "../../lib/api/analytics";
 import type { ConversationSummary, ReviewItem } from "../../lib/api/types";
@@ -34,7 +34,7 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
     <section className="analyticsPage" aria-labelledby="analytics-title">
       <div className="analyticsHero">
         <div>
-          <p className="eyebrow">Yuranix analytics</p>
+          <p className="eyebrow">Yoranix analytics</p>
           <h2 id="analytics-title">Operational analytics from live workspace data</h2>
           <p>Track recent usage, response quality signals, knowledge failures, and widget readiness without adding product analytics or unsupported tracking.</p>
         </div>
@@ -165,7 +165,7 @@ export function AnalyticsSkeleton() {
       <div className="analyticsHero analyticsSkeletonBlock">
         <div>
           <p className="eyebrow">Loading</p>
-          <h2>Loading Yuranix analytics</h2>
+          <h2>Loading Yoranix analytics</h2>
           <p>Collecting tenant-scoped operational metrics.</p>
         </div>
       </div>

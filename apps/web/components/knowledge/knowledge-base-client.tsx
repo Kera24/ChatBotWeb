@@ -160,7 +160,7 @@ export function KnowledgeBaseClient({ session, initialDocuments }: KnowledgeBase
     <section className="knowledgeBasePage" aria-labelledby="knowledge-title">
       <div className="knowledgeHero">
         <div>
-          <p className="eyebrow">Yuranix Knowledge Base</p>
+          <p className="eyebrow">Yoranix Knowledge Base</p>
           <h2 id="knowledge-title">Operational source control for grounded answers</h2>
           <p>Upload, inspect, process, and retire workspace-scoped sources through the existing document lifecycle.</p>
         </div>

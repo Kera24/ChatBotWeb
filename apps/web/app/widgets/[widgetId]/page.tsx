@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../../components/conversations/state-panels";
+import { AccessDeniedState, ErrorState } from "../../../components/conversations/state-panels";
 import { WidgetDetailClient } from "../../../components/widgets/widget-detail-client";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../../lib/api/errors";
 import {
@@ -13,7 +13,8 @@ import {
   listWidgetRevisions,
   listWidgetSdkVersions,
 } from "../../../lib/api/widgets";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../../lib/auth/development-session";
+import { requireDashboardSession } from "../../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -23,13 +24,9 @@ type WidgetDetailPageProps = {
 
 export default async function WidgetDetailPage({ params }: WidgetDetailPageProps) {
   const { widgetId } = await params;
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadWidgetAdminData(tenant.session, widgetId);
+  const result = await loadWidgetAdminData(session, widgetId);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
     return <ErrorState message={messageForApiError(result.error)} retryHref="/widgets" />;
@@ -39,7 +36,7 @@ export default async function WidgetDetailPage({ params }: WidgetDetailPageProps
     <>
       <Link className="backLink" href="/widgets">Back to widgets</Link>
       <WidgetDetailClient
-        session={tenant.session}
+        session={session}
         initialWidget={result.data.widget}
         initialDraft={result.data.draft}
         initialOrigins={result.data.origins}

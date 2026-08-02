@@ -1,7 +1,7 @@
 export const navigationItems = [
   {
     label: "Overview",
-    href: "/",
+    href: "/dashboard",
     glyph: "OV",
   },
   {

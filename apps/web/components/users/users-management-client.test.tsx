@@ -1,4 +1,4 @@
-﻿import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,8 +28,8 @@ function membership(overrides: Partial<MembershipRecord> = {}): MembershipRecord
   return {
     id: "membership-1",
     organisation_id: "org-1",
-    organisation_name: "Yuranix College",
-    organisation_slug: "yuranix-college",
+    organisation_name: "Yoranix College",
+    organisation_slug: "yoranix-college",
     workspace_id: "workspace-1",
     workspace_name: "Admissions Assistant",
     workspace_slug: "admissions",
@@ -151,7 +151,7 @@ describe("UsersManagementClient", () => {
   it("renders the loading skeleton", () => {
     render(<UsersSkeleton />);
 
-    expect(screen.getByRole("heading", { name: "Loading Yuranix users" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Loading Yoranix users" })).toBeInTheDocument();
   });
 });
 

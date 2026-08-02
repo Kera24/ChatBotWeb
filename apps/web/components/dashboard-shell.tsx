@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { navigationItems } from "../lib/navigation";
+import { LogoutButton } from "./logout-button";
 
 type DashboardShellProps = {
   children: ReactNode;
@@ -14,6 +15,8 @@ type DashboardShellProps = {
 
 export function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
+
+  if (pathname === "/") return <>{children}</>;
 
   return (
     <div className="shell">
@@ -24,17 +27,17 @@ export function DashboardShell({ children }: DashboardShellProps) {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
       >
-        <Link className="brandBlock" href="/" aria-label="Yuranix overview">
-          <Image className="brandMark" src="/brand/yuranix-logo.png" alt="" aria-hidden="true" width={52} height={52} priority />
+        <Link className="brandBlock" href="/" aria-label="Yoranix overview">
+          <Image className="brandMark" src="/brand/yoranix-logo.png" alt="" aria-hidden="true" width={52} height={52} priority />
           <div>
-            <p className="brandKicker">Yuranix</p>
+            <p className="brandKicker">Yoranix</p>
             <p className="brandName">Knowledge Platform</p>
           </div>
         </Link>
 
         <nav className="navList">
           {navigationItems.map((item, index) => {
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <motion.div
                 key={item.href}
@@ -71,10 +74,11 @@ export function DashboardShell({ children }: DashboardShellProps) {
         >
           <div>
             <p className="workspaceLabel">AI Knowledge Platform</p>
-            <h1>Yuranix Command Center</h1>
+            <h1>Yoranix Command Center</h1>
           </div>
-          <div className="trustBadge" aria-label="Trust guardrails">
-            Source-grounded by design
+          <div className="topbarActions">
+            <div className="trustBadge" aria-label="Trust guardrails">Source-grounded by design</div>
+            <LogoutButton />
           </div>
         </motion.div>
 
@@ -91,9 +95,4 @@ export function DashboardShell({ children }: DashboardShellProps) {
     </div>
   );
 }
-
-
-
-
-
 

@@ -7,11 +7,11 @@ import {
   AccessDeniedState,
   EmptyState,
   ErrorState,
-  MissingTenantConfiguration,
 } from "../../components/conversations/state-panels";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../lib/api/errors";
 import { listConversations } from "../../lib/api/conversations";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import { requireDashboardSession } from "../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +28,9 @@ export default async function ConversationsPage({ searchParams }: ConversationsP
   const params = await searchParams;
   const limit = clampNumber(params.limit, 20, 1, 50);
   const offset = clampNumber(params.offset, 0, 0, 10_000);
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadConversationList(tenant.session, {
+  const result = await loadConversationList(session, {
     status: params.status,
     channel: params.channel,
     limit,

@@ -34,18 +34,16 @@ describe("dashboard API client", () => {
     expect(getDashboardApiBaseUrl()).toBe("http://localhost:8000");
   });
 
-  it("adds dashboard development auth headers in the centralized client", async () => {
+  it("uses credentialed requests without development auth headers in the centralized client", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.local");
     const mock = fetchMock().mockResolvedValue(okResponse());
 
     await dashboardApiGet({ path: "/api/test", session });
 
     const [, init] = mock.mock.calls[0];
-    expect(init.headers).toMatchObject({
-      Accept: "application/json",
-      "X-Development-User-Email": "viewer@example.test",
-      "X-Development-Role": "viewer",
-    });
+    expect(init.headers).toMatchObject({ Accept: "application/json" });
+    expect(init.headers).not.toHaveProperty("X-Development-User-Email");
+    expect(init.credentials).toBe("include");
   });
 
   it.each([

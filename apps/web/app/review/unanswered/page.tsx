@@ -1,13 +1,14 @@
 import Link from "next/link";
 
-import { EmptyState, AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../../components/conversations/state-panels";
+import { EmptyState, AccessDeniedState, ErrorState } from "../../../components/conversations/state-panels";
 import { ReviewPaginationControls } from "../../../components/review/review-pagination-controls";
 import { ReviewFilters } from "../../../components/review/review-filters";
 import { ReviewList } from "../../../components/review/review-list";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../../lib/api/errors";
 import { listUnansweredReviewItems } from "../../../lib/api/review";
 import type { ReviewListMeta, ReviewItem } from "../../../lib/api/types";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../../lib/auth/development-session";
+import { requireDashboardSession } from "../../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +28,9 @@ export default async function ReviewQueuePage({ searchParams }: ReviewPageProps)
   const params = await searchParams;
   const limit = clampNumber(params.limit, 20, 1, 50);
   const offset = clampNumber(params.offset, 0, 0, 10_000);
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadReviewItems(tenant.session, {
+  const result = await loadReviewItems(session, {
     answer_state: params.answer_state,
     review_status: params.review_status,
     channel: params.channel,

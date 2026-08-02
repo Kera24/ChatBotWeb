@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 
@@ -100,7 +100,7 @@ export function UsersManagementClient({ session, initialMemberships, meta }: Use
     <section className="usersPage" aria-labelledby="users-title">
       <div className="usersHero">
         <div>
-          <p className="eyebrow">Yuranix access control</p>
+          <p className="eyebrow">Yoranix access control</p>
           <h2 id="users-title">Users and role management</h2>
           <p>Manage organisation memberships, role responsibility, and active access using the repository RBAC model.</p>
         </div>
@@ -195,7 +195,7 @@ export function UsersManagementClient({ session, initialMemberships, meta }: Use
 }
 
 export function UsersSkeleton() {
-  return <section className="usersPage" aria-busy="true" aria-live="polite"><div className="usersHero usersSkeletonBlock"><div><p className="eyebrow">Loading</p><h2>Loading Yuranix users</h2><p>Collecting tenant-scoped membership records.</p></div></div></section>;
+  return <section className="usersPage" aria-busy="true" aria-live="polite"><div className="usersHero usersSkeletonBlock"><div><p className="eyebrow">Loading</p><h2>Loading Yoranix users</h2><p>Collecting tenant-scoped membership records.</p></div></div></section>;
 }
 
 function Metric({ label, value, detail }: { label: string; value: number; detail: string }) {

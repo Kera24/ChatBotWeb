@@ -1,25 +1,22 @@
-﻿import { AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../components/conversations/state-panels";
+import { AccessDeniedState, ErrorState } from "../../components/conversations/state-panels";
 import { UsersManagementClient } from "../../components/users/users-management-client";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../lib/api/errors";
 import { listMemberships } from "../../lib/api/users";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import { requireDashboardSession } from "../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadMemberships(tenant.session);
+  const result = await loadMemberships(session);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
     return <ErrorState message={messageForApiError(result.error)} retryHref="/users" />;
   }
 
-  return <UsersManagementClient session={tenant.session} initialMemberships={result.data} meta={result.meta} />;
+  return <UsersManagementClient session={session} initialMemberships={result.data} meta={result.meta} />;
 }
 
 async function loadMemberships(session: DevelopmentDashboardSession) {

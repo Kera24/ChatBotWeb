@@ -1,4 +1,4 @@
-﻿import { render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { OverviewDashboard, OverviewSkeleton } from "./overview-dashboard";
@@ -155,7 +155,7 @@ const overviewData: OverviewData = {
 };
 
 describe("OverviewDashboard", () => {
-  it("renders Yuranix summary cards from existing module data", () => {
+  it("renders Yoranix summary cards from existing module data", () => {
     render(<OverviewDashboard session={session} data={overviewData} environment="development" />);
 
     expect(screen.getByRole("heading", { name: /operational view of the ai knowledge platform/i })).toBeInTheDocument();
@@ -207,7 +207,7 @@ describe("OverviewDashboard", () => {
   it("renders the loading skeleton", () => {
     render(<OverviewSkeleton />);
 
-    expect(screen.getByRole("heading", { name: "Loading Yuranix overview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Loading Yoranix overview" })).toBeInTheDocument();
     expect(screen.getByText("Collecting tenant-scoped dashboard signals.")).toBeInTheDocument();
   });
 });

@@ -1,21 +1,18 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 
-import { AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../components/conversations/state-panels";
+import { AccessDeniedState, ErrorState } from "../../components/conversations/state-panels";
 import { WidgetList } from "../../components/widgets/widget-status";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../lib/api/errors";
 import { listWidgets } from "../../lib/api/widgets";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import { requireDashboardSession } from "../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function WidgetsPage() {
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadWidgets(tenant.session);
+  const result = await loadWidgets(session);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
     return <ErrorState message={messageForApiError(result.error)} retryHref="/widgets" />;

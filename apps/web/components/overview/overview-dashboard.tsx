@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 
 import type { OverviewData } from "../../lib/api/overview";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
@@ -36,7 +36,7 @@ export function OverviewDashboard({ session, data, environment }: OverviewDashbo
     <section className="overviewPage" aria-labelledby="overview-title">
       <div className="overviewHero">
         <div>
-          <p className="eyebrow">Yuranix overview</p>
+          <p className="eyebrow">Yoranix overview</p>
           <h2 id="overview-title">Operational view of the AI knowledge platform</h2>
           <p>Monitor workspace readiness, knowledge health, widget publication, and answer-review pressure from existing tenant-scoped systems.</p>
         </div>
@@ -86,7 +86,7 @@ export function OverviewDashboard({ session, data, environment }: OverviewDashbo
             </div>
           </div>
           <dl className="overviewFacts">
-            <div><dt>Platform</dt><dd>Yuranix Knowledge Platform</dd></div>
+            <div><dt>Platform</dt><dd>Yoranix Knowledge Platform</dd></div>
             <div><dt>Workspace status</dt><dd>Active</dd></div>
             <div><dt>Member role</dt><dd>{session.role.replace("_", " ")}</dd></div>
             <div><dt>Environment</dt><dd>{environment}</dd></div>
@@ -168,7 +168,7 @@ export function OverviewSkeleton() {
       <div className="overviewHero overviewSkeletonBlock">
         <div>
           <p className="eyebrow">Loading</p>
-          <h2>Loading Yuranix overview</h2>
+          <h2>Loading Yoranix overview</h2>
           <p>Collecting tenant-scoped dashboard signals.</p>
         </div>
       </div>

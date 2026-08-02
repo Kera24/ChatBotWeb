@@ -1,17 +1,12 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 
 import { WidgetCreateForm } from "../../../components/widgets/widget-create-form";
-import { MissingTenantConfiguration } from "../../../components/conversations/state-panels";
-import { getDevelopmentDashboardSession } from "../../../lib/auth/development-session";
+import { requireDashboardSession } from "../../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export default function NewWidgetPage() {
-  const tenant = getDevelopmentDashboardSession();
-
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
+export default async function NewWidgetPage() {
+  const session = await requireDashboardSession();
 
   return (
     <section className="widgetAdminPage" aria-labelledby="new-widget-title">
@@ -24,7 +19,7 @@ export default function NewWidgetPage() {
         </div>
       </div>
       <section className="widgetPanel">
-        <WidgetCreateForm session={tenant.session} />
+        <WidgetCreateForm session={session} />
       </section>
     </section>
   );

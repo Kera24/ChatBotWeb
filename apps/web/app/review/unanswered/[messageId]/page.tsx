@@ -1,9 +1,10 @@
-import { AccessDeniedState, ErrorState, MissingTenantConfiguration } from "../../../../components/conversations/state-panels";
+import { AccessDeniedState, ErrorState } from "../../../../components/conversations/state-panels";
 import { ReviewDetail } from "../../../../components/review/review-detail";
 import { getUnansweredReviewItem } from "../../../../lib/api/review";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../../../lib/api/errors";
 import type { ReviewItemDetail } from "../../../../lib/api/types";
-import { getDevelopmentDashboardSession, type DevelopmentDashboardSession } from "../../../../lib/auth/development-session";
+import type { DevelopmentDashboardSession } from "../../../../lib/auth/development-session";
+import { requireDashboardSession } from "../../../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,20 +14,16 @@ type ReviewDetailPageProps = {
 
 export default async function ReviewDetailPage({ params }: ReviewDetailPageProps) {
   const { messageId } = await params;
-  const tenant = getDevelopmentDashboardSession();
+  const session = await requireDashboardSession();
 
-  if (!tenant.configured) {
-    return <MissingTenantConfiguration missing={tenant.missing} invalid={tenant.invalid} />;
-  }
-
-  const result = await loadReviewDetail(tenant.session, messageId);
+  const result = await loadReviewDetail(session, messageId);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
     return <ErrorState message={messageForApiError(result.error)} retryHref={`/review/unanswered/${messageId}`} />;
   }
 
-  const canUpdate = tenant.session.role === "org_owner" || tenant.session.role === "client_admin" || tenant.session.role === "super_admin";
-  return <ReviewDetail detail={result.data} session={tenant.session} canUpdate={canUpdate} />;
+  const canUpdate = session.role === "org_owner" || session.role === "client_admin" || session.role === "super_admin";
+  return <ReviewDetail detail={result.data} session={session} canUpdate={canUpdate} />;
 }
 
 async function loadReviewDetail(

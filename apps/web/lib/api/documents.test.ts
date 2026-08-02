@@ -38,10 +38,8 @@ describe("document dashboard API", () => {
 
     const [url, init] = mock.mock.calls[0];
     expect(String(url)).toBe("http://api.local/api/v1/workspaces/workspace-1/documents?organisation_id=org-1");
-    expect(init.headers).toMatchObject({
-      "X-Development-User-Email": "admin@example.test",
-      "X-Development-Role": "client_admin",
-    });
+    expect(init.headers).not.toHaveProperty("X-Development-User-Email");
+    expect(init.credentials).toBe("include");
   });
 
   it("posts uploads as FormData without a JSON content type", async () => {

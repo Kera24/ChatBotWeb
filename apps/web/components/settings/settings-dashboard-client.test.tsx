@@ -33,8 +33,8 @@ function settings(overrides: Partial<WorkspaceSettings> = {}): WorkspaceSettings
     },
     organisation: {
       id: "org-1",
-      name: "Yuranix College",
-      slug: "yuranix-college",
+      name: "Yoranix College",
+      slug: "yoranix-college",
       status: "active",
       plan_key: "pilot",
       created_at: "2026-07-01T00:00:00Z",
@@ -91,7 +91,7 @@ describe("SettingsDashboardClient", () => {
 
     expect(screen.getByRole("heading", { name: "Workspace controls and operational posture" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Admissions Workspace")).toBeInTheDocument();
-    expect(screen.getByText("Yuranix College")).toBeInTheDocument();
+    expect(screen.getByText("Yoranix College")).toBeInTheDocument();
     expect(screen.getAllByText("azure-openai")).toHaveLength(2);
     expect(screen.getByText("Widget-owned configuration")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Manage widget configuration" })).toHaveAttribute("href", "/widgets");
@@ -158,7 +158,7 @@ describe("SettingsDashboardClient", () => {
   it("renders loading skeleton", () => {
     render(<SettingsSkeleton />);
 
-    expect(screen.getByRole("heading", { name: "Loading Yuranix settings" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Loading Yoranix settings" })).toBeInTheDocument();
   });
 });
 
