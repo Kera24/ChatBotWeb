@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { navigationItems } from "../lib/navigation";
+import { AssistantSwitcher } from "./assistants/assistant-switcher";
 import { LogoutButton } from "./logout-button";
 
 type DashboardShellProps = {
@@ -77,6 +78,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             <h1>Yoranix Command Center</h1>
           </div>
           <div className="topbarActions">
+            <Suspense fallback={null}><AssistantSwitcher /></Suspense>
             <div className="trustBadge" aria-label="Trust guardrails">Source-grounded by design</div>
             <LogoutButton />
           </div>
@@ -95,4 +97,3 @@ export function DashboardShell({ children }: DashboardShellProps) {
     </div>
   );
 }
-

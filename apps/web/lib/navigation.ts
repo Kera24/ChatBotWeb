@@ -1,8 +1,8 @@
 export const navigationItems = [
   {
-    label: "Overview",
+    label: "My Assistants",
     href: "/dashboard",
-    glyph: "OV",
+    glyph: "AI",
   },
   {
     label: "Knowledge Base",

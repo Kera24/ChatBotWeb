@@ -11,10 +11,12 @@ from app.access.widget_admin.service import (
     WidgetAdminNotFound,
     WidgetAdminValidationError,
     active_published_revision,
+    archive_widget,
     add_widget_origin,
     create_widget,
     create_preview_grant,
     diff_draft_to_published,
+    duplicate_widget,
     get_current_draft,
     get_embed_metadata,
     list_installation_status,
@@ -117,6 +119,34 @@ def create_admin_widget(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Widget identity already exists.") from exc
     return success_response(_widget_detail(db, widget).model_dump(mode="json"))
 
+
+@router.post("/{workspace_id}/widgets/{widget_id}/duplicate", status_code=status.HTTP_201_CREATED)
+def duplicate_admin_widget(
+    workspace_id: str,
+    widget_id: str,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    try:
+        duplicated = duplicate_widget(db, widget=widget, actor_user_id=current_user.user_id)
+    except WidgetAdminValidationError as exc:
+        raise _validation_http_error(exc) from exc
+    return success_response(_widget_detail(db, duplicated).model_dump(mode="json"))
+
+
+@router.post("/{workspace_id}/widgets/{widget_id}/archive")
+def archive_admin_widget(
+    workspace_id: str,
+    widget_id: str,
+    db: DbSession,
+    current_user: WidgetAdminDependency,
+    organisation_id: str = Query(...),
+) -> dict[str, object]:
+    widget = _load_widget_or_404(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+    archived = archive_widget(db, widget=widget, actor_user_id=current_user.user_id)
+    return success_response(_widget_summary(db, archived).model_dump(mode="json"))
 
 @router.get("/{workspace_id}/widgets/{widget_id}")
 def get_admin_widget(

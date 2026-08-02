@@ -193,6 +193,23 @@ export function getWidgetDetail(session: DevelopmentDashboardSession, widgetId: 
   });
 }
 
+
+export function duplicateWidget(session: DevelopmentDashboardSession, widgetId: string) {
+  return dashboardApiPost<WidgetDetail>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/duplicate`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+  });
+}
+
+export function archiveWidget(session: DevelopmentDashboardSession, widgetId: string) {
+  return dashboardApiPost<WidgetSummary>({
+    path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/archive`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+  });
+}
+
 export function getWidgetDraft(session: DevelopmentDashboardSession, widgetId: string) {
   return dashboardApiGet<WidgetRevisionDetail>({
     path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/draft`,
@@ -227,6 +244,18 @@ export function addWidgetOrigin(session: DevelopmentDashboardSession, widgetId: 
   });
 }
 
+export function activateWidgetPublicCredential(session: DevelopmentDashboardSession, credentialId: string) {
+  return dashboardApiPost<{
+    id: string;
+    public_identifier: string;
+    status: string;
+    environment: string;
+  }>({
+    path: `/api/v1/workspaces/${session.workspaceId}/public-credentials/${credentialId}/activate`,
+    session,
+    searchParams: { organisation_id: session.organisationId },
+  });
+}
 export function removeWidgetOrigin(session: DevelopmentDashboardSession, widgetId: string, originId: string) {
   return dashboardApiDelete<WidgetOrigin>({
     path: `/api/v1/workspaces/${session.workspaceId}/widgets/${widgetId}/origins/${originId}`,

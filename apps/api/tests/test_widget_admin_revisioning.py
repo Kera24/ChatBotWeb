@@ -257,6 +257,62 @@ def seed_document(client: TestClient, *, organisation_id: str, workspace_id: str
         return document.id
 
 
+def test_widget_assistant_duplicate_and_archive_lifecycle(client: TestClient) -> None:
+    org, workspace, _ = seed_tenant(client, slug="assistants", email="owner@example.test", role="org_owner")
+    document_id = seed_document(client, organisation_id=org, workspace_id=workspace, title="Admissions Handbook")
+    created = create_widget_api(client, organisation_id=org, workspace_id=workspace, email="owner@example.test", display_name="Admissions Assistant")
+    assert created.status_code == 201
+    widget = created.json()["data"]
+    widget_id = widget["id"]
+    draft = widget["draft"]
+
+    scoped = client.patch(
+        f"/api/v1/workspaces/{workspace}/widgets/{widget_id}/draft/knowledge",
+        params={"organisation_id": org},
+        headers=headers("owner@example.test", "org_owner"),
+        json={"document_ids": [document_id], "expected_concurrency_version": draft["concurrency_version"]},
+    )
+    assert scoped.status_code == 200
+
+    duplicated = client.post(
+        f"/api/v1/workspaces/{workspace}/widgets/{widget_id}/duplicate",
+        params={"organisation_id": org},
+        headers=headers("owner@example.test", "org_owner"),
+    )
+    assert duplicated.status_code == 201
+    copy_widget = duplicated.json()["data"]
+    assert copy_widget["id"] != widget_id
+    assert copy_widget["display_name"] == "Admissions Assistant Copy"
+    assert copy_widget["draft"]["configuration"]["bot_name"] == "Admissions Assistant Copy"
+    assert copy_widget["draft"]["configuration"]["knowledge_scope_json"] == [document_id]
+
+    archived = client.post(
+        f"/api/v1/workspaces/{workspace}/widgets/{widget_id}/archive",
+        params={"organisation_id": org},
+        headers=headers("owner@example.test", "org_owner"),
+    )
+    assert archived.status_code == 200
+    assert archived.json()["data"]["operational_status"] == "archived"
+
+    hidden_detail = client.get(
+        f"/api/v1/workspaces/{workspace}/widgets/{widget_id}",
+        params={"organisation_id": org},
+        headers=headers("owner@example.test", "org_owner"),
+    )
+    listed = client.get(
+        f"/api/v1/workspaces/{workspace}/widgets",
+        params={"organisation_id": org},
+        headers=headers("owner@example.test", "org_owner"),
+    )
+    listed_ids = {item["id"] for item in listed.json()["data"]}
+    assert hidden_detail.status_code == 404
+    assert widget_id not in listed_ids
+    assert copy_widget["id"] in listed_ids
+
+    with client.app.state.testing_session() as db:
+        actions = {event.action for event in db.execute(select(AuditEvent)).scalars().all()}
+        assert {"widget.created", "widget.duplicated", "widget.archived"}.issubset(actions)
+
 def test_widget_b4_knowledge_preview_validation_and_tenant_scope(client: TestClient) -> None:
     org_a, workspace_a, _ = seed_tenant(client, slug="alpha-b4", email="alpha-b4@example.test")
     org_b, workspace_b, _ = seed_tenant(client, slug="beta-b4", email="beta-b4@example.test")

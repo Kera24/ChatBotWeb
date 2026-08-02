@@ -125,6 +125,7 @@ def create_widget(
         raise WidgetAdminValidationError(str(exc), errors=[WidgetAdminFieldError("environment", "invalid", str(exc))]) from exc
 
     values = validate_configuration_payload({**default_widget_payload(bot_name=safe_name), **(initial_configuration or {})})
+    knowledge_scope = _normalise_scope_ids((initial_configuration or {}).get("knowledge_scope_json", []))
     widget = Widget(
         organisation_id=organisation_id,
         workspace_id=workspace_id,
@@ -145,8 +146,8 @@ def create_widget(
         status="draft",
         concurrency_version=1,
         created_by_user_id=actor_user_id,
-        knowledge_scope_json=[],
-        configuration_hash=_configuration_hash({**values, "knowledge_scope_json": []}),
+        knowledge_scope_json=knowledge_scope,
+        configuration_hash=_configuration_hash({**values, "knowledge_scope_json": knowledge_scope}),
         **values,
     )
     db.add(draft)
@@ -166,6 +167,57 @@ def create_widget(
     db.refresh(widget)
     return widget
 
+
+def duplicate_widget(db: Session, *, widget: Widget, actor_user_id: str | None) -> Widget:
+    draft = get_current_draft(db, widget=widget)
+    source_configuration = _configuration_values(draft)
+    source_configuration["knowledge_scope_json"] = list(draft.knowledge_scope_json or [])
+    copy_name = _copy_display_name(db, organisation_id=widget.organisation_id, workspace_id=widget.workspace_id, display_name=widget.display_name)
+    duplicated = create_widget(
+        db,
+        organisation_id=widget.organisation_id,
+        workspace_id=widget.workspace_id,
+        display_name=copy_name,
+        environment=widget.public_credential.environment,
+        actor_user_id=actor_user_id,
+        initial_configuration={**source_configuration, "bot_name": copy_name},
+    )
+    add_audit_event(
+        db,
+        organisation_id=widget.organisation_id,
+        workspace_id=widget.workspace_id,
+        actor_user_id=actor_user_id,
+        action="widget.duplicated",
+        entity_type="widget",
+        entity_id=duplicated.id,
+        new_status=duplicated.operational_status,
+        metadata_json={"source_widget_id": widget.id},
+    )
+    db.commit()
+    db.refresh(duplicated)
+    return duplicated
+
+
+def archive_widget(db: Session, *, widget: Widget, actor_user_id: str | None) -> Widget:
+    if widget.archived_at is None:
+        previous_status = widget.operational_status
+        widget.archived_at = utc_now()
+        widget.operational_status = "archived"
+        add_audit_event(
+            db,
+            organisation_id=widget.organisation_id,
+            workspace_id=widget.workspace_id,
+            actor_user_id=actor_user_id,
+            action="widget.archived",
+            entity_type="widget",
+            entity_id=widget.id,
+            previous_status=previous_status,
+            new_status=widget.operational_status,
+            metadata_json={"active_published_revision_id": widget.active_published_revision_id},
+        )
+        db.commit()
+        db.refresh(widget)
+    return widget
 
 def get_current_draft(db: Session, *, widget: Widget) -> WidgetConfigurationRevision:
     draft = db.execute(
@@ -351,6 +403,25 @@ def _get_revision(db: Session, *, widget: Widget, revision_id: str) -> WidgetCon
         raise WidgetAdminNotFound("Revision not found.")
     return revision
 
+
+def _copy_display_name(db: Session, *, organisation_id: str, workspace_id: str, display_name: str) -> str:
+    existing_names = set(
+        db.execute(
+            select(Widget.display_name).where(
+                Widget.organisation_id == organisation_id,
+                Widget.workspace_id == workspace_id,
+                Widget.archived_at.is_(None),
+            )
+        ).scalars().all()
+    )
+    base = display_name[:145].rstrip()
+    candidate = f"{base} Copy"
+    suffix = 2
+    while candidate in existing_names:
+        suffix_text = f" Copy {suffix}"
+        candidate = f"{base[:160 - len(suffix_text)].rstrip()}{suffix_text}"
+        suffix += 1
+    return candidate
 
 def _next_revision_number(db: Session, widget_id: str) -> int:
     current = db.execute(select(func.max(WidgetConfigurationRevision.revision_number)).where(WidgetConfigurationRevision.widget_id == widget_id)).scalar_one()
