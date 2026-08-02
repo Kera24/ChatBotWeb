@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+﻿from fastapi import APIRouter
 
 from app.api.v1.admin import router as admin_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.audit_events import router as audit_events_router
 from app.api.v1.conversations import router as conversations_router
 from app.api.v1.documents import router as documents_router
+from app.api.v1.memberships import router as memberships_router
 from app.api.v1.orgs import router as orgs_router
 from app.api.v1.public_credentials import router as public_credentials_router
 from app.api.v1.public_widget import router as public_widget_router
@@ -21,6 +22,7 @@ API_V1_ROUTER_REGISTRATIONS = (
     (workspaces_router, "/workspaces", ["workspaces"]),
     (audit_events_router, "/workspaces", ["audit-events"]),
     (documents_router, "/workspaces", ["documents"]),
+    (memberships_router, "/workspaces", ["memberships"]),
     (public_credentials_router, "/workspaces", ["public-credentials"]),
     (widgets_router, "/workspaces", ["widgets"]),
     (public_widget_router, "", ["public-widget"]),
