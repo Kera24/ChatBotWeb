@@ -21,6 +21,7 @@ type ConversationsPageProps = {
     channel?: string;
     limit?: string;
     offset?: string;
+    assistant?: string;
   }>;
 };
 
@@ -29,8 +30,10 @@ export default async function ConversationsPage({ searchParams }: ConversationsP
   const limit = clampNumber(params.limit, 20, 1, 50);
   const offset = clampNumber(params.offset, 0, 0, 10_000);
   const session = await requireDashboardSession();
+  if (!params.assistant) return <ErrorState message="Select an assistant before viewing conversations." retryHref="/dashboard" />;
 
   const result = await loadConversationList(session, {
+    assistantId: params.assistant,
     status: params.status,
     channel: params.channel,
     limit,
@@ -41,7 +44,7 @@ export default async function ConversationsPage({ searchParams }: ConversationsP
     if (result.error.kind === "forbidden") {
       return <AccessDeniedState />;
     }
-    return <ErrorState message={messageForApiError(result.error)} retryHref="/conversations" />;
+    return <ErrorState message={messageForApiError(result.error)} retryHref={`/conversations?assistant=${params.assistant}`} />;
   }
 
   const conversations = result.data;
@@ -61,11 +64,11 @@ export default async function ConversationsPage({ searchParams }: ConversationsP
       </div>
 
       <div className="conversationToolbar">
-        <ConversationFilters status={params.status} channel={params.channel} limit={limit} />
-        <Link className="actionButton" href="/conversations" aria-label="Refresh conversation history">Refresh</Link>
+        <ConversationFilters status={params.status} channel={params.channel} limit={limit} assistantId={params.assistant} />
+        <Link className="actionButton" href={`/conversations?assistant=${params.assistant}`} aria-label="Refresh conversation history">Refresh</Link>
       </div>
 
-      {conversations.length === 0 ? <EmptyState /> : <ConversationList conversations={conversations} />}
+      {conversations.length === 0 ? <EmptyState /> : <ConversationList conversations={conversations} assistantId={params.assistant} />}
 
       <PaginationControls
         basePath="/conversations"
@@ -74,6 +77,7 @@ export default async function ConversationsPage({ searchParams }: ConversationsP
         limit={limit}
         offset={offset}
         hasNext={conversations.length === limit}
+        assistantId={params.assistant}
       />
     </section>
   );
@@ -88,7 +92,7 @@ function clampNumber(value: string | undefined, fallback: number, min: number, m
 
 async function loadConversationList(
   session: DevelopmentDashboardSession,
-  params: { status?: string; channel?: string; limit: number; offset: number },
+  params: { assistantId: string; status?: string; channel?: string; limit: number; offset: number },
 ) {
   try {
     const response = await listConversations(session, params);

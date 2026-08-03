@@ -7,9 +7,10 @@ type PaginationControlsProps = {
   limit: number;
   offset: number;
   hasNext: boolean;
+  assistantId: string;
 };
 
-export function PaginationControls({ basePath, status, channel, limit, offset, hasNext }: PaginationControlsProps) {
+export function PaginationControls({ basePath, status, channel, limit, offset, hasNext, assistantId }: PaginationControlsProps) {
   const previousOffset = Math.max(0, offset - limit);
   const nextOffset = offset + limit;
 
@@ -18,7 +19,7 @@ export function PaginationControls({ basePath, status, channel, limit, offset, h
       <Link
         aria-disabled={offset === 0}
         className={offset === 0 ? "actionButton disabledButton" : "actionButton"}
-        href={buildHref(basePath, { status, channel, limit, offset: previousOffset })}
+        href={buildHref(basePath, { assistant: assistantId, status, channel, limit, offset: previousOffset })}
       >
         Previous
       </Link>
@@ -26,7 +27,7 @@ export function PaginationControls({ basePath, status, channel, limit, offset, h
       <Link
         aria-disabled={!hasNext}
         className={!hasNext ? "actionButton disabledButton" : "actionButton"}
-        href={buildHref(basePath, { status, channel, limit, offset: nextOffset })}
+        href={buildHref(basePath, { assistant: assistantId, status, channel, limit, offset: nextOffset })}
       >
         Next
       </Link>

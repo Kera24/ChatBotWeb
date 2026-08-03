@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.access.widget_admin.service import WidgetAdminNotFound, get_widget
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
 from app.repositories.conversation_repository import (
     get_conversation_detail,
@@ -35,6 +36,7 @@ def list_workspace_conversations(
     db: DbSession,
     _current_user: ConversationViewerDependency,
     organisation_id: str = Query(..., description="Temporary tenant context required until production auth can infer organisation access safely."),
+    assistant_id: str | None = Query(default=None, min_length=1, description="Assistant context used to enforce conversation isolation."),
     status_filter: str | None = Query(default=None, alias="status"),
     channel: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=MAX_CONVERSATION_HISTORY_LIMIT),
@@ -43,6 +45,7 @@ def list_workspace_conversations(
     started_before: datetime | None = Query(default=None),
 ) -> dict[str, object]:
     _ensure_workspace(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    assistant = _ensure_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id) if assistant_id else None
     rows = list_conversation_summaries(
         db,
         organisation_id=organisation_id,
@@ -53,10 +56,12 @@ def list_workspace_conversations(
         offset=offset,
         started_after=started_after,
         started_before=started_before,
+        widget_id=assistant.id if assistant else None,
     )
     data = [
         ConversationSummaryRead(
             id=row.conversation.id,
+            assistant_id=row.conversation.widget_id,
             organisation_id=row.conversation.organisation_id,
             workspace_id=row.conversation.workspace_id,
             channel=row.conversation.channel,
@@ -71,7 +76,7 @@ def list_workspace_conversations(
         ).model_dump(mode="json")
         for row in rows
     ]
-    return success_response(data, meta={"limit": limit, "offset": offset})
+    return success_response(data, meta={"limit": limit, "offset": offset, "assistant_id": assistant.id if assistant else None})
 
 
 @router.get("/{workspace_id}/conversations/{conversation_id}")
@@ -81,16 +86,19 @@ def get_workspace_conversation_detail(
     db: DbSession,
     _current_user: ConversationViewerDependency,
     organisation_id: str = Query(..., description="Temporary tenant context required until production auth can infer organisation access safely."),
+    assistant_id: str | None = Query(default=None, min_length=1, description="Assistant context used to enforce conversation isolation."),
 ) -> dict[str, object]:
     _ensure_workspace(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    assistant = _ensure_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id) if assistant_id else None
     conversation = get_conversation_detail(
         db,
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         conversation_id=conversation_id,
+        widget_id=assistant.id if assistant else None,
     )
     if conversation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found for workspace.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found for assistant.")
 
     messages = list_messages(
         db,
@@ -107,6 +115,7 @@ def get_workspace_conversation_detail(
     )
     data = ConversationDetailRead(
         id=conversation.id,
+        assistant_id=conversation.widget_id,
         organisation_id=conversation.organisation_id,
         workspace_id=conversation.workspace_id,
         channel=conversation.channel,
@@ -129,9 +138,17 @@ def _ensure_workspace(db: DbSession, *, organisation_id: str, workspace_id: str)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found for organisation.")
 
 
+def _ensure_assistant(db: DbSession, *, organisation_id: str, workspace_id: str, assistant_id: str):
+    try:
+        return get_widget(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=assistant_id)
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assistant not found for workspace.") from exc
+
+
 def _message_response(message, citations) -> ConversationMessageRead:
     return ConversationMessageRead(
         id=message.id,
+        assistant_id=message.widget_id,
         role=message.role,
         content=message.content,
         sequence_number=message.sequence_number,
@@ -154,6 +171,7 @@ def _message_response(message, citations) -> ConversationMessageRead:
         citations=[
             ConversationCitationRead(
                 id=citation.id,
+                assistant_id=citation.widget_id,
                 citation_index=citation.citation_index,
                 chunk_id=citation.chunk_id,
                 document_id=citation.document_id,

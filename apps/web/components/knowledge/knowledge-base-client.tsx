@@ -20,6 +20,7 @@ import type { DevelopmentDashboardSession } from "../../lib/auth/development-ses
 
 type KnowledgeBaseClientProps = {
   session: DevelopmentDashboardSession;
+  assistantId: string;
   initialDocuments: DocumentRecord[];
 };
 
@@ -37,7 +38,7 @@ type ConfirmState = {
 const PROCESSING_STATUSES = new Set(["uploaded", "pending", "queued", "processing", "extracting", "chunking", "embedding"]);
 const READY_STATUSES = new Set(["ready", "completed"]);
 
-export function KnowledgeBaseClient({ session, initialDocuments }: KnowledgeBaseClientProps) {
+export function KnowledgeBaseClient({ session, assistantId, initialDocuments }: KnowledgeBaseClientProps) {
   const [documents, setDocuments] = useState(initialDocuments);
   const [selectedDocumentId, setSelectedDocumentId] = useState(initialDocuments[0]?.id ?? "");
   const [details, setDetails] = useState<Record<string, DetailState>>({});
@@ -55,7 +56,7 @@ export function KnowledgeBaseClient({ session, initialDocuments }: KnowledgeBase
   const summary = useMemo(() => buildSummary(documents, details), [documents, details]);
 
   async function refreshDocuments(nextSelectedId = selectedDocumentId) {
-    const response = await listDocuments(session);
+    const response = assistantId ? await listDocuments(session, assistantId) : await listDocuments(session);
     setDocuments(response.data);
     if (response.data.length === 0) {
       setSelectedDocumentId("");
@@ -104,6 +105,7 @@ export function KnowledgeBaseClient({ session, initialDocuments }: KnowledgeBase
         title: String(formData.get("title") ?? ""),
         category: String(formData.get("category") ?? ""),
         visibility: "workspace",
+        ...(assistantId ? { assistantId } : {}),
       });
       form.reset();
       setUploadFile(null);
@@ -162,7 +164,7 @@ export function KnowledgeBaseClient({ session, initialDocuments }: KnowledgeBase
         <div>
           <p className="eyebrow">Yoranix Knowledge Base</p>
           <h2 id="knowledge-title">Operational source control for grounded answers</h2>
-          <p>Upload, inspect, process, and retire workspace-scoped sources through the existing document lifecycle.</p>
+          <p>Upload, inspect, process, and retire sources assigned to the selected assistant through the existing document lifecycle.</p>
         </div>
         <div className="knowledgeHeroAside">
           <strong>{summary.ready}</strong>
@@ -188,7 +190,7 @@ export function KnowledgeBaseClient({ session, initialDocuments }: KnowledgeBase
               <p className="sectionKicker">Upload</p>
               <h3 id="upload-title">Add a source</h3>
             </div>
-            <span className="knowledgePill">Workspace only</span>
+            <span className="knowledgePill">Assistant scoped</span>
           </div>
           <form className="knowledgeUploadForm" onSubmit={handleUpload}>
             <label>

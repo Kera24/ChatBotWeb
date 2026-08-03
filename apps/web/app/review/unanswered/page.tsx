@@ -21,6 +21,7 @@ type ReviewPageProps = {
     created_before?: string;
     limit?: string;
     offset?: string;
+    assistant?: string;
   }>;
 };
 
@@ -29,8 +30,10 @@ export default async function ReviewQueuePage({ searchParams }: ReviewPageProps)
   const limit = clampNumber(params.limit, 20, 1, 50);
   const offset = clampNumber(params.offset, 0, 0, 10_000);
   const session = await requireDashboardSession();
+  if (!params.assistant) return <ErrorState message="Select an assistant before opening knowledge gaps." retryHref="/dashboard" />;
 
   const result = await loadReviewItems(session, {
+    assistantId: params.assistant,
     answer_state: params.answer_state,
     review_status: params.review_status,
     channel: params.channel,
@@ -42,7 +45,7 @@ export default async function ReviewQueuePage({ searchParams }: ReviewPageProps)
 
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
-    return <ErrorState message={messageForApiError(result.error)} retryHref="/review/unanswered" />;
+    return <ErrorState message={messageForApiError(result.error)} retryHref={`/review/unanswered?assistant=${params.assistant}`} />;
   }
 
   const items = result.data;
@@ -70,11 +73,12 @@ export default async function ReviewQueuePage({ searchParams }: ReviewPageProps)
           createdAfter={params.created_after}
           createdBefore={params.created_before}
           limit={limit}
+          assistantId={params.assistant}
         />
-        <Link className="actionButton" href="/review/unanswered" aria-label="Refresh review queue">Refresh</Link>
+        <Link className="actionButton" href={`/review/unanswered?assistant=${params.assistant}`} aria-label="Refresh review queue">Refresh</Link>
       </div>
 
-      {items.length === 0 ? <EmptyState /> : <ReviewList items={items} />}
+      {items.length === 0 ? <EmptyState /> : <ReviewList items={items} assistantId={params.assistant} />}
 
       <ReviewPaginationControls
         basePath="/review/unanswered"
@@ -86,6 +90,7 @@ export default async function ReviewQueuePage({ searchParams }: ReviewPageProps)
         limit={limit}
         offset={offset}
         hasNext={offset + items.length < total}
+        assistantId={params.assistant}
       />
     </section>
   );
@@ -99,7 +104,7 @@ function clampNumber(value: string | undefined, fallback: number, min: number, m
 
 async function loadReviewItems(
   session: DevelopmentDashboardSession,
-  params: { answer_state?: string; review_status?: string; channel?: string; created_after?: string; created_before?: string; limit: number; offset: number },
+  params: { assistantId: string; answer_state?: string; review_status?: string; channel?: string; created_after?: string; created_before?: string; limit: number; offset: number },
 ): Promise<{ ok: true; data: ReviewItem[]; meta: ReviewListMeta } | { ok: false; error: DashboardApiError }> {
   try {
     const response = await listUnansweredReviewItems(session, params);

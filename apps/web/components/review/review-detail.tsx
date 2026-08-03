@@ -21,7 +21,7 @@ export function ReviewDetail({ detail, session, canUpdate }: ReviewDetailProps) 
   const assistantMessage = detail.conversation_context.find((message) => message.id === item.assistant_message_id);
   return (
     <section className="reviewDetailPage" aria-labelledby="review-detail-title">
-      <Link className="backLink" href="/review/unanswered">Back to review queue</Link>
+      <Link className="backLink" href={item.assistant_id ? `/review/unanswered?assistant=${item.assistant_id}` : "/review/unanswered"}>Back to review queue</Link>
       <div className="detailHero reviewDetailHero">
         <div>
           <p className="eyebrow">Knowledge gap review</p>

@@ -188,7 +188,7 @@ export function AssistantOnboardingWizard({ session }: { session: DevelopmentDas
       const currentWidget = await ensureAssistant();
       const uploaded: DocumentUploadResult[] = [];
       for (const file of files) {
-        const result = await uploadDocument(session, { file, title: file.name, category: "onboarding", visibility: "workspace" });
+        const result = await uploadDocument(session, { file, title: file.name, category: "onboarding", visibility: "workspace", assistantId: currentWidget.id });
         uploaded.push(result.data);
       }
       setStepStatus("upload", "complete");
@@ -235,7 +235,8 @@ export function AssistantOnboardingWizard({ session }: { session: DevelopmentDas
     setBusy(true);
     setError(null);
     try {
-      const response = await answerChatbotQuestion(session, { query, conversationId });
+      const currentWidget = await ensureAssistant();
+      const response = await answerChatbotQuestion(session, { query, conversationId, assistantId: currentWidget.id });
       setConversationId(response.data.conversation_id);
       setMessages((current) => [...current, { id: `playground-${++sequence.current}`, question: query, answer: response.data }]);
       setQuestion("");

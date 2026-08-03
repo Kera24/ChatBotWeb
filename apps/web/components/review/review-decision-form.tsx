@@ -31,7 +31,7 @@ export function ReviewDecisionForm({ session, item, canUpdate }: ReviewDecisionF
     setPending(status);
     setError(null);
     try {
-      const response = await updateUnansweredReviewStatus(session, item.assistant_message_id, {
+      const response = await updateUnansweredReviewStatus(session, item.assistant_message_id, item.assistant_id || "", {
         review_status: status,
         reviewer_note: note || null,
       });

@@ -46,13 +46,18 @@ export function AssistantSwitcher() {
         const storedSelected = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
         const selectedId = firstExistingId(widgetPayload.data, urlSelected) ?? firstExistingId(widgetPayload.data, storedSelected) ?? widgetPayload.data[0]?.id ?? null;
         setState({ loading: false, open: false, assistants: widgetPayload.data, selectedId, error: null, workspaceId: context.workspace_id });
+        if (!urlSelected && selectedId && requiresAssistantContext(pathname)) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("assistant", selectedId);
+          router.replace(`${pathname}?${params.toString()}`);
+        }
       } catch (error) {
         if (!cancelled) setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : "Assistants could not be loaded." }));
       }
     }
     load();
     return () => { cancelled = true; };
-  }, [searchParams]);
+  }, [pathname, router, searchParams]);
 
   useEffect(() => {
     function onDocumentClick(event: MouseEvent) {
@@ -128,4 +133,8 @@ function selectedStorageKey(workspaceId: string) {
 function firstExistingId(assistants: WidgetSummary[], candidate: string | null) {
   if (!candidate) return null;
   return assistants.some((assistant) => assistant.id === candidate) ? candidate : null;
+}
+
+function requiresAssistantContext(pathname: string) {
+  return pathname === "/knowledge" || pathname === "/chatbot" || pathname === "/analytics" || pathname === "/conversations" || pathname.startsWith("/conversations/") || pathname === "/review/unanswered" || pathname.startsWith("/review/unanswered/");
 }

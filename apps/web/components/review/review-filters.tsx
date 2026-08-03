@@ -5,11 +5,13 @@ type ReviewFiltersProps = {
   createdAfter?: string;
   createdBefore?: string;
   limit: number;
+  assistantId: string;
 };
 
-export function ReviewFilters({ answerState, reviewStatus, channel, createdAfter, createdBefore, limit }: ReviewFiltersProps) {
+export function ReviewFilters({ answerState, reviewStatus, channel, createdAfter, createdBefore, limit, assistantId }: ReviewFiltersProps) {
   return (
     <form className="conversationControls reviewControls" aria-label="Review queue filters">
+      <input type="hidden" name="assistant" value={assistantId} />
       <label>
         <span>Answer state</span>
         <select name="answer_state" defaultValue={answerState ?? ""}>

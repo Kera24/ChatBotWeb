@@ -5,9 +5,10 @@ import { ConversationStatusBadge } from "./conversation-status-badge";
 
 type ConversationListProps = {
   conversations: ConversationSummary[];
+  assistantId: string;
 };
 
-export function ConversationList({ conversations }: ConversationListProps) {
+export function ConversationList({ conversations, assistantId }: ConversationListProps) {
   return (
     <div className="conversationList" aria-label="Conversation history results">
       {conversations.map((conversation) => (
@@ -15,7 +16,7 @@ export function ConversationList({ conversations }: ConversationListProps) {
           <div className="conversationRowMain">
             <div className="conversationRowTitleLine">
               <h2>
-                <Link href={`/conversations/${conversation.id}`}>
+                <Link href={conversation.assistant_id || assistantId ? `/conversations/${conversation.id}?assistant=${conversation.assistant_id || assistantId}` : `/conversations/${conversation.id}`}>
                   {conversation.title || `Conversation ${conversation.id.slice(0, 8)}`}
                 </Link>
               </h2>

@@ -90,6 +90,7 @@ export type UploadDocumentInput = {
   title?: string;
   category?: string;
   visibility?: string;
+  assistantId?: string;
 };
 
 function workspacePath(session: DevelopmentDashboardSession, suffix: string) {
@@ -100,11 +101,11 @@ function tenantParams(session: DevelopmentDashboardSession) {
   return { organisation_id: session.organisationId };
 }
 
-export function listDocuments(session: DevelopmentDashboardSession) {
+export function listDocuments(session: DevelopmentDashboardSession, assistantId?: string) {
   return dashboardApiGet<DocumentRecord[]>({
     path: workspacePath(session, "/documents"),
     session,
-    searchParams: tenantParams(session),
+    searchParams: { ...tenantParams(session), ...(assistantId ? { assistant_id: assistantId } : {}) },
   });
 }
 
@@ -126,7 +127,7 @@ export function uploadDocument(session: DevelopmentDashboardSession, input: Uplo
   return dashboardApiPostForm<DocumentUploadResult>({
     path: workspacePath(session, "/documents/upload"),
     session,
-    searchParams: tenantParams(session),
+    searchParams: { ...tenantParams(session), ...(input.assistantId ? { assistant_id: input.assistantId } : {}) },
     formData,
   });
 }

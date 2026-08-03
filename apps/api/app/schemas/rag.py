@@ -1,4 +1,4 @@
-from decimal import Decimal
+﻿from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -7,6 +7,7 @@ from app.ai.contracts import FinishReason, TokenUsage
 
 class RAGAnswerRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
+    assistant_id: str | None = Field(default=None, min_length=1, max_length=80)
     conversation_id: str | None = None
     model_key: str | None = Field(default=None, min_length=1, max_length=120)
     prompt_key: str | None = Field(default=None, min_length=1, max_length=120)

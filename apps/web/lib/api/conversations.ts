@@ -1,4 +1,4 @@
-﻿import { dashboardApiGet } from "./client";
+import { dashboardApiGet } from "./client";
 import type {
   ConversationDetail,
   ConversationListMeta,
@@ -16,6 +16,7 @@ export async function listConversations(
     session,
     searchParams: {
       organisation_id: session.organisationId,
+      assistant_id: params.assistantId,
       status: params.status,
       channel: params.channel,
       started_after: params.started_after,
@@ -26,10 +27,10 @@ export async function listConversations(
   });
 }
 
-export async function getConversationDetail(session: DevelopmentDashboardSession, conversationId: string) {
+export async function getConversationDetail(session: DevelopmentDashboardSession, conversationId: string, assistantId?: string) {
   return dashboardApiGet<ConversationDetail>({
     path: `/api/v1/workspaces/${session.workspaceId}/conversations/${conversationId}`,
     session,
-    searchParams: { organisation_id: session.organisationId },
+    searchParams: { organisation_id: session.organisationId, ...(assistantId ? { assistant_id: assistantId } : {}) },
   });
 }

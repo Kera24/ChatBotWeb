@@ -43,6 +43,7 @@ def list_review_items(
     created_before: datetime | None = None,
     limit: int = 50,
     offset: int = 0,
+    widget_id: str | None = None,
 ) -> list[ReviewItemRow]:
     statement = _review_item_select(
         organisation_id=organisation_id,
@@ -52,6 +53,7 @@ def list_review_items(
         channel=channel,
         created_after=created_after,
         created_before=created_before,
+        widget_id=widget_id,
     )
     statement = statement.order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc()).offset(max(0, offset)).limit(max(1, min(limit, 100)))
     return [_row_to_review_item(row) for row in db.execute(statement).all()]
@@ -67,6 +69,7 @@ def count_review_items(
     channel: str | None = None,
     created_after: datetime | None = None,
     created_before: datetime | None = None,
+    widget_id: str | None = None,
 ) -> int:
     base = _review_base_query(
         organisation_id=organisation_id,
@@ -76,6 +79,7 @@ def count_review_items(
         channel=channel,
         created_after=created_after,
         created_before=created_before,
+        widget_id=widget_id,
     )
     statement = select(func.count(ChatMessage.id)).select_from(ChatMessage).join(ChatSession, ChatSession.id == ChatMessage.conversation_id).outerjoin(
         ReviewAnnotation,
@@ -95,11 +99,13 @@ def get_review_item_detail(
     organisation_id: str,
     workspace_id: str,
     assistant_message_id: str,
+    widget_id: str | None = None,
 ) -> ReviewItemRow | None:
     statement = _review_item_select(
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         assistant_message_id=assistant_message_id,
+        widget_id=widget_id,
     )
     row = db.execute(statement).first()
     return _row_to_review_item(row) if row is not None else None
@@ -114,6 +120,7 @@ def update_review_status(
     review_status: str,
     reviewer_note: str | None,
     actor_user_id: str | None,
+    widget_id: str | None = None,
 ) -> ReviewAnnotation:
     if review_status not in REVIEW_STATUSES:
         raise InvalidReviewStatus(f"Unsupported review status {review_status!r}.")
@@ -123,6 +130,7 @@ def update_review_status(
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         assistant_message_id=assistant_message_id,
+        widget_id=widget_id,
     )
     if item is None:
         raise ReviewItemNotFound("Review item not found for tenant workspace.")
@@ -132,6 +140,7 @@ def update_review_status(
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         assistant_message_id=assistant_message_id,
+        widget_id=widget_id,
     )
     previous_status = annotation.review_status if annotation is not None else "open"
     now = datetime.now(timezone.utc)
@@ -142,6 +151,7 @@ def update_review_status(
             conversation_id=item.conversation.id,
             assistant_message_id=assistant_message_id,
             review_status=review_status,
+            widget_id=item.conversation.widget_id,
         )
     annotation.review_status = review_status
     annotation.reviewer_note = reviewer_note
@@ -158,7 +168,7 @@ def update_review_status(
         actor_user_id=actor_user_id,
         previous_status=previous_status,
         new_status=review_status,
-        metadata_json={"conversation_id": item.conversation.id, "answer_state": item.assistant_message.answer_state},
+        metadata_json={"conversation_id": item.conversation.id, "answer_state": item.assistant_message.answer_state, "assistant_id": item.conversation.widget_id},
     )
     db.commit()
     db.refresh(annotation)
@@ -172,13 +182,17 @@ def list_citations_for_review_item(
     workspace_id: str,
     conversation_id: str,
     assistant_message_id: str,
+    widget_id: str | None = None,
 ) -> list[Citation]:
     statement = select(Citation).where(
         Citation.organisation_id == organisation_id,
         Citation.workspace_id == workspace_id,
         Citation.conversation_id == conversation_id,
         Citation.message_id == assistant_message_id,
-    ).order_by(Citation.citation_index)
+    )
+    if widget_id is not None:
+        statement = statement.where(Citation.widget_id == widget_id)
+    statement = statement.order_by(Citation.citation_index)
     return list(db.execute(statement).scalars().all())
 
 
@@ -192,6 +206,7 @@ def _review_item_select(
     created_after: datetime | None = None,
     created_before: datetime | None = None,
     assistant_message_id: str | None = None,
+    widget_id: str | None = None,
 ):
     UserMessage = aliased(ChatMessage)
     user_question = (
@@ -253,6 +268,7 @@ def _review_item_select(
         channel=channel,
         created_after=created_after,
         created_before=created_before,
+        widget_id=widget_id,
     )(statement)
 
 
@@ -265,6 +281,7 @@ def _review_base_query(
     channel: str | None = None,
     created_after: datetime | None = None,
     created_before: datetime | None = None,
+    widget_id: str | None = None,
 ):
     states = [answer_state] if answer_state else sorted(REVIEW_ANSWER_STATES)
 
@@ -277,6 +294,8 @@ def _review_base_query(
             ChatSession.organisation_id == organisation_id,
             ChatSession.workspace_id == workspace_id,
         )
+        if widget_id is not None:
+            statement = statement.where(ChatSession.widget_id == widget_id, ChatMessage.widget_id == widget_id)
         if review_status is not None:
             if review_status == "open":
                 statement = statement.where(or_(ReviewAnnotation.review_status == "open", ReviewAnnotation.id.is_(None)))
@@ -299,12 +318,15 @@ def _get_annotation(
     organisation_id: str,
     workspace_id: str,
     assistant_message_id: str,
+    widget_id: str | None = None,
 ) -> ReviewAnnotation | None:
     statement = select(ReviewAnnotation).where(
         ReviewAnnotation.organisation_id == organisation_id,
         ReviewAnnotation.workspace_id == workspace_id,
         ReviewAnnotation.assistant_message_id == assistant_message_id,
     )
+    if widget_id is not None:
+        statement = statement.where(ReviewAnnotation.widget_id == widget_id)
     return db.execute(statement).scalar_one_or_none()
 
 

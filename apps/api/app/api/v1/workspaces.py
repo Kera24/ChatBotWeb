@@ -94,6 +94,7 @@ def answer_workspace_rag_question(
                 organisation_id=organisation_id,
                 workspace_id=workspace_id,
                 query=payload.query,
+                assistant_id=payload.assistant_id,
                 conversation_id=payload.conversation_id,
                 model_key=payload.model_key,
                 prompt_key=payload.prompt_key,

@@ -7,9 +7,10 @@ import { ReviewStatusBadge } from "./review-status-badge";
 
 type ReviewListProps = {
   items: ReviewItem[];
+  assistantId: string;
 };
 
-export function ReviewList({ items }: ReviewListProps) {
+export function ReviewList({ items, assistantId }: ReviewListProps) {
   return (
     <div className="reviewList" aria-label="Knowledge gap review results">
       {items.map((item) => (
@@ -17,7 +18,7 @@ export function ReviewList({ items }: ReviewListProps) {
           <div className="reviewRowMain">
             <div className="conversationRowTitleLine">
               <h2>
-                <Link href={`/review/unanswered/${item.assistant_message_id}`}>
+                <Link href={`/review/unanswered/${item.assistant_message_id}?assistant=${item.assistant_id || assistantId}`}>
                   {item.user_question || "Question unavailable"}
                 </Link>
               </h2>

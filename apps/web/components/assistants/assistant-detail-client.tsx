@@ -69,7 +69,7 @@ export function AssistantDetailClient(props: AssistantDetailClientProps) {
 
       {selected === "overview" ? <OverviewTab widget={widget} draft={props.initialDraft} embed={props.initialEmbed} overviewData={props.overviewData} /> : null}
       {selected === "knowledge" ? <KnowledgeTab widget={widget} draft={props.initialDraft} knowledgeOptions={props.initialKnowledgeOptions} /> : null}
-      {selected === "playground" ? <PlaygroundTab session={props.session} /> : null}
+      {selected === "playground" ? <PlaygroundTab session={props.session} assistantId={widget.id} /> : null}
       {selected === "widget" ? <WidgetDetailClient session={props.session} initialWidget={props.initialWidget} initialDraft={props.initialDraft} initialOrigins={props.initialOrigins} initialEmbed={props.initialEmbed} sdkVersions={props.initialSdkVersions} knowledgeOptions={props.initialKnowledgeOptions} initialRevisions={props.initialRevisions} initialInstallationStatus={props.initialInstallationStatus} /> : null}
       {selected === "analytics" ? <AnalyticsTab widget={widget} overviewData={props.overviewData} /> : null}
       {selected === "settings" ? <SettingsTab session={props.session} widget={widget} /> : null}
@@ -130,10 +130,10 @@ function KnowledgeTab({ widget, draft, knowledgeOptions }: { widget: WidgetDetai
   );
 }
 
-function PlaygroundTab({ session }: { session: DevelopmentDashboardSession }) {
+function PlaygroundTab({ session, assistantId }: { session: DevelopmentDashboardSession; assistantId: string }) {
   return (
     <div className="assistantPlaygroundShell">
-      <ChatbotClient session={session} />
+      <ChatbotClient session={session} assistantId={assistantId} />
     </div>
   );
 }

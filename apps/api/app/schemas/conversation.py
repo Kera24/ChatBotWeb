@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class ConversationCitationRead(BaseModel):
     id: str
+    assistant_id: str | None = None
     citation_index: int
     chunk_id: str
     document_id: str
@@ -21,6 +22,7 @@ class ConversationCitationRead(BaseModel):
 
 class ConversationMessageRead(BaseModel):
     id: str
+    assistant_id: str | None = None
     role: str
     content: str
     sequence_number: int
@@ -45,6 +47,7 @@ class ConversationMessageRead(BaseModel):
 
 class ConversationSummaryRead(BaseModel):
     id: str
+    assistant_id: str | None = None
     organisation_id: str
     workspace_id: str
     channel: str
@@ -60,6 +63,7 @@ class ConversationSummaryRead(BaseModel):
 
 class ConversationDetailRead(BaseModel):
     id: str
+    assistant_id: str | None = None
     organisation_id: str
     workspace_id: str
     channel: str

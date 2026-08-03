@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass, field
 from hashlib import sha256
@@ -49,6 +49,7 @@ class PublicWidgetRAGAdapter:
                     workspace_id=prepared.workspace_id,
                     conversation_id=prepared.conversation_id,
                     query=prepared.canonical_message,
+                    assistant_id=_assistant_id_for(self.orchestrator.db, prepared),
                     channel="widget",
                     model_key=None,
                     prompt_key=None,
@@ -202,3 +203,12 @@ def _knowledge_scope_for(db, prepared) -> list[str]:  # noqa: ANN001
         credential_id=prepared.credential_id,
     )
     return list(getattr(configuration, "knowledge_scope_json", None) or [])
+
+def _assistant_id_for(db, prepared) -> str | None:  # noqa: ANN001
+    configuration = get_configuration_for_credential(
+        db,
+        organisation_id=prepared.organisation_id,
+        workspace_id=prepared.workspace_id,
+        credential_id=prepared.credential_id,
+    )
+    return getattr(configuration, "widget_id", None)

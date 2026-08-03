@@ -1,4 +1,4 @@
-﻿import { getConversationDetail, listConversations } from "./conversations";
+import { getConversationDetail, listConversations } from "./conversations";
 import { listDocuments, type DocumentRecord } from "./documents";
 import { listUnansweredReviewItems } from "./review";
 import type { ConversationDetail, ConversationSummary, ReviewItem } from "./types";
@@ -6,6 +6,7 @@ import { listWidgets, type WidgetSummary } from "./widgets";
 import type { DevelopmentDashboardSession } from "../auth/development-session";
 
 export type AnalyticsFilters = {
+  assistantId?: string;
   started_after?: string;
   started_before?: string;
   conversation_status?: string;
@@ -30,8 +31,9 @@ const DETAIL_SAMPLE_LIMIT = 25;
 
 export async function loadAnalyticsData(session: DevelopmentDashboardSession, filters: AnalyticsFilters = {}): Promise<AnalyticsData> {
   const [documents, conversations, widgets, reviewItems] = await Promise.all([
-    listDocuments(session),
+    listDocuments(session, filters.assistantId),
     listConversations(session, {
+      assistantId: filters.assistantId,
       status: filters.conversation_status,
       channel: filters.conversation_channel,
       started_after: filters.started_after,
@@ -41,6 +43,7 @@ export async function loadAnalyticsData(session: DevelopmentDashboardSession, fi
     }),
     listWidgets(session),
     listUnansweredReviewItems(session, {
+      assistantId: filters.assistantId,
       review_status: "open",
       channel: filters.conversation_channel,
       created_after: filters.started_after,
@@ -54,7 +57,7 @@ export async function loadAnalyticsData(session: DevelopmentDashboardSession, fi
     ? documents.data.filter((document) => document.status === filters.document_status)
     : documents.data;
   const detailTargets = conversations.data.slice(0, DETAIL_SAMPLE_LIMIT);
-  const details = await Promise.all(detailTargets.map((conversation) => getConversationDetail(session, conversation.id)));
+  const details = await Promise.all(detailTargets.map((conversation) => filters.assistantId ? getConversationDetail(session, conversation.id, filters.assistantId) : getConversationDetail(session, conversation.id)));
 
   return {
     filters,

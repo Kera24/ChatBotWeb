@@ -1,4 +1,4 @@
-﻿import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { loadOverviewData } from "./overview";
 import { listConversations } from "./conversations";
@@ -32,10 +32,10 @@ describe("overview API aggregation", () => {
 
     const data = await loadOverviewData(session);
 
-    expect(listDocuments).toHaveBeenCalledWith(session);
-    expect(listConversations).toHaveBeenCalledWith(session, { limit: 50, offset: 0 });
+    expect(listDocuments).toHaveBeenCalledWith(session, "widget-1");
+    expect(listConversations).toHaveBeenCalledWith(session, { assistantId: "widget-1", limit: 50, offset: 0 });
     expect(listWidgets).toHaveBeenCalledWith(session);
-    expect(listUnansweredReviewItems).toHaveBeenCalledWith(session, { review_status: "open", limit: 20, offset: 0 });
+    expect(listUnansweredReviewItems).toHaveBeenCalledWith(session, { assistantId: "widget-1", review_status: "open", limit: 20, offset: 0 });
     expect(data.reviewTotal).toBe(7);
     expect(data.documents).toHaveLength(1);
     expect(data.conversations).toHaveLength(1);

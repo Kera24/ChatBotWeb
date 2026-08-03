@@ -61,6 +61,7 @@ def start_conversation(
     external_user_id: str | None = None,
     title: str | None = None,
     metadata_json: dict | None = None,
+    widget_id: str | None = None,
 ) -> ChatSession:
     if channel not in VALID_CHANNELS:
         raise ValueError(f"Unsupported conversation channel {channel!r}.")
@@ -73,6 +74,7 @@ def start_conversation(
         external_user_id=external_user_id,
         title=title,
         metadata_json=metadata_json,
+        widget_id=widget_id,
         started_at=_now(),
     )
 

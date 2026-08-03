@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
+from app.access.widget_admin.service import create_widget
 from app.db.models import Membership, Organisation, User, Workspace
 from app.db.session import get_db
 from app.main import create_app
@@ -84,6 +85,7 @@ def seed_conversation(
     title: str | None = "Admissions chat",
     metadata_json: dict | None = None,
     answer_state: str = "answered",
+    widget_id: str | None = None,
 ):
     with client.app.state.testing_session() as db:
         conversation = start_conversation(
@@ -93,6 +95,7 @@ def seed_conversation(
             channel=channel,
             title=title,
             metadata_json=metadata_json or {"source": "test"},
+            widget_id=widget_id,
         )
         user_message = append_user_message(
             db,
@@ -180,6 +183,19 @@ def seed_conversation(
         return conversation.id, user_message.id, assistant_message.id, citation.id
 
 
+def seed_assistant(client: TestClient, *, organisation_id: str, workspace_id: str, display_name: str) -> str:
+    with client.app.state.testing_session() as db:
+        widget = create_widget(
+            db,
+            organisation_id=organisation_id,
+            workspace_id=workspace_id,
+            display_name=display_name,
+            environment="development",
+            actor_user_id=None,
+        )
+        return widget.id
+
+
 def list_conversations(client: TestClient, *, organisation_id: str, workspace_id: str, email: str, role: str, **params):
     query = {"organisation_id": organisation_id}
     query.update(params)
@@ -190,10 +206,12 @@ def list_conversations(client: TestClient, *, organisation_id: str, workspace_id
     )
 
 
-def get_conversation(client: TestClient, *, organisation_id: str, workspace_id: str, conversation_id: str, email: str, role: str):
+def get_conversation(client: TestClient, *, organisation_id: str, workspace_id: str, conversation_id: str, email: str, role: str, **params):
+    query = {"organisation_id": organisation_id}
+    query.update(params)
     return client.get(
         f"/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}",
-        params={"organisation_id": organisation_id},
+        params=query,
         headers=dev_headers(email, role),
     )
 
@@ -410,3 +428,104 @@ def test_response_excludes_system_prompt_secret_and_internal_metadata_fields(cli
     assert "metadata_json" not in payload
     assert "anonymous_user_id" not in payload
     assert "external_user_id" not in payload
+
+
+def test_assistant_filter_is_server_enforced_for_conversation_list_and_detail(client: TestClient) -> None:
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client,
+        organisation_name="Alpha",
+        organisation_slug="alpha",
+        user_email="admin-assistant-scope@example.test",
+        role="client_admin",
+    )
+    admissions_assistant_id = seed_assistant(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        display_name="Admissions Assistant",
+    )
+    sales_assistant_id = seed_assistant(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        display_name="Sales Assistant",
+    )
+    admissions_conversation_id, _u1, _a1, _c1 = seed_conversation(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        widget_id=admissions_assistant_id,
+    )
+    sales_conversation_id, _u2, _a2, _c2 = seed_conversation(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        widget_id=sales_assistant_id,
+    )
+
+    admissions_list = list_conversations(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        email="admin-assistant-scope@example.test",
+        role="client_admin",
+        assistant_id=admissions_assistant_id,
+    )
+    sales_list = list_conversations(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        email="admin-assistant-scope@example.test",
+        role="client_admin",
+        assistant_id=sales_assistant_id,
+    )
+    cross_detail = get_conversation(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        conversation_id=sales_conversation_id,
+        email="admin-assistant-scope@example.test",
+        role="client_admin",
+        assistant_id=admissions_assistant_id,
+    )
+    own_detail = get_conversation(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        conversation_id=admissions_conversation_id,
+        email="admin-assistant-scope@example.test",
+        role="client_admin",
+        assistant_id=admissions_assistant_id,
+    )
+
+    assert admissions_list.status_code == 200
+    assert [item["id"] for item in admissions_list.json()["data"]] == [admissions_conversation_id]
+    assert admissions_list.json()["data"][0]["assistant_id"] == admissions_assistant_id
+    assert sales_list.status_code == 200
+    assert [item["id"] for item in sales_list.json()["data"]] == [sales_conversation_id]
+    assert cross_detail.status_code == 404
+    assert own_detail.status_code == 200
+    assert own_detail.json()["data"]["assistant_id"] == admissions_assistant_id
+    assert own_detail.json()["data"]["messages"][1]["assistant_id"] == admissions_assistant_id
+    assert own_detail.json()["data"]["messages"][1]["citations"][0]["assistant_id"] == admissions_assistant_id
+
+
+def test_invalid_assistant_id_is_rejected_for_conversation_list(client: TestClient) -> None:
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client,
+        organisation_name="Alpha",
+        organisation_slug="alpha-invalid-assistant",
+        user_email="invalid-assistant@example.test",
+        role="client_admin",
+    )
+
+    response = list_conversations(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        email="invalid-assistant@example.test",
+        role="client_admin",
+        assistant_id="missing-assistant",
+    )
+
+    assert response.status_code == 404

@@ -14,18 +14,38 @@ export type OverviewData = {
 };
 
 export async function loadOverviewData(session: DevelopmentDashboardSession): Promise<OverviewData> {
-  const [documents, conversations, widgets, reviewItems] = await Promise.all([
-    listDocuments(session),
-    listConversations(session, { limit: 50, offset: 0 }),
-    listWidgets(session),
-    listUnansweredReviewItems(session, { review_status: "open", limit: 20, offset: 0 }),
-  ]);
+  const widgets = await listWidgets(session);
+  const assistants = widgets.data;
+
+  if (assistants.length === 0) {
+    const [documents, conversations, reviewItems] = await Promise.all([
+      listDocuments(session),
+      listConversations(session, { limit: 50, offset: 0 }),
+      listUnansweredReviewItems(session, { review_status: "open", limit: 20, offset: 0 }),
+    ]);
+    return {
+      documents: documents.data,
+      conversations: conversations.data,
+      widgets: widgets.data,
+      reviewItems: reviewItems.data,
+      reviewTotal: reviewItems.meta?.total ?? reviewItems.data.length,
+    };
+  }
+
+  const scoped = await Promise.all(assistants.map(async (assistant) => {
+    const [documents, conversations, reviewItems] = await Promise.all([
+      listDocuments(session, assistant.id),
+      listConversations(session, { assistantId: assistant.id, limit: 50, offset: 0 }),
+      listUnansweredReviewItems(session, { assistantId: assistant.id, review_status: "open", limit: 20, offset: 0 }),
+    ]);
+    return { documents, conversations, reviewItems };
+  }));
 
   return {
-    documents: documents.data,
-    conversations: conversations.data,
+    documents: scoped.flatMap((item) => item.documents.data),
+    conversations: scoped.flatMap((item) => item.conversations.data),
     widgets: widgets.data,
-    reviewItems: reviewItems.data,
-    reviewTotal: reviewItems.meta?.total ?? reviewItems.data.length,
+    reviewItems: scoped.flatMap((item) => item.reviewItems.data),
+    reviewTotal: scoped.reduce((total, item) => total + (item.reviewItems.meta?.total ?? item.reviewItems.data.length), 0),
   };
 }

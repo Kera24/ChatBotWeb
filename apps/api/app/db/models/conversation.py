@@ -13,11 +13,13 @@ class ChatSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_chat_sessions_tenant_workspace", "organisation_id", "workspace_id"),
         Index("ix_chat_sessions_tenant_status", "organisation_id", "workspace_id", "status"),
+        Index("ix_chat_sessions_widget_recent", "organisation_id", "workspace_id", "widget_id", "last_message_at"),
         Index("ix_chat_sessions_recent", "organisation_id", "workspace_id", "last_message_at", "started_at"),
     )
 
     organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    widget_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("widgets.id"), nullable=True, index=True)
     channel: Mapped[str] = mapped_column(String(40), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="active", server_default="active")
     anonymous_user_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -38,11 +40,13 @@ class ChatMessage(UUIDPrimaryKeyMixin, Base):
         UniqueConstraint("conversation_id", "sequence_number", name="uq_chat_messages_conversation_sequence"),
         Index("ix_chat_messages_tenant_workspace", "organisation_id", "workspace_id"),
         Index("ix_chat_messages_conversation_order", "conversation_id", "sequence_number"),
+        Index("ix_chat_messages_widget", "organisation_id", "workspace_id", "widget_id"),
         Index("ix_chat_messages_execution_id", "execution_id"),
     )
 
     organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    widget_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("widgets.id"), nullable=True, index=True)
     conversation_id: Mapped[str] = mapped_column(String(36), ForeignKey("chat_sessions.id"), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(40), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -75,11 +79,13 @@ class Citation(UUIDPrimaryKeyMixin, Base):
         UniqueConstraint("message_id", "citation_index", name="uq_citations_message_index"),
         Index("ix_citations_tenant_workspace", "organisation_id", "workspace_id"),
         Index("ix_citations_message_order", "message_id", "citation_index"),
+        Index("ix_citations_widget", "organisation_id", "workspace_id", "widget_id"),
         Index("ix_citations_chunk", "chunk_id"),
     )
 
     organisation_id: Mapped[str] = mapped_column(String(36), ForeignKey("organisations.id"), nullable=False, index=True)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), nullable=False, index=True)
+    widget_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("widgets.id"), nullable=True, index=True)
     conversation_id: Mapped[str] = mapped_column(String(36), ForeignKey("chat_sessions.id"), nullable=False, index=True)
     message_id: Mapped[str] = mapped_column(String(36), ForeignKey("chat_messages.id"), nullable=False, index=True)
     chunk_id: Mapped[str] = mapped_column(String(36), ForeignKey("chunks.id"), nullable=False, index=True)

@@ -2,11 +2,13 @@ type ConversationFiltersProps = {
   status?: string;
   channel?: string;
   limit: number;
+  assistantId: string;
 };
 
-export function ConversationFilters({ status, channel, limit }: ConversationFiltersProps) {
+export function ConversationFilters({ status, channel, limit, assistantId }: ConversationFiltersProps) {
   return (
     <form className="conversationControls" aria-label="Conversation filters">
+      <input type="hidden" name="assistant" value={assistantId} />
       <label>
         <span>Status</span>
         <select name="status" defaultValue={status ?? ""}>

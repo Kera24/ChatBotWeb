@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+﻿from dataclasses import dataclass, field
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.ai.model_registry import ModelConfig
 from app.ai.service import AICoreGenerateInput
 from app.core.config import settings
 from app.repositories import conversation_repository
+from app.access.widget_admin.service import WidgetAdminNotFound, get_current_draft, get_widget
 from app.repositories.workspace_repository import get_workspace_for_organisation
 from app.services.conversation import (
     append_assistant_message,
@@ -58,6 +59,7 @@ class RAGOrchestrationRequest:
     organisation_id: str
     workspace_id: str
     query: str
+    assistant_id: str | None = None
     channel: str = "dashboard_test"
     conversation_id: str | None = None
     model_key: str | None = None
@@ -122,7 +124,9 @@ class RAGOrchestrator:
 
     def answer(self, request: RAGOrchestrationRequest) -> RAGOrchestrationResult:
         self._validate_workspace(request)
-        conversation = self._resolve_conversation(request)
+        assistant = self._resolve_assistant(request)
+        assistant_id = assistant.id if assistant is not None else None
+        conversation = self._resolve_conversation(request, assistant_id=assistant_id)
         user_message = append_user_message(
             self.db,
             organisation_id=request.organisation_id,
@@ -143,7 +147,7 @@ class RAGOrchestrator:
             max_context_chunks=settings.RETRIEVAL_MAX_CONTEXT_CHUNKS,
             max_context_chars=max_context_chars,
             provider=self.embedding_provider,
-            document_ids=(request.metadata or {}).get("knowledge_document_ids") or None,
+            document_ids=self._knowledge_scope_for_request(request, assistant),
         )
         context = "\n\n".join(block.context_text for block in retrieval.context_blocks)
         model_key = request.model_key or DEFAULT_RAG_MODEL_KEY
@@ -293,20 +297,39 @@ class RAGOrchestrator:
         if workspace is None:
             raise RAGTenantContextError("Workspace not found for organisation.")
 
-    def _resolve_conversation(self, request: RAGOrchestrationRequest):
+    def _resolve_assistant(self, request: RAGOrchestrationRequest):
+        if request.assistant_id is None:
+            return None
+        try:
+            return get_widget(self.db, organisation_id=request.organisation_id, workspace_id=request.workspace_id, widget_id=request.assistant_id)
+        except WidgetAdminNotFound as exc:
+            raise RAGTenantContextError("Assistant not found for workspace.") from exc
+
+    def _knowledge_scope_for_request(self, request: RAGOrchestrationRequest, assistant) -> list[str] | None:
+        if assistant is None:
+            return (request.metadata or {}).get("knowledge_document_ids") or None
+        try:
+            draft = get_current_draft(self.db, widget=assistant)
+        except WidgetAdminNotFound:
+            return []
+        return list(draft.knowledge_scope_json or [])
+
+    def _resolve_conversation(self, request: RAGOrchestrationRequest, *, assistant_id: str | None):
         if request.conversation_id is None:
             return start_conversation(
                 self.db,
                 organisation_id=request.organisation_id,
                 workspace_id=request.workspace_id,
                 channel=request.channel,
-                metadata_json=request.metadata,
+                metadata_json={**(request.metadata or {}), **({"assistant_id": assistant_id, "widget_id": assistant_id} if assistant_id else {})},
+                widget_id=assistant_id,
             )
         conversation = conversation_repository.get_conversation(
             self.db,
             organisation_id=request.organisation_id,
             workspace_id=request.workspace_id,
             conversation_id=request.conversation_id,
+            widget_id=assistant_id,
         )
         if conversation is None:
             raise RAGConversationNotFoundError("Conversation not found for tenant workspace.")

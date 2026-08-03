@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.access.widget_admin.service import WidgetAdminNotFound, get_widget
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
 from app.api.v1.conversations import _message_response
 from app.repositories.conversation_repository import list_citations_for_messages, list_messages
@@ -42,6 +43,7 @@ def list_unanswered_review_items(
     db: DbSession,
     _current_user: ReviewReaderDependency,
     organisation_id: str = Query(..., description="Temporary tenant context required until production auth can infer organisation access safely."),
+    assistant_id: str | None = Query(default=None, min_length=1, description="Assistant context used to enforce review isolation."),
     answer_state: str | None = Query(default=None),
     review_status: str | None = Query(default=None),
     channel: str | None = Query(default=None),
@@ -51,6 +53,7 @@ def list_unanswered_review_items(
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
     _ensure_workspace(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    assistant = _ensure_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id) if assistant_id else None
     _validate_filters(answer_state=answer_state, review_status=review_status)
     rows = list_review_items(
         db,
@@ -63,6 +66,7 @@ def list_unanswered_review_items(
         created_before=created_before,
         limit=limit,
         offset=offset,
+        widget_id=assistant.id if assistant else None,
     )
     total = count_review_items(
         db,
@@ -73,9 +77,10 @@ def list_unanswered_review_items(
         channel=channel,
         created_after=created_after,
         created_before=created_before,
+        widget_id=assistant.id if assistant else None,
     )
-    data = [_review_item_response(db, organisation_id=organisation_id, workspace_id=workspace_id, row=row) for row in rows]
-    return success_response([item.model_dump(mode="json") for item in data], meta={"limit": limit, "offset": offset, "count": len(data), "total": total})
+    data = [_review_item_response(db, organisation_id=organisation_id, workspace_id=workspace_id, row=row, widget_id=assistant.id if assistant else None) for row in rows]
+    return success_response([item.model_dump(mode="json") for item in data], meta={"limit": limit, "offset": offset, "count": len(data), "total": total, "assistant_id": assistant.id if assistant else None})
 
 
 @router.get("/{workspace_id}/review/unanswered/{assistant_message_id}")
@@ -85,16 +90,19 @@ def get_unanswered_review_item(
     db: DbSession,
     _current_user: ReviewReaderDependency,
     organisation_id: str = Query(..., description="Temporary tenant context required until production auth can infer organisation access safely."),
+    assistant_id: str | None = Query(default=None, min_length=1, description="Assistant context used to enforce review isolation."),
 ) -> dict[str, object]:
     _ensure_workspace(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    assistant = _ensure_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id) if assistant_id else None
     row = get_review_item_detail(
         db,
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         assistant_message_id=assistant_message_id,
+        widget_id=assistant.id if assistant else None,
     )
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review item not found for workspace.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review item not found for assistant.")
 
     messages = list_messages(
         db,
@@ -110,7 +118,7 @@ def get_unanswered_review_item(
         message_ids=[message.id for message in messages],
     )
     data = ReviewItemDetailRead(
-        item=_review_item_response(db, organisation_id=organisation_id, workspace_id=workspace_id, row=row),
+        item=_review_item_response(db, organisation_id=organisation_id, workspace_id=workspace_id, row=row, widget_id=assistant.id if assistant else None),
         conversation_context=[_message_response(message, citations_by_message.get(message.id, [])) for message in messages],
     )
     return success_response(data.model_dump(mode="json"))
@@ -124,8 +132,10 @@ def update_unanswered_review_item(
     db: DbSession,
     current_user: ReviewUpdaterDependency,
     organisation_id: str = Query(..., description="Temporary tenant context required until production auth can infer organisation access safely."),
+    assistant_id: str | None = Query(default=None, min_length=1, description="Assistant context used to enforce review isolation."),
 ) -> dict[str, object]:
     _ensure_workspace(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    assistant = _ensure_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id) if assistant_id else None
     try:
         annotation = update_review_status(
             db,
@@ -135,21 +145,23 @@ def update_unanswered_review_item(
             review_status=payload.review_status,
             reviewer_note=payload.reviewer_note,
             actor_user_id=current_user.user_id,
+            widget_id=assistant.id if assistant else None,
         )
     except InvalidReviewStatus as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except ReviewItemNotFound as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review item not found for workspace.") from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review item not found for assistant.") from exc
 
     row = get_review_item_detail(
         db,
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         assistant_message_id=annotation.assistant_message_id,
+        widget_id=assistant.id if assistant else None,
     )
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review item not found for workspace.")
-    data = _review_item_response(db, organisation_id=organisation_id, workspace_id=workspace_id, row=row)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review item not found for assistant.")
+    data = _review_item_response(db, organisation_id=organisation_id, workspace_id=workspace_id, row=row, widget_id=assistant.id if assistant else None)
     return success_response(data.model_dump(mode="json"))
 
 
@@ -159,6 +171,13 @@ def _ensure_workspace(db: DbSession, *, organisation_id: str, workspace_id: str)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found for organisation.")
 
 
+def _ensure_assistant(db: DbSession, *, organisation_id: str, workspace_id: str, assistant_id: str):
+    try:
+        return get_widget(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=assistant_id)
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assistant not found for workspace.") from exc
+
+
 def _validate_filters(*, answer_state: str | None, review_status: str | None) -> None:
     if answer_state is not None and answer_state not in REVIEW_ANSWER_STATES:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported review answer_state filter.")
@@ -166,16 +185,18 @@ def _validate_filters(*, answer_state: str | None, review_status: str | None) ->
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unsupported review_status filter.")
 
 
-def _review_item_response(db: DbSession, *, organisation_id: str, workspace_id: str, row) -> ReviewItemRead:
+def _review_item_response(db: DbSession, *, organisation_id: str, workspace_id: str, row, widget_id: str | None = None) -> ReviewItemRead:
     citations = list_citations_for_review_item(
         db,
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         conversation_id=row.conversation.id,
         assistant_message_id=row.assistant_message.id,
+        widget_id=widget_id,
     )
     return ReviewItemRead(
         conversation_id=row.conversation.id,
+        assistant_id=row.conversation.widget_id,
         assistant_message_id=row.assistant_message.id,
         user_question=row.user_question,
         assistant_answer=row.assistant_message.content,
@@ -191,6 +212,7 @@ def _review_item_response(db: DbSession, *, organisation_id: str, workspace_id: 
         citations=[
             ConversationCitationRead(
                 id=citation.id,
+                assistant_id=citation.widget_id,
                 citation_index=citation.citation_index,
                 chunk_id=citation.chunk_id,
                 document_id=citation.document_id,

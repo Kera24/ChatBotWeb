@@ -8,6 +8,7 @@ from app.schemas.conversation import ConversationCitationRead, ConversationMessa
 
 class ReviewItemRead(BaseModel):
     conversation_id: str
+    assistant_id: str | None = None
     assistant_message_id: str
     user_question: str | None = None
     assistant_answer: str

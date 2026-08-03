@@ -13,13 +13,16 @@ export const dynamic = "force-dynamic";
 
 type ConversationDetailPageProps = {
   params: Promise<{ conversationId: string }>;
+  searchParams: Promise<{ assistant?: string }>;
 };
 
-export default async function ConversationDetailPage({ params }: ConversationDetailPageProps) {
+export default async function ConversationDetailPage({ params, searchParams }: ConversationDetailPageProps) {
   const { conversationId } = await params;
+  const query = await searchParams;
   const session = await requireDashboardSession();
+  if (!query.assistant) return <ErrorState message="Assistant context is required for conversation detail." retryHref="/conversations" />;
 
-  const result = await loadConversationDetail(session, conversationId);
+  const result = await loadConversationDetail(session, conversationId, query.assistant);
 
   if (!result.ok) {
     if (result.error.kind === "forbidden") {
@@ -28,7 +31,7 @@ export default async function ConversationDetailPage({ params }: ConversationDet
     return (
       <ErrorState
         message={messageForApiError(result.error)}
-        retryHref={`/conversations/${conversationId}`}
+        retryHref={`/conversations/${conversationId}?assistant=${query.assistant}`}
       />
     );
   }
@@ -37,7 +40,7 @@ export default async function ConversationDetailPage({ params }: ConversationDet
 
   return (
     <section className="conversationDetailPage" aria-labelledby="detail-title">
-      <Link className="backLink" href="/conversations">Back to conversations</Link>
+      <Link className="backLink" href={`/conversations?assistant=${query.assistant}`}>Back to conversations</Link>
       <div className="detailHero">
         <div>
           <p className="eyebrow">Conversation detail</p>
@@ -75,9 +78,10 @@ export default async function ConversationDetailPage({ params }: ConversationDet
 async function loadConversationDetail(
   session: DevelopmentDashboardSession,
   conversationId: string,
+  assistantId: string,
 ) {
   try {
-    const response = await getConversationDetail(session, conversationId);
+    const response = await getConversationDetail(session, conversationId, assistantId);
     return { ok: true as const, data: response.data };
   } catch (error) {
     if (isDashboardApiError(error)) {

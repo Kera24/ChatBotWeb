@@ -10,6 +10,7 @@ type ReviewPaginationControlsProps = {
   limit: number;
   offset: number;
   hasNext: boolean;
+  assistantId: string;
 };
 
 export function ReviewPaginationControls({
@@ -22,6 +23,7 @@ export function ReviewPaginationControls({
   limit,
   offset,
   hasNext,
+  assistantId,
 }: ReviewPaginationControlsProps) {
   const previousOffset = Math.max(0, offset - limit);
   const nextOffset = offset + limit;
@@ -30,7 +32,7 @@ export function ReviewPaginationControls({
       <Link
         aria-disabled={offset === 0}
         className={offset === 0 ? "actionButton disabledButton" : "actionButton"}
-        href={buildHref(basePath, { answer_state: answerState, review_status: reviewStatus, channel, created_after: createdAfter, created_before: createdBefore, limit, offset: previousOffset })}
+        href={buildHref(basePath, { assistant: assistantId, answer_state: answerState, review_status: reviewStatus, channel, created_after: createdAfter, created_before: createdBefore, limit, offset: previousOffset })}
       >
         Previous
       </Link>
@@ -38,7 +40,7 @@ export function ReviewPaginationControls({
       <Link
         aria-disabled={!hasNext}
         className={!hasNext ? "actionButton disabledButton" : "actionButton"}
-        href={buildHref(basePath, { answer_state: answerState, review_status: reviewStatus, channel, created_after: createdAfter, created_before: createdBefore, limit, offset: nextOffset })}
+        href={buildHref(basePath, { assistant: assistantId, answer_state: answerState, review_status: reviewStatus, channel, created_after: createdAfter, created_before: createdBefore, limit, offset: nextOffset })}
       >
         Next
       </Link>

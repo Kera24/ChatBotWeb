@@ -14,18 +14,20 @@ type AnalyticsPageProps = {
     conversation_status?: string;
     conversation_channel?: string;
     document_status?: string;
+    assistant?: string;
   }>;
 };
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const params = await searchParams;
   const session = await requireDashboardSession();
+  if (!params.assistant) return <ErrorState message="Select an assistant before viewing analytics." retryHref="/dashboard" />;
 
-  const filters = normaliseFilters(params);
+  const filters = normaliseFilters(params, params.assistant);
   const result = await loadAnalytics(session, filters);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
-    return <ErrorState message={messageForApiError(result.error)} retryHref="/analytics" />;
+    return <ErrorState message={messageForApiError(result.error)} retryHref={`/analytics?assistant=${params.assistant}`} />;
   }
 
   return <AnalyticsDashboard data={result.data} />;
@@ -41,8 +43,9 @@ async function loadAnalytics(session: DevelopmentDashboardSession, filters: Anal
   }
 }
 
-function normaliseFilters(params: AnalyticsPageProps["searchParams"] extends Promise<infer T> ? T : never): AnalyticsFilters {
+function normaliseFilters(params: AnalyticsPageProps["searchParams"] extends Promise<infer T> ? T : never, assistantId: string): AnalyticsFilters {
   return {
+    assistantId,
     started_after: dateParam(params.started_after),
     started_before: dateParam(params.started_before),
     conversation_status: enumParam(params.conversation_status, ["active", "completed", "abandoned", "archived"]),

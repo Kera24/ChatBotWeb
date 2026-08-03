@@ -1,4 +1,4 @@
-﻿export type ApiEnvelope<TData, TMeta = Record<string, unknown>> = {
+export type ApiEnvelope<TData, TMeta = Record<string, unknown>> = {
   success: boolean;
   data: TData;
   meta?: TMeta;
@@ -11,6 +11,7 @@ export type AnswerState = "answered" | "low_confidence" | "fallback" | "failed" 
 
 export type ConversationSummary = {
   id: string;
+  assistant_id: string | null;
   organisation_id: string;
   workspace_id: string;
   channel: ConversationChannel | string;
@@ -26,6 +27,7 @@ export type ConversationSummary = {
 
 export type ConversationCitation = {
   id: string;
+  assistant_id: string | null;
   citation_index: number;
   chunk_id: string;
   document_id: string;
@@ -41,6 +43,7 @@ export type ConversationCitation = {
 
 export type ConversationMessage = {
   id: string;
+  assistant_id: string | null;
   role: MessageRole | string;
   content: string;
   sequence_number: number;
@@ -65,6 +68,7 @@ export type ConversationMessage = {
 
 export type ConversationDetail = {
   id: string;
+  assistant_id: string | null;
   organisation_id: string;
   workspace_id: string;
   channel: ConversationChannel | string;
@@ -81,10 +85,12 @@ export type ConversationDetail = {
 
 export type ConversationListMeta = {
   limit: number;
+  assistant_id?: string;
   offset: number;
 };
 
 export type ConversationListParams = {
+  assistantId?: string;
   status?: string;
   channel?: string;
   started_after?: string;
@@ -97,6 +103,7 @@ export type ReviewStatus = "open" | "reviewed" | "dismissed" | "knowledge_gap";
 
 export type ReviewItem = {
   conversation_id: string;
+  assistant_id: string | null;
   assistant_message_id: string;
   user_question: string | null;
   assistant_answer: string;
@@ -126,12 +133,14 @@ export type ReviewItemDetail = {
 
 export type ReviewListMeta = {
   limit: number;
+  assistant_id?: string;
   offset: number;
   count: number;
   total: number;
 };
 
 export type ReviewListParams = {
+  assistantId?: string;
   answer_state?: string;
   review_status?: string;
   channel?: string;

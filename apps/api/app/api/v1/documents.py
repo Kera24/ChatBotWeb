@@ -4,6 +4,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
+from app.access.widget_admin.service import (
+    WidgetAdminConflict,
+    WidgetAdminNotFound,
+    WidgetAdminValidationError,
+    get_current_draft,
+    get_widget,
+    update_draft_knowledge_scope,
+)
 
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
 from app.repositories.document_repository import (
@@ -90,15 +98,19 @@ def list_documents(
         ...,
         description="Temporary tenant context required until production auth can infer organisation access safely.",
     ),
+    assistant_id: str | None = Query(default=None, min_length=1),
 ) -> dict[str, object]:
     ensure_workspace_in_organisation(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    scoped_document_ids = _assistant_document_ids(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id)
     documents = list_documents_for_workspace(
         db,
         organisation_id=organisation_id,
         workspace_id=workspace_id,
     )
+    if scoped_document_ids is not None:
+        documents = [document for document in documents if document.id in scoped_document_ids]
     data = [DocumentRead.model_validate(document).model_dump(mode="json") for document in documents]
-    return success_response(data)
+    return success_response(data, meta={"assistant_id": assistant_id} if assistant_id else None)
 
 
 @router.post("/{workspace_id}/documents", status_code=status.HTTP_201_CREATED)
@@ -150,6 +162,7 @@ async def upload_document(
     title: str | None = Form(default=None),
     category: str | None = Form(default=None),
     visibility: str = Form(default="workspace"),
+    assistant_id: str | None = Query(default=None, min_length=1),
 ) -> dict[str, object]:
     ensure_workspace_in_organisation(db, organisation_id=organisation_id, workspace_id=workspace_id)
     filename = file.filename or "upload"
@@ -196,11 +209,14 @@ async def upload_document(
             detail="Document source identity already exists for this workspace.",
         ) from exc
 
+    if assistant_id is not None:
+        _assign_document_to_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id, document_id=document.id, actor_user_id=current_user.user_id)
+
     data = {
         "document": DocumentRead.model_validate(document).model_dump(mode="json"),
         "document_version": DocumentVersionRead.model_validate(version).model_dump(mode="json"),
     }
-    return success_response(data)
+    return success_response(data, meta={"assistant_id": assistant_id} if assistant_id else None)
 
 @router.get("/{workspace_id}/documents/{document_id}")
 def get_document(
@@ -638,3 +654,41 @@ def transition_document_version(
         data,
         meta={"previous_status": result.previous_status, "new_status": result.new_status},
     )
+
+
+def _assistant_document_ids(db: DbSession, *, organisation_id: str, workspace_id: str, assistant_id: str | None) -> set[str] | None:
+    if assistant_id is None:
+        return None
+    assistant = _ensure_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id)
+    try:
+        draft = get_current_draft(db, widget=assistant)
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assistant knowledge scope not found.") from exc
+    return set(draft.knowledge_scope_json or [])
+
+
+def _assign_document_to_assistant(db: DbSession, *, organisation_id: str, workspace_id: str, assistant_id: str, document_id: str, actor_user_id: str | None) -> None:
+    assistant = _ensure_assistant(db, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id)
+    try:
+        draft = get_current_draft(db, widget=assistant)
+        document_ids = list(dict.fromkeys([*(draft.knowledge_scope_json or []), document_id]))
+        update_draft_knowledge_scope(
+            db,
+            widget=assistant,
+            actor_user_id=actor_user_id,
+            document_ids=document_ids,
+            expected_concurrency_version=draft.concurrency_version,
+        )
+    except WidgetAdminConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assistant knowledge scope changed while assigning the document.") from exc
+    except WidgetAdminValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.message) from exc
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assistant knowledge scope not found.") from exc
+
+
+def _ensure_assistant(db: DbSession, *, organisation_id: str, workspace_id: str, assistant_id: str):
+    try:
+        return get_widget(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=assistant_id)
+    except WidgetAdminNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assistant not found for workspace.") from exc

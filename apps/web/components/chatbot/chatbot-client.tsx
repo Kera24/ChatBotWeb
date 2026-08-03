@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useMemo, useRef, useState, type FormEvent } from "react";
@@ -26,9 +26,11 @@ type ChatMessage =
 
 type ChatbotClientProps = {
   session: DevelopmentDashboardSession;
+  assistantId: string;
+  missingAssistant?: boolean;
 };
 
-export function ChatbotClient({ session }: ChatbotClientProps) {
+export function ChatbotClient({ session, assistantId, missingAssistant = false }: ChatbotClientProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
@@ -36,7 +38,7 @@ export function ChatbotClient({ session }: ChatbotClientProps) {
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
 
-  const canSend = composer.trim().length > 0 && !pending;
+  const canSend = composer.trim().length > 0 && !pending && !missingAssistant;
   const conversationLabel = useMemo(() => conversationId ? `Conversation ${conversationId.slice(0, 8)}` : "New dashboard test", [conversationId]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -55,7 +57,7 @@ export function ChatbotClient({ session }: ChatbotClientProps) {
     setError(null);
 
     try {
-      const response = await answerChatbotQuestion(session, { query, conversationId });
+      const response = await answerChatbotQuestion(session, { query, conversationId, assistantId });
       setConversationId(response.data.conversation_id);
       setMessages((current) => [...current, assistantMessageFromResponse(response.data)]);
     } catch (caught) {
@@ -86,6 +88,8 @@ export function ChatbotClient({ session }: ChatbotClientProps) {
           <span>answers in this test</span>
         </div>
       </div>
+
+      {missingAssistant ? <div className="statePanel urgentState" role="alert"><h2>Select an assistant</h2><p>Assistant context is required before testing knowledge retrieval.</p></div> : null}
 
       <div className="chatbotLayout">
         <section className="chatbotPanel" aria-label="Chat test">
@@ -239,5 +243,3 @@ function messageForChatbotError(error: unknown) {
   }
   return "The chatbot request could not be completed.";
 }
-
-

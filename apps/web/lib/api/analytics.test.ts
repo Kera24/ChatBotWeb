@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { loadAnalyticsData } from "./analytics";
 import { getConversationDetail, listConversations } from "./conversations";
@@ -36,6 +36,7 @@ describe("analytics API aggregation", () => {
     vi.mocked(listUnansweredReviewItems).mockResolvedValue(envelope([{ assistant_message_id: "message-1" }] as never, { total: 4 }));
 
     const data = await loadAnalyticsData(session, {
+      assistantId: "widget-1",
       started_after: "2026-07-01",
       started_before: "2026-07-31",
       conversation_status: "active",
@@ -44,6 +45,7 @@ describe("analytics API aggregation", () => {
     });
 
     expect(listConversations).toHaveBeenCalledWith(session, {
+      assistantId: "widget-1",
       status: "active",
       channel: "widget",
       started_after: "2026-07-01",
@@ -52,6 +54,7 @@ describe("analytics API aggregation", () => {
       offset: 0,
     });
     expect(listUnansweredReviewItems).toHaveBeenCalledWith(session, {
+      assistantId: "widget-1",
       review_status: "open",
       channel: "widget",
       created_after: "2026-07-01",
@@ -59,7 +62,7 @@ describe("analytics API aggregation", () => {
       limit: 100,
       offset: 0,
     });
-    expect(getConversationDetail).toHaveBeenCalledWith(session, "conversation-1");
+    expect(getConversationDetail).toHaveBeenCalledWith(session, "conversation-1", "widget-1");
     expect(data.documents).toEqual([{ id: "doc-failed", status: "failed" }]);
     expect(data.reviewTotal).toBe(4);
   });

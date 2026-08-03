@@ -3,8 +3,12 @@ import { requireDashboardSession } from "../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatbotPage() {
-  const session = await requireDashboardSession();
+type ChatbotPageProps = { searchParams: Promise<{ assistant?: string }> };
 
-  return <ChatbotClient session={session} />;
+export default async function ChatbotPage({ searchParams }: ChatbotPageProps) {
+  const params = await searchParams;
+  const session = await requireDashboardSession();
+  if (!params.assistant) return <ChatbotClient session={session} assistantId="" missingAssistant />;
+
+  return <ChatbotClient session={session} assistantId={params.assistant} />;
 }

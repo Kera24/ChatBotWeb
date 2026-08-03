@@ -32,6 +32,7 @@ def create_conversation(
     external_user_id: str | None = None,
     title: str | None = None,
     metadata_json: dict | None = None,
+    widget_id: str | None = None,
     started_at: datetime,
 ) -> ChatSession:
     conversation = ChatSession(
@@ -43,6 +44,7 @@ def create_conversation(
         external_user_id=external_user_id,
         title=title,
         metadata_json=metadata_json,
+        widget_id=widget_id,
         started_at=started_at,
     )
     db.add(conversation)
@@ -57,12 +59,15 @@ def get_conversation(
     organisation_id: str,
     workspace_id: str,
     conversation_id: str,
+    widget_id: str | None = None,
 ) -> ChatSession | None:
     statement = select(ChatSession).where(
         ChatSession.id == conversation_id,
         ChatSession.organisation_id == organisation_id,
         ChatSession.workspace_id == workspace_id,
     )
+    if widget_id is not None:
+        statement = statement.where(ChatSession.widget_id == widget_id)
     return db.execute(statement).scalar_one_or_none()
 
 
@@ -73,13 +78,18 @@ def list_conversations(
     workspace_id: str,
     status: str | None = None,
     limit: int = 50,
+    widget_id: str | None = None,
 ) -> list[ChatSession]:
     statement = select(ChatSession).where(
         ChatSession.organisation_id == organisation_id,
         ChatSession.workspace_id == workspace_id,
     )
+    if widget_id is not None:
+        statement = statement.where(ChatSession.widget_id == widget_id)
     if status is not None:
         statement = statement.where(ChatSession.status == status)
+    if widget_id is not None:
+        statement = statement.where(ChatSession.widget_id == widget_id)
     statement = statement.order_by(ChatSession.last_message_at.desc().nullslast(), ChatSession.started_at.desc()).limit(limit)
     return list(db.execute(statement).scalars().all())
 
@@ -102,6 +112,7 @@ def list_conversation_summaries(
     offset: int = 0,
     started_after: datetime | None = None,
     started_before: datetime | None = None,
+    widget_id: str | None = None,
 ) -> list[ConversationSummaryRow]:
     safe_limit = max(1, min(limit, 100))
     safe_offset = max(0, offset)
@@ -131,10 +142,16 @@ def list_conversation_summaries(
         ChatSession.organisation_id == organisation_id,
         ChatSession.workspace_id == workspace_id,
     )
+    if widget_id is not None:
+        statement = statement.where(ChatSession.widget_id == widget_id)
     if status is not None:
         statement = statement.where(ChatSession.status == status)
+    if widget_id is not None:
+        statement = statement.where(ChatSession.widget_id == widget_id)
     if channel is not None:
         statement = statement.where(ChatSession.channel == channel)
+    if widget_id is not None:
+        statement = statement.where(ChatSession.widget_id == widget_id)
     if started_after is not None:
         statement = statement.where(ChatSession.started_at >= started_after)
     if started_before is not None:
@@ -162,12 +179,14 @@ def get_conversation_detail(
     organisation_id: str,
     workspace_id: str,
     conversation_id: str,
+    widget_id: str | None = None,
 ) -> ChatSession | None:
     return get_conversation(
         db,
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         conversation_id=conversation_id,
+        widget_id=widget_id,
     )
 
 
@@ -276,7 +295,7 @@ def create_message(
         db,
         organisation_id=organisation_id,
         workspace_id=workspace_id,
-        conversation_id=conversation_id,
+        conversation_id=conversation_id
     )
     if conversation is None:
         raise ConversationNotFound("Conversation not found for tenant workspace.")
@@ -284,6 +303,7 @@ def create_message(
         organisation_id=organisation_id,
         workspace_id=workspace_id,
         conversation_id=conversation_id,
+        widget_id=conversation.widget_id,
         role=role,
         content=content,
         sequence_number=sequence_number,
@@ -388,6 +408,7 @@ def create_citations(
             workspace_id=workspace_id,
             conversation_id=conversation_id,
             message_id=message_id,
+            widget_id=message.widget_id,
             chunk_id=chunk.id,
             document_id=chunk.document_id,
             document_version_id=chunk.document_version_id,
