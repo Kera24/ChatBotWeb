@@ -60,7 +60,7 @@ describe("widget runtime lifecycle", () => {
     const iframe = document.getElementById("yoranix-widget-iframe") as HTMLIFrameElement | null;
     expect(iframe).not.toBeNull();
     expect(iframe?.getAttribute("sandbox")).toContain("allow-scripts");
-    expect(iframe?.title).toBe("Yoranix chat widget");
+    expect(iframe?.title).toBe("Conversa chat widget");
     await completeHandshake(api);
     await ready;
     expect(api.isReady()).toBe(true);

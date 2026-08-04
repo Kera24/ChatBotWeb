@@ -1,4 +1,4 @@
-﻿import { UsersSkeleton } from "../../components/users/users-management-client";
+import { UsersSkeleton } from "../../components/users/users-skeleton";
 
 export default function Loading() {
   return <UsersSkeleton />;

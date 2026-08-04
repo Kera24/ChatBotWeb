@@ -8,6 +8,7 @@ describe("ConversationStatusBadge", () => {
     render(<ConversationStatusBadge status="active" />);
 
     expect(screen.getByText("Active")).toBeTruthy();
+    expect(screen.getByLabelText("Status: Active")).toBeTruthy();
   });
 
   it.each([
@@ -18,5 +19,16 @@ describe("ConversationStatusBadge", () => {
     render(<ConversationStatusBadge status={state} answerState />);
 
     expect(screen.getByText(label)).toBeTruthy();
+    expect(screen.getByLabelText(`Answer state: ${label}`)).toBeTruthy();
+  });
+
+  it("falls back to pending when status is missing", () => {
+    render(<ConversationStatusBadge status={null} answerState />);
+    expect(screen.getByText("Pending")).toBeTruthy();
+  });
+
+  it("renders unknown statuses with a readable label", () => {
+    render(<ConversationStatusBadge status="something_new" />);
+    expect(screen.getByText("something new")).toBeTruthy();
   });
 });

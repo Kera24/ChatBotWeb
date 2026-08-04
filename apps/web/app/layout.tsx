@@ -5,8 +5,12 @@ import { DashboardShell } from "../components/dashboard-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Yoranix AI Platform",
-  description: "Client dashboard foundation for ChatBotWeb / Yoranix AI Platform.",
+  title: "Conversa AI Platform",
+  description: "Client dashboard foundation for ChatBotWeb / Conversa AI Platform.",
+  openGraph: {
+    title: "Conversa AI Platform",
+    description: "Client dashboard foundation for ChatBotWeb / Conversa AI Platform.",
+  },
 };
 
 export default function RootLayout({

@@ -5,7 +5,7 @@ export function LoadingState({ title = "Loading conversations" }: { title?: stri
     <section className="statePanel" aria-live="polite" aria-busy="true">
       <p className="sectionKicker">Loading</p>
       <h2>{title}</h2>
-      <p>Yoranix is collecting the latest conversation history for this workspace.</p>
+      <p>Conversa is collecting the latest conversation history for this workspace.</p>
     </section>
   );
 }
@@ -27,7 +27,7 @@ export function MissingTenantConfiguration({ missing, invalid = [] }: { missing:
     <section className="statePanel urgentState">
       <p className="sectionKicker">Workspace unavailable</p>
       <h2>Workspace access is not ready</h2>
-      <p>Yoranix could not establish a complete workspace context for this session. Ask an administrator to review workspace access before continuing.</p>
+      <p>Conversa could not establish a complete workspace context for this session. Ask an administrator to review workspace access before continuing.</p>
       {issueCount > 0 ? <p>{issueCount} configuration item{issueCount === 1 ? "" : "s"} need attention.</p> : null}
     </section>
   );

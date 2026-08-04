@@ -45,7 +45,7 @@ describe("WidgetApp structural shell", () => {
 
   it("uses safe fallback names", () => {
     render(<WidgetApp shellState="open" snapshot={null} systemDark={false} />);
-    expect(screen.getByRole("heading", { name: "Yoranix assistant" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Conversa assistant" })).toBeTruthy();
   });
 
   it("exposes close control and open callbacks", () => {

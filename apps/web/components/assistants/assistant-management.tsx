@@ -1,13 +1,34 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
-import { Archive, BarChart3, Bot, Copy, ExternalLink, FileText, Pencil, Plus, Rocket, Search, SlidersHorizontal } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  Archive,
+  BarChart3,
+  Bot,
+  CheckCircle2,
+  Clock3,
+  Copy,
+  ExternalLink,
+  FileText,
+  Grid3X3,
+  List,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Rocket,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { archiveWidget, duplicateWidget, type WidgetDetail, type WidgetSummary } from "../../lib/api/widgets";
 import { isDashboardApiError } from "../../lib/api/errors";
 import type { OverviewData } from "../../lib/api/overview";
+import { archiveWidget, duplicateWidget, type WidgetDetail, type WidgetSummary } from "../../lib/api/widgets";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
 
 type AssistantManagementProps = {
@@ -18,60 +39,72 @@ type AssistantManagementProps = {
 
 type AssistantStatus = "Draft" | "Training" | "Ready" | "Published" | "Archived";
 type StatusFilter = "all" | AssistantStatus;
+type SortOption = "updated-desc" | "updated-asc" | "name-asc" | "name-desc" | "status-asc";
+type ViewMode = "grid" | "list";
 
 type AssistantCardModel = WidgetDetail & {
   lifecycle: AssistantStatus;
   knowledgeCount: number;
   conversationCount: number;
+  description: string;
 };
 
+type PendingAction = { id: string; action: "duplicate" | "archive" } | null;
+
 const statusFilters: StatusFilter[] = ["all", "Draft", "Training", "Ready", "Published", "Archived"];
+const lifecycleOrder: Record<AssistantStatus, number> = { Published: 0, Ready: 1, Training: 2, Draft: 3, Archived: 4 };
+
+const lifecycleMeta: Record<AssistantStatus, { icon: LucideIcon; description: string }> = {
+  Published: { icon: Rocket, description: "Published and available to customers" },
+  Ready: { icon: CheckCircle2, description: "Ready to publish or test" },
+  Training: { icon: Loader2, description: "Training is in progress" },
+  Draft: { icon: Pencil, description: "Draft changes need review" },
+  Archived: { icon: Archive, description: "Archived and hidden from active work" },
+};
 
 export function AssistantManagement({ session, assistants, data }: AssistantManagementProps) {
   const reduceMotion = useReducedMotion();
   const [items, setItems] = useState<WidgetDetail[]>(assistants);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [sort, setSort] = useState<"updated-desc" | "updated-asc">("updated-desc");
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortOption>("updated-desc");
+  const [view, setView] = useState<ViewMode>("grid");
+  const [pending, setPending] = useState<PendingAction>(null);
+  const [archiveTarget, setArchiveTarget] = useState<AssistantCardModel | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
 
+  const selectedAssistantId = getSelectedAssistantId(session.workspaceId);
   const cards = useMemo(() => buildAssistantCards(items, data), [items, data]);
-  const filtered = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return cards
-      .filter((assistant) => !normalizedQuery || assistant.display_name.toLowerCase().includes(normalizedQuery))
-      .filter((assistant) => status === "all" || assistant.lifecycle === status)
-      .sort((a, b) => {
-        const left = new Date(a.updated_at).getTime();
-        const right = new Date(b.updated_at).getTime();
-        return sort === "updated-desc" ? right - left : left - right;
-      });
-  }, [cards, query, sort, status]);
+  const metrics = useMemo(() => buildAssistantMetrics(cards), [cards]);
+  const filtered = useMemo(() => filterAndSortAssistants(cards, query, status, sort), [cards, query, sort, status]);
 
-  async function onDuplicate(assistant: WidgetDetail) {
-    setBusyId(assistant.id);
-    setError(null);
+  async function onDuplicate(assistant: AssistantCardModel) {
+    setPending({ id: assistant.id, action: "duplicate" });
+    setNotice(null);
     try {
       const response = await duplicateWidget(session, assistant.id);
       setItems((current) => [response.data, ...current]);
+      setNotice({ tone: "success", message: `${assistant.display_name} was duplicated.` });
     } catch (caught) {
-      setError(messageForAssistantError(caught, "Assistant could not be duplicated."));
+      setNotice({ tone: "danger", message: messageForAssistantError(caught, "Assistant could not be duplicated.") });
     } finally {
-      setBusyId(null);
+      setPending(null);
     }
   }
 
-  async function onArchive(assistant: WidgetDetail) {
-    setBusyId(assistant.id);
-    setError(null);
+  async function confirmArchive() {
+    if (!archiveTarget) return;
+    setPending({ id: archiveTarget.id, action: "archive" });
+    setNotice(null);
     try {
-      await archiveWidget(session, assistant.id);
-      setItems((current) => current.filter((item) => item.id !== assistant.id));
+      await archiveWidget(session, archiveTarget.id);
+      setItems((current) => current.filter((item) => item.id !== archiveTarget.id));
+      setNotice({ tone: "success", message: `${archiveTarget.display_name} was archived.` });
+      setArchiveTarget(null);
     } catch (caught) {
-      setError(messageForAssistantError(caught, "Assistant could not be archived."));
+      setNotice({ tone: "danger", message: messageForAssistantError(caught, "Assistant could not be archived.") });
     } finally {
-      setBusyId(null);
+      setPending(null);
     }
   }
 
@@ -80,114 +113,307 @@ export function AssistantManagement({ session, assistants, data }: AssistantMana
   }
 
   return (
-    <section className="assistantPage" aria-labelledby="assistants-title">
+    <section className="assistantPage assistantDashboardPage" aria-labelledby="assistants-title">
       <motion.div
-        className="assistantHero"
+        className="assistantDashboardHeader"
         initial={reduceMotion ? false : { opacity: 0, y: 18 }}
         animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
       >
         <div>
-          <p className="eyebrow">Workspace assistants</p>
+          <p className="assistantEyebrow">Workspace assistants</p>
           <h2 id="assistants-title">My AI Assistants</h2>
-          <p>Create, publish, monitor, and refine every AI assistant in {session.workspaceName} from one secure workspace.</p>
+          <p>Build, manage, publish, and monitor every Conversa assistant in {session.workspaceName} without leaving your workspace context.</p>
         </div>
-        <Link className="assistantPrimaryCta" href="/assistants/new">
+        <Link className="assistantPrimaryCta assistantHeaderCta" href="/assistants/new">
           <Plus size={18} aria-hidden="true" />
           Create Assistant
         </Link>
       </motion.div>
 
-      <section className="assistantControlBar" aria-label="Assistant search and filters">
-        <label className="assistantSearch">
-          <Search size={17} aria-hidden="true" />
-          <span className="srOnly">Search assistants by name</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search assistants" />
-        </label>
-        <label className="assistantSelect">
-          <SlidersHorizontal size={17} aria-hidden="true" />
-          <span className="srOnly">Filter assistants by status</span>
-          <select value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}>
-            {statusFilters.map((option) => <option key={option} value={option}>{option === "all" ? "All statuses" : option}</option>)}
-          </select>
-        </label>
-        <label className="assistantSelect">
-          <span className="srOnly">Sort assistants by last updated</span>
-          <select value={sort} onChange={(event) => setSort(event.target.value as "updated-desc" | "updated-asc")}>
-            <option value="updated-desc">Newest updated</option>
-            <option value="updated-asc">Oldest updated</option>
-          </select>
-        </label>
-      </section>
+      <AssistantMetrics metrics={metrics} />
 
-      {error ? <div className="assistantError" role="alert">{error}</div> : null}
+      <AssistantFilters query={query} status={status} sort={sort} view={view} resultCount={filtered.length} onQueryChange={setQuery} onStatusChange={setStatus} onSortChange={setSort} onViewChange={setView} />
+
+      <AnimatePresence>
+        {notice ? (
+          <motion.div
+            className={`assistantFeedback assistantFeedback${notice.tone === "success" ? "Success" : "Danger"}`}
+            role="status"
+            initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -6 }}
+          >
+            {notice.tone === "success" ? <CheckCircle2 size={17} aria-hidden="true" /> : <XCircle size={17} aria-hidden="true" />}
+            <span>{notice.message}</span>
+            <button type="button" aria-label="Dismiss notification" onClick={() => setNotice(null)}>Dismiss</button>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {filtered.length === 0 ? (
-        <div className="assistantNoResults">
-          <Bot size={26} aria-hidden="true" />
-          <h3>No assistants match this view</h3>
-          <p>Adjust the search or status filter to show assistants in this workspace.</p>
-        </div>
+        <AssistantNoResults />
       ) : (
-        <motion.div className="assistantGrid" initial={false} animate={{ opacity: 1 }}>
+        <motion.div className={`assistantCollection assistantCollection${view === "list" ? "List" : "Grid"}`} initial={false} layout>
           {filtered.map((assistant, index) => (
-            <motion.article
-              className="assistantCard"
+            <AssistantCard
               key={assistant.id}
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-              animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, delay: Math.min(index * 0.04, 0.18) }}
-            >
-              <div className="assistantCardHeader">
-                <div className="assistantIcon" aria-hidden="true"><Bot size={21} /></div>
-                <div>
-                  <h3>{assistant.display_name}</h3>
-                  <p>Updated {formatDate(assistant.updated_at)}</p>
-                </div>
-                <AssistantStatusBadge status={assistant.lifecycle} />
-              </div>
-
-              <dl className="assistantStats">
-                <div><dt>Knowledge Documents</dt><dd><FileText size={16} aria-hidden="true" />{assistant.knowledgeCount}</dd></div>
-                <div><dt>Widget Status</dt><dd>{widgetStatusLabel(assistant)}</dd></div>
-                <div><dt>Conversations</dt><dd>{assistant.conversationCount}</dd></div>
-                <div><dt>Last Updated</dt><dd>{formatShortDate(assistant.updated_at)}</dd></div>
-              </dl>
-
-              <div className="assistantActions" aria-label={`Actions for ${assistant.display_name}`}>
-                <Link className="assistantAction primary" href={`/assistants/${assistant.id}`}><ExternalLink size={15} aria-hidden="true" />Open</Link>
-                <Link className="assistantAction" href={`/assistants/${assistant.id}?tab=settings`}><Pencil size={15} aria-hidden="true" />Edit</Link>
-                <Link className="assistantAction" href={`/assistants/${assistant.id}?tab=analytics`}><BarChart3 size={15} aria-hidden="true" />Analytics</Link>
-                <Link className="assistantAction" href={`/assistants/${assistant.id}?tab=widget`}><Rocket size={15} aria-hidden="true" />Publish</Link>
-                <button className="assistantAction" type="button" onClick={() => onDuplicate(assistant)} disabled={busyId === assistant.id}><Copy size={15} aria-hidden="true" />Duplicate</button>
-                <button className="assistantAction danger" type="button" onClick={() => onArchive(assistant)} disabled={busyId === assistant.id}><Archive size={15} aria-hidden="true" />Archive</button>
-              </div>
-            </motion.article>
+              assistant={assistant}
+              index={index}
+              reducedMotion={Boolean(reduceMotion)}
+              selected={selectedAssistantId === assistant.id}
+              pending={pending?.id === assistant.id ? pending.action : null}
+              view={view}
+              onDuplicate={onDuplicate}
+              onArchive={() => setArchiveTarget(assistant)}
+            />
           ))}
         </motion.div>
       )}
+
+      <ArchiveAssistantDialog target={archiveTarget} pending={Boolean(pending && archiveTarget && pending.id === archiveTarget.id && pending.action === "archive")} onCancel={() => setArchiveTarget(null)} onConfirm={confirmArchive} />
     </section>
   );
 }
 
-export function AssistantEmptyState() {
+function AssistantMetrics({ metrics }: { metrics: ReturnType<typeof buildAssistantMetrics> }) {
+  const reduceMotion = useReducedMotion();
   return (
-    <section className="assistantEmpty" aria-labelledby="assistant-empty-title">
-      <div className="assistantEmptyArt" aria-hidden="true">
+    <section className="assistantMetrics" aria-label="Assistant summary metrics">
+      {metrics.map((metric, index) => {
+        const Icon = metric.icon;
+        return (
+          <motion.article
+            className="assistantMetricCard"
+            key={metric.label}
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.26, delay: Math.min(index * 0.05, 0.2) }}
+            whileHover={reduceMotion ? undefined : { y: -2 }}
+          >
+            <span className="assistantMetricIcon" aria-hidden="true"><Icon size={18} /></span>
+            <div>
+              <p>{metric.label}</p>
+              <strong aria-label={`${metric.label}: ${metric.value}`}>{metric.value}</strong>
+              <span>{metric.helper}</span>
+            </div>
+          </motion.article>
+        );
+      })}
+    </section>
+  );
+}
+
+function AssistantFilters(props: {
+  query: string;
+  status: StatusFilter;
+  sort: SortOption;
+  view: ViewMode;
+  resultCount: number;
+  onQueryChange: (value: string) => void;
+  onStatusChange: (value: StatusFilter) => void;
+  onSortChange: (value: SortOption) => void;
+  onViewChange: (value: ViewMode) => void;
+}) {
+  return (
+    <section className="assistantControlSurface" aria-label="Assistant search, filters, and view controls">
+      <div className="assistantControlSummary">
+        <p>Assistants</p>
+        <span>{props.resultCount} shown. Filters run locally on the loaded workspace assistant list.</span>
+      </div>
+      <div className="assistantControlBar premiumAssistantControlBar">
+        <label className="assistantSearch premiumAssistantSearch">
+          <Search size={17} aria-hidden="true" />
+          <span className="srOnly">Search assistants by name or description</span>
+          <input value={props.query} onChange={(event) => props.onQueryChange(event.target.value)} placeholder="Search assistants" />
+        </label>
+        <label className="assistantSelect premiumAssistantSelect">
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          <span className="srOnly">Filter assistants by status</span>
+          <select value={props.status} onChange={(event) => props.onStatusChange(event.target.value as StatusFilter)}>
+            {statusFilters.map((option) => <option key={option} value={option}>{option === "all" ? "All statuses" : option}</option>)}
+          </select>
+        </label>
+        <label className="assistantSelect premiumAssistantSelect">
+          <Clock3 size={17} aria-hidden="true" />
+          <span className="srOnly">Sort assistants</span>
+          <select value={props.sort} onChange={(event) => props.onSortChange(event.target.value as SortOption)}>
+            <option value="updated-desc">Newest updated</option>
+            <option value="updated-asc">Oldest updated</option>
+            <option value="name-asc">Name A-Z</option>
+            <option value="name-desc">Name Z-A</option>
+            <option value="status-asc">Status priority</option>
+          </select>
+        </label>
+        <div className="assistantViewToggle" role="group" aria-label="Assistant view mode">
+          <button type="button" aria-pressed={props.view === "grid"} onClick={() => props.onViewChange("grid")}><Grid3X3 size={16} aria-hidden="true" />Grid</button>
+          <button type="button" aria-pressed={props.view === "list"} onClick={() => props.onViewChange("list")}><List size={16} aria-hidden="true" />List</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AssistantCard(props: {
+  assistant: AssistantCardModel;
+  index: number;
+  reducedMotion: boolean;
+  selected: boolean;
+  pending: "duplicate" | "archive" | null;
+  view: ViewMode;
+  onDuplicate: (assistant: AssistantCardModel) => void;
+  onArchive: () => void;
+}) {
+  const { assistant, pending } = props;
+  const IdentityIcon = lifecycleMeta[assistant.lifecycle].icon;
+  const disabled = Boolean(pending);
+  return (
+    <motion.article
+      className={`premiumAssistantCard ${props.view === "list" ? "premiumAssistantCardList" : ""}${props.selected ? " premiumAssistantCardSelected" : ""}`}
+      aria-labelledby={`assistant-${assistant.id}-title`}
+      initial={props.reducedMotion ? false : { opacity: 0, y: 16 }}
+      animate={props.reducedMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay: Math.min(props.index * 0.04, 0.18) }}
+      whileHover={props.reducedMotion ? undefined : { y: -3 }}
+      layout
+    >
+      <div className="assistantCardTopline">
+        <div className="assistantAvatar" aria-hidden="true"><IdentityIcon size={22} /></div>
+        <div className="assistantTitleBlock">
+          <div className="assistantTitleRow">
+            <h3 id={`assistant-${assistant.id}-title`}>{assistant.display_name}</h3>
+            {props.selected ? <span className="assistantCurrentPill"><Sparkles size={13} aria-hidden="true" />Current</span> : null}
+          </div>
+          <p>{assistant.description}</p>
+        </div>
+        <AssistantStatusBadge status={assistant.lifecycle} />
+      </div>
+
+      <div className="assistantLifecycleLine">
+        <span aria-hidden="true" />
+        <strong>{assistant.lifecycle}</strong>
+        <p>{lifecycleMeta[assistant.lifecycle].description}</p>
+      </div>
+
+      <dl className="premiumAssistantFacts">
+        <div><dt>Knowledge</dt><dd><FileText size={15} aria-hidden="true" />{assistant.knowledgeCount}</dd></div>
+        <div><dt>Widget</dt><dd>{widgetStatusLabel(assistant)}</dd></div>
+        <div><dt>Conversations</dt><dd>{assistant.conversationCount}</dd></div>
+        <div><dt>Updated</dt><dd>{formatShortDate(assistant.updated_at)}</dd></div>
+      </dl>
+
+      <div className="assistantPrimaryRow">
+        <Link className="assistantAction primary" href={`/assistants/${assistant.id}?assistant=${assistant.id}`}><ExternalLink size={15} aria-hidden="true" />Open</Link>
+        <Link className="assistantAction" href={`/assistants/${assistant.id}?tab=settings&assistant=${assistant.id}`}><Pencil size={15} aria-hidden="true" />Edit</Link>
+        <Link className="assistantAction" href={`/assistants/${assistant.id}?tab=analytics&assistant=${assistant.id}`}><BarChart3 size={15} aria-hidden="true" />Analytics</Link>
+        <Link className="assistantAction" href={`/assistants/${assistant.id}?tab=widget&assistant=${assistant.id}`}><Rocket size={15} aria-hidden="true" />Publish</Link>
+        <details className="assistantOverflow">
+          <summary role="button" tabIndex={0} aria-haspopup="menu" aria-label={`More actions for ${assistant.display_name}`}><MoreHorizontal size={17} aria-hidden="true" /></summary>
+          <div className="assistantOverflowMenu" role="menu">
+            <button type="button" role="menuitem" onClick={() => props.onDuplicate(assistant)} disabled={disabled} aria-label={`Duplicate ${assistant.display_name}`}>
+              {pending === "duplicate" ? <Loader2 size={15} aria-hidden="true" className="spinIcon" /> : <Copy size={15} aria-hidden="true" />}
+              {pending === "duplicate" ? "Duplicating" : "Duplicate"}
+            </button>
+            <button type="button" role="menuitem" onClick={props.onArchive} disabled={disabled} aria-label={`Archive ${assistant.display_name}`}>
+              {pending === "archive" ? <Loader2 size={15} aria-hidden="true" className="spinIcon" /> : <Archive size={15} aria-hidden="true" />}
+              {pending === "archive" ? "Archiving" : "Archive"}
+            </button>
+          </div>
+        </details>
+      </div>
+    </motion.article>
+  );
+}
+
+function ArchiveAssistantDialog({ target, pending, onCancel, onConfirm }: { target: AssistantCardModel | null; pending: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <AnimatePresence>
+      {target ? (
+        <motion.div className="assistantDialogBackdrop" initial={reduceMotion ? false : { opacity: 0 }} animate={reduceMotion ? undefined : { opacity: 1 }} exit={reduceMotion ? undefined : { opacity: 0 }}>
+          <motion.div
+            className="assistantConfirmDialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-assistant-title"
+            initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
+            animate={reduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: 12, scale: 0.98 }}
+          >
+            <div className="assistantConfirmIcon" aria-hidden="true"><Archive size={22} /></div>
+            <h3 id="archive-assistant-title">Archive assistant?</h3>
+            <p>{target.display_name} will be removed from active assistant management. Existing backend archive behavior is preserved.</p>
+            <div className="assistantConfirmActions">
+              <button type="button" className="assistantAction" onClick={onCancel} disabled={pending}>Cancel</button>
+              <button type="button" className="assistantAction danger solid" onClick={onConfirm} disabled={pending}>
+                {pending ? <Loader2 size={15} aria-hidden="true" className="spinIcon" /> : <Archive size={15} aria-hidden="true" />}
+                {pending ? "Archiving" : "Archive"}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+export function AssistantEmptyState() {
+  const reduceMotion = useReducedMotion();
+  return (
+    <section className="assistantEmpty premiumAssistantEmpty" aria-labelledby="assistant-empty-title">
+      <motion.div className="assistantEmptyArt premiumAssistantEmptyArt" aria-hidden="true" initial={reduceMotion ? false : { opacity: 0, y: 18 }} animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}>
         <div className="assistantEmptyLogo">Y</div>
         <div className="assistantEmptyPanel panelOne" />
         <div className="assistantEmptyPanel panelTwo" />
-      </div>
-      <p className="eyebrow">Welcome to Yoranix</p>
-      <h2 id="assistant-empty-title">Let&apos;s build your first AI Assistant.</h2>
+      </motion.div>
+      <p className="assistantEyebrow">Welcome to Conversa</p>
+      <h2 id="assistant-empty-title">Create your first AI assistant</h2>
       <p>Start with a secure assistant, connect approved knowledge, test responses, then publish the widget when it is ready.</p>
       <Link className="assistantPrimaryCta large" href="/assistants/new"><Plus size={19} aria-hidden="true" />Create Assistant</Link>
     </section>
   );
 }
 
+function AssistantNoResults() {
+  return (
+    <div className="assistantNoResults premiumAssistantNoResults">
+      <Bot size={30} aria-hidden="true" />
+      <h3>No assistants match this view</h3>
+      <p>Adjust search, status, or sort controls to show assistants in this workspace.</p>
+    </div>
+  );
+}
+
+export function AssistantDashboardSkeleton() {
+  return (
+    <section className="assistantPage assistantDashboardPage" aria-label="Loading My AI Assistants">
+      <div className="assistantDashboardHeader assistantSkeletonBlock" />
+      <div className="assistantMetrics">
+        {Array.from({ length: 4 }, (_, index) => <div className="assistantMetricCard assistantSkeletonBlock" key={index} />)}
+      </div>
+      <div className="assistantControlSurface assistantSkeletonBlock" />
+      <div className="assistantCollection assistantCollectionGrid">
+        {Array.from({ length: 4 }, (_, index) => <div className="premiumAssistantCard assistantSkeletonBlock" key={index} />)}
+      </div>
+    </section>
+  );
+}
+
+export function AssistantDashboardError({ message, retryHref = "/dashboard" }: { message: string; retryHref?: string }) {
+  return (
+    <section className="assistantDashboardError" role="alert" aria-labelledby="assistant-error-title">
+      <XCircle size={28} aria-hidden="true" />
+      <p className="assistantEyebrow">Assistant dashboard unavailable</p>
+      <h2 id="assistant-error-title">We could not load your assistants.</h2>
+      <p>{message}</p>
+      <Link className="assistantPrimaryCta" href={retryHref}>Retry</Link>
+    </section>
+  );
+}
+
 export function AssistantStatusBadge({ status }: { status: AssistantStatus }) {
-  return <span className={`assistantStatus status${status}`}>{status}</span>;
+  const Icon = lifecycleMeta[status].icon;
+  return <span className={`assistantStatus premiumAssistantStatus status${status}`} aria-label={`Status: ${status}`}><Icon size={13} aria-hidden="true" />{status}</span>;
 }
 
 export function assistantLifecycle(widget: WidgetSummary | WidgetDetail): AssistantStatus {
@@ -204,13 +430,42 @@ function buildAssistantCards(assistants: WidgetDetail[], data: OverviewData): As
     lifecycle: assistantLifecycle(assistant),
     knowledgeCount: assistant.draft?.configuration.knowledge_scope_json.length ?? 0,
     conversationCount: countAssistantConversations(data.conversations, assistant),
+    description: assistant.draft?.configuration.welcome_message || "Source-grounded assistant configured for this workspace.",
   }));
+}
+
+function buildAssistantMetrics(cards: AssistantCardModel[]) {
+  const readyOrPublished = cards.filter((assistant) => assistant.lifecycle === "Ready" || assistant.lifecycle === "Published").length;
+  const trainingOrDraft = cards.filter((assistant) => assistant.lifecycle === "Training" || assistant.lifecycle === "Draft").length;
+  const archived = cards.filter((assistant) => assistant.lifecycle === "Archived").length;
+  const knowledge = cards.reduce((total, assistant) => total + assistant.knowledgeCount, 0);
+  return [
+    { label: "Total assistants", value: cards.length, helper: "Loaded from workspace assistants", icon: Bot },
+    { label: "Ready or published", value: readyOrPublished, helper: "Available for testing or deployment", icon: CheckCircle2 },
+    { label: "Training or draft", value: trainingOrDraft, helper: "Needs review before production", icon: Clock3 },
+    { label: archived > 0 ? "Archived assistants" : "Knowledge sources", value: archived > 0 ? archived : knowledge, helper: archived > 0 ? "Excluded from active assistant work" : "Assigned across loaded assistants", icon: archived > 0 ? Archive : FileText },
+  ];
+}
+
+function filterAndSortAssistants(cards: AssistantCardModel[], query: string, status: StatusFilter, sort: SortOption) {
+  const normalizedQuery = query.trim().toLowerCase();
+  return cards
+    .filter((assistant) => !normalizedQuery || `${assistant.display_name} ${assistant.description}`.toLowerCase().includes(normalizedQuery))
+    .filter((assistant) => status === "all" || assistant.lifecycle === status)
+    .sort((a, b) => {
+      if (sort === "name-asc") return a.display_name.localeCompare(b.display_name);
+      if (sort === "name-desc") return b.display_name.localeCompare(a.display_name);
+      if (sort === "status-asc") return lifecycleOrder[a.lifecycle] - lifecycleOrder[b.lifecycle] || a.display_name.localeCompare(b.display_name);
+      const left = new Date(a.updated_at).getTime();
+      const right = new Date(b.updated_at).getTime();
+      return sort === "updated-desc" ? right - left : left - right;
+    });
 }
 
 function countAssistantConversations(conversations: OverviewData["conversations"], assistant: WidgetSummary) {
   return conversations.filter((conversation) => {
     const metadata = (conversation.metadata ?? {}) as Record<string, unknown>;
-    return metadata.widget_id === assistant.id || metadata.assistant_id === assistant.id || metadata.public_identifier === assistant.public_identifier;
+    return metadata.widget_id === assistant.id || metadata.assistant_id === assistant.id || metadata.public_identifier === assistant.public_identifier || conversation.assistant_id === assistant.id;
   }).length;
 }
 
@@ -221,12 +476,14 @@ function widgetStatusLabel(assistant: WidgetSummary) {
   return "Ready";
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
 function formatShortDate(value: string) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(value));
+}
+
+function getSelectedAssistantId(workspaceId: string) {
+  if (typeof window === "undefined") return null;
+  const url = new URL(window.location.href);
+  return url.searchParams.get("assistant") ?? window.localStorage.getItem(`yoranix:selected-assistant:${workspaceId}`);
 }
 
 function messageForAssistantError(error: unknown, fallback: string) {

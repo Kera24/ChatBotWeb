@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle, Ban, CheckCircle2, Clock3, Loader2, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 
 import { updateUnansweredReviewStatus } from "../../lib/api/review";
@@ -14,11 +15,11 @@ type ReviewDecisionFormProps = {
   canUpdate: boolean;
 };
 
-const statuses = [
-  { value: "reviewed", label: "Mark reviewed" },
-  { value: "dismissed", label: "Dismiss" },
-  { value: "knowledge_gap", label: "Mark knowledge gap" },
-  { value: "open", label: "Reopen" },
+const statuses: Array<{ value: string; label: string; icon: LucideIcon }> = [
+  { value: "reviewed", label: "Mark reviewed", icon: CheckCircle2 },
+  { value: "dismissed", label: "Dismiss", icon: Ban },
+  { value: "knowledge_gap", label: "Mark knowledge gap", icon: AlertTriangle },
+  { value: "open", label: "Reopen", icon: Clock3 },
 ];
 
 export function ReviewDecisionForm({ session, item, canUpdate }: ReviewDecisionFormProps) {
@@ -49,12 +50,14 @@ export function ReviewDecisionForm({ session, item, canUpdate }: ReviewDecisionF
 
   return (
     <section className="reviewDecisionPanel" aria-labelledby="review-decision-title">
-      <div>
-        <p className="sectionKicker">Reviewer decision</p>
-        <h2 id="review-decision-title">What should happen next?</h2>
+      <div className="reviewDecisionHeading">
+        <div>
+          <p className="sectionKicker">Reviewer decision</p>
+          <h2 id="review-decision-title">What should happen next?</h2>
+        </div>
+        <ReviewStatusBadge status={current.review_status} />
       </div>
-      <ReviewStatusBadge status={current.review_status} />
-      {current.reviewed_at ? <p>Last reviewed {new Date(current.reviewed_at).toLocaleString()}</p> : null}
+      {current.reviewed_at ? <p className="reviewFilterNote">Last reviewed {new Date(current.reviewed_at).toLocaleString()}</p> : null}
       <label>
         <span>Reviewer note</span>
         <textarea
@@ -69,12 +72,13 @@ export function ReviewDecisionForm({ session, item, canUpdate }: ReviewDecisionF
       <div className="reviewDecisionActions" aria-label="Review status actions">
         {statuses.map((status) => (
           <button
-            className="actionButton"
+            className="actionButton reviewDecisionButton"
             type="button"
             key={status.value}
             disabled={!canUpdate || pending !== null}
             onClick={() => submitStatus(status.value)}
           >
+            {pending === status.value ? <Loader2 size={15} aria-hidden="true" className="spinIcon" /> : <status.icon size={15} aria-hidden="true" />}
             {pending === status.value ? "Saving" : status.label}
           </button>
         ))}

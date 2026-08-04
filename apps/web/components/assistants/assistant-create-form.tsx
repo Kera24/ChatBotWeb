@@ -22,7 +22,7 @@ const DEFAULT_CONFIGURATION: Partial<WidgetConfigurationPayload> = {
   language: "en",
   suggested_questions_json: ["What can you help me with?", "Where can I find company information?"],
   fallback_contact_text: "Contact the team for help with this question.",
-  privacy_notice_text: "Answers are generated from approved Yoranix workspace knowledge.",
+  privacy_notice_text: "Answers are generated from approved Conversa workspace knowledge.",
   privacy_notice_url: null,
   terms_url: null,
   show_citations: true,

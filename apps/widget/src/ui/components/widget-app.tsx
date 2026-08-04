@@ -30,7 +30,7 @@ type ComposerState = Readonly<{
   validationMessage: string | null;
 }>;
 
-const FALLBACK_BOT_NAME = "Yoranix assistant";
+const FALLBACK_BOT_NAME = "Conversa assistant";
 const FALLBACK_LAUNCHER_LABEL = "Open chat";
 const FALLBACK_WELCOME = "Ask a question and I'll check the available information.";
 const COUNT_NOTICE_THRESHOLD = Math.floor(PUBLIC_MESSAGE_MAX_CHARACTERS * CHARACTER_COUNT_NOTICE_RATIO);

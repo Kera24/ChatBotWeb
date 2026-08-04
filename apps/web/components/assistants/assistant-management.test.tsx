@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AssistantManagement } from "./assistant-management";
-import * as widgetApi from "../../lib/api/widgets";
+import { AssistantDashboardError, AssistantDashboardSkeleton, AssistantManagement } from "./assistant-management";
 import type { OverviewData } from "../../lib/api/overview";
 import type { WidgetDetail } from "../../lib/api/widgets";
+import * as widgetApi from "../../lib/api/widgets";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
 
 vi.mock("../../lib/api/widgets", async () => {
@@ -87,7 +88,7 @@ const salesWidget: WidgetDetail = {
   publication_status: "draft",
   draft_dirty: true,
   updated_at: "2026-07-10T00:00:00.000Z",
-  draft: baseWidget.draft ? { ...baseWidget.draft, id: "sales-draft", configuration: { ...baseWidget.draft.configuration, bot_name: "Sales Assistant", knowledge_scope_json: [] } } : null,
+  draft: baseWidget.draft ? { ...baseWidget.draft, id: "sales-draft", configuration: { ...baseWidget.draft.configuration, bot_name: "Sales Assistant", welcome_message: "Answers revenue and pipeline questions.", knowledge_scope_json: [] } } : null,
 };
 
 const overview: OverviewData = {
@@ -97,6 +98,7 @@ const overview: OverviewData = {
       id: "conversation-1",
       organisation_id: "org-1",
       workspace_id: "workspace-1",
+      assistant_id: "assistant-1",
       channel: "widget",
       status: "completed",
       title: "Admissions",
@@ -116,11 +118,25 @@ const overview: OverviewData = {
 describe("AssistantManagement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
+    window.history.replaceState({}, "", "/dashboard");
   });
 
   it("renders the first-assistant empty state", () => {
     render(<AssistantManagement session={session} assistants={[]} data={overview} />);
-    expect(screen.getByRole("heading", { name: /let's build your first ai assistant/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /create your first ai assistant/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /create assistant/i })).toHaveAttribute("href", "/assistants/new");
+  });
+
+  it("renders premium metrics and assistant cards", () => {
+    render(<AssistantManagement session={session} assistants={[baseWidget, salesWidget]} data={overview} />);
+
+    expect(screen.getByRole("heading", { name: "My AI Assistants" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Total assistants: 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ready or published: 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Training or draft: 1")).toBeInTheDocument();
+    expect(screen.getByText("Ask admissions questions.")).toBeInTheDocument();
+    expect(screen.getByText("Answers revenue and pipeline questions.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /create assistant/i })).toHaveAttribute("href", "/assistants/new");
   });
 
@@ -137,17 +153,55 @@ describe("AssistantManagement", () => {
     expect(screen.getByText(/no assistants match/i)).toBeInTheDocument();
   });
 
-  it("duplicates and archives assistants through the widget contract", async () => {
+  it("sorts assistants and toggles list view without backend calls", () => {
+    render(<AssistantManagement session={session} assistants={[baseWidget, salesWidget]} data={overview} />);
+
+    fireEvent.change(screen.getByLabelText(/sort assistants/i), { target: { value: "name-desc" } });
+    const cards = screen.getAllByRole("article", { name: /assistant/i });
+    expect(within(cards[0]).getByText("Sales Assistant")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /list/i }));
+    expect(screen.getByRole("button", { name: /list/i })).toHaveAttribute("aria-pressed", "true");
+    expect(widgetApi.duplicateWidget).not.toHaveBeenCalled();
+    expect(widgetApi.archiveWidget).not.toHaveBeenCalled();
+  });
+
+  it("shows the current assistant indicator from query context", () => {
+    window.history.replaceState({}, "", "/dashboard?assistant=assistant-2");
+    render(<AssistantManagement session={session} assistants={[baseWidget, salesWidget]} data={overview} />);
+
+    const salesCard = screen.getByRole("article", { name: /sales assistant/i });
+    expect(within(salesCard).getByText("Current")).toBeInTheDocument();
+  });
+
+  it("duplicates and archives assistants through the widget contract with confirmation", async () => {
+    const user = userEvent.setup();
     const copy = { ...baseWidget, id: "assistant-copy", display_name: "Admissions Assistant Copy" };
     vi.mocked(widgetApi.duplicateWidget).mockResolvedValue({ success: true, data: copy });
     vi.mocked(widgetApi.archiveWidget).mockResolvedValue({ success: true, data: { ...baseWidget, operational_status: "archived" } });
 
     render(<AssistantManagement session={session} assistants={[baseWidget]} data={overview} />);
-    fireEvent.click(screen.getByRole("button", { name: /duplicate/i }));
+    await user.click(screen.getByRole("button", { name: /more actions for admissions assistant/i }));
+    await user.click(screen.getByRole("menuitem", { name: /duplicate admissions assistant/i }));
     await waitFor(() => expect(widgetApi.duplicateWidget).toHaveBeenCalledWith(session, "assistant-1"));
     expect(screen.getByText("Admissions Assistant Copy")).toBeInTheDocument();
+    expect(screen.getByText(/was duplicated/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole("button", { name: /archive/i })[0]);
+    const originalCard = screen.getAllByRole("article", { name: /admissions assistant/i }).find((card) => within(card).queryByRole("heading", { name: "Admissions Assistant" }));
+    expect(originalCard).toBeDefined();
+    await user.click(within(originalCard as HTMLElement).getByRole("button", { name: /more actions/i }));
+    await user.click(within(originalCard as HTMLElement).getByRole("menuitem", { name: /^archive admissions assistant$/i }));
+    const dialog = screen.getByRole("dialog", { name: /archive assistant/i });
+    await user.click(within(dialog).getByRole("button", { name: /^archive$/i }));
     await waitFor(() => expect(widgetApi.archiveWidget).toHaveBeenCalled());
+  });
+
+  it("renders loading and recoverable error states", () => {
+    render(<AssistantDashboardSkeleton />);
+    expect(screen.getByLabelText(/loading my ai assistants/i)).toBeInTheDocument();
+
+    render(<AssistantDashboardError message="Please try again." />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Please try again.");
+    expect(screen.getByRole("link", { name: /retry/i })).toHaveAttribute("href", "/dashboard");
   });
 });

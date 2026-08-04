@@ -279,7 +279,8 @@ describe("widget administration frontend", () => {
 
     await waitFor(() => expect(widgetApi.rotateWidgetPublicKey).toHaveBeenCalledWith(session, "widget-1", "credential-1"));
     expect(await screen.findByText(/Public key rotated/)).toBeTruthy();
-    expect(screen.getAllByText(/wpk_dev_rotated/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("wpk_dev_...otated")).toBeTruthy();
+    expect(screen.queryByText("wpk_dev_rotated")).toBeNull();
   });
   it("saves tenant-scoped knowledge selections and reports draft-only semantics", async () => {
     vi.mocked(widgetApi.updateWidgetKnowledgeScope).mockResolvedValue({ success: true, data: { ...draft, concurrency_version: 4, configuration: { ...config, knowledge_scope_json: ["doc-1"] } } });

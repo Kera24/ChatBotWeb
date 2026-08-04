@@ -1,8 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SettingsDashboardClient, SettingsSkeleton } from "./settings-dashboard-client";
+import { render, screen, userEvent, waitFor } from "../../test/test-utils";
+import { SettingsDashboardClient } from "./settings-dashboard-client";
 import { DashboardApiError } from "../../lib/api/errors";
 import * as settingsApi from "../../lib/api/settings";
 import type { WorkspaceSettings } from "../../lib/api/settings";
@@ -14,7 +13,11 @@ const session: DevelopmentDashboardSession = {
   organisationId: "org-1",
   workspaceId: "workspace-1",
   userEmail: "admin@example.test",
+  fullName: "Admin User",
   role: "client_admin",
+  onboardingComplete: true,
+  organisationName: "Yoranix College",
+  workspaceName: "Admissions Workspace",
 };
 
 const viewerSession: DevelopmentDashboardSession = { ...session, role: "viewer", userEmail: "viewer@example.test" };
@@ -89,37 +92,45 @@ describe("SettingsDashboardClient", () => {
   it("renders workspace, organisation, operational, and boundary settings", () => {
     render(<SettingsDashboardClient session={session} initialSettings={settings()} />);
 
-    expect(screen.getByRole("heading", { name: "Workspace controls and operational posture" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Workspace Settings" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Admissions Workspace")).toBeInTheDocument();
     expect(screen.getByText("Yoranix College")).toBeInTheDocument();
     expect(screen.getAllByText("azure-openai")).toHaveLength(2);
     expect(screen.getByText("Widget-owned configuration")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Manage widget configuration" })).toHaveAttribute("href", "/widgets");
+    expect(screen.getByRole("link", { name: /Manage widget configuration/ })).toHaveAttribute("href", "/widgets");
     expect(screen.getByText("database url")).toBeInTheDocument();
     expect(screen.queryByText(/postgres|redis:\/\/|connection string value/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the environment badge and organisation/plan context in the header", () => {
+    render(<SettingsDashboardClient session={session} initialSettings={settings()} />);
+    expect(screen.getByText("staging environment")).toBeInTheDocument();
+    expect(screen.getByText("Yoranix College · pilot plan")).toBeInTheDocument();
   });
 
   it("tracks dirty state, resets, and saves supported workspace fields", async () => {
     const user = userEvent.setup();
     render(<SettingsDashboardClient session={session} initialSettings={settings()} />);
 
-    const saveButton = screen.getByRole("button", { name: "Save changes" });
+    const saveButton = screen.getByRole("button", { name: /Save changes/ });
     expect(saveButton).toBeDisabled();
+    expect(screen.getByText("Up to date")).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("Workspace name"));
     await user.type(screen.getByLabelText("Workspace name"), "Support Workspace");
     await user.clear(screen.getByLabelText("Default language"));
     await user.type(screen.getByLabelText("Default language"), "en-AU");
     expect(saveButton).toBeEnabled();
+    expect(screen.getAllByText("Unsaved changes").length).toBeGreaterThanOrEqual(1);
 
-    await user.click(screen.getByRole("button", { name: "Reset" }));
+    await user.click(screen.getByRole("button", { name: /Reset/ }));
     expect(screen.getByDisplayValue("Admissions Workspace")).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("Workspace name"));
     await user.type(screen.getByLabelText("Workspace name"), "Support Workspace");
     await user.clear(screen.getByLabelText("Default language"));
     await user.type(screen.getByLabelText("Default language"), "en-AU");
-    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(screen.getByRole("button", { name: /Save changes/ }));
 
     await waitFor(() => expect(settingsApi.updateWorkspaceSettings).toHaveBeenCalledWith(session, { name: "Support Workspace", default_language: "en-AU", expected_updated_at: "2026-07-02T00:00:00Z" }));
     expect(await screen.findByText("Workspace settings saved.")).toBeInTheDocument();
@@ -132,15 +143,16 @@ describe("SettingsDashboardClient", () => {
     await user.clear(screen.getByLabelText("Workspace name"));
 
     expect(screen.getByRole("alert")).toHaveTextContent("Workspace name is required.");
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Save changes/ })).toBeDisabled();
   });
 
-  it("renders read-only behaviour for viewers", () => {
+  it("renders read-only behaviour for viewers and hides the save bar", () => {
     render(<SettingsDashboardClient session={viewerSession} initialSettings={settings()} />);
 
     expect(screen.getByLabelText("Workspace name")).toBeDisabled();
     expect(screen.getByLabelText("Default language")).toBeDisabled();
     expect(screen.getByText(/only organisation owners and client admins can change workspace fields/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save changes/ })).not.toBeInTheDocument();
   });
 
   it("shows conflict errors from stale saves", async () => {
@@ -150,15 +162,13 @@ describe("SettingsDashboardClient", () => {
 
     await user.clear(screen.getByLabelText("Workspace name"));
     await user.type(screen.getByLabelText("Workspace name"), "Changed Workspace");
-    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(screen.getByRole("button", { name: /Save changes/ }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Reload the page before saving again");
+    expect(await screen.findByText(/Reload the page before saving again/)).toBeInTheDocument();
   });
 
-  it("renders loading skeleton", () => {
-    render(<SettingsSkeleton />);
-
-    expect(screen.getByRole("heading", { name: "Loading Yoranix settings" })).toBeInTheDocument();
+  it("does not render a danger zone since no destructive workspace API exists", () => {
+    render(<SettingsDashboardClient session={session} initialSettings={settings()} />);
+    expect(screen.queryByText(/danger zone/i)).not.toBeInTheDocument();
   });
 });
-

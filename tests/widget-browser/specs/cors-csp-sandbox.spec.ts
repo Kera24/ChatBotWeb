@@ -39,6 +39,6 @@ test("iframe sandbox and permission attributes stay minimal", async ({ instrumen
   expect(attrs.sandbox).not.toContain("allow-top-navigation");
   expect(attrs.allow ?? "").not.toMatch(/camera|microphone|geolocation|clipboard/i);
   expect(attrs.referrerPolicy).toBe("strict-origin-when-cross-origin");
-  expect(attrs.title).toBe("Yoranix chat widget");
+  expect(attrs.title).toBe("Conversa chat widget");
   expect(attrs.loading).toBe("lazy");
 });

@@ -1,8 +1,9 @@
-import { AnalyticsDashboard } from "../../components/analytics/analytics-dashboard";
+import { AnalyticsDashboard, AnalyticsNoAssistantState } from "../../components/analytics/analytics-dashboard";
 import { AccessDeniedState, ErrorState } from "../../components/conversations/state-panels";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../lib/api/errors";
 import { loadAnalyticsData, type AnalyticsFilters } from "../../lib/api/analytics";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
+import { getWidgetDetail } from "../../lib/api/widgets";
 import { requireDashboardSession } from "../../lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -21,22 +22,36 @@ type AnalyticsPageProps = {
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const params = await searchParams;
   const session = await requireDashboardSession();
-  if (!params.assistant) return <ErrorState message="Select an assistant before viewing analytics." retryHref="/dashboard" />;
+  if (!params.assistant) return <AnalyticsNoAssistantState />;
 
   const filters = normaliseFilters(params, params.assistant);
-  const result = await loadAnalytics(session, filters);
+  const [result, assistantResult] = await Promise.all([loadAnalytics(session, filters), loadAssistant(session, params.assistant)]);
   if (!result.ok) {
     if (result.error.kind === "forbidden") return <AccessDeniedState />;
     return <ErrorState message={messageForApiError(result.error)} retryHref={`/analytics?assistant=${params.assistant}`} />;
   }
+  if (!assistantResult.ok) {
+    if (assistantResult.error.kind === "forbidden") return <AccessDeniedState />;
+    return <ErrorState message={messageForApiError(assistantResult.error)} retryHref={`/analytics?assistant=${params.assistant}`} />;
+  }
 
-  return <AnalyticsDashboard data={result.data} />;
+  return <AnalyticsDashboard data={result.data} assistant={assistantResult.data} />;
 }
 
 async function loadAnalytics(session: DevelopmentDashboardSession, filters: AnalyticsFilters) {
   try {
     const data = await loadAnalyticsData(session, filters);
     return { ok: true as const, data };
+  } catch (error) {
+    if (isDashboardApiError(error)) return { ok: false as const, error };
+    return { ok: false as const, error: new DashboardApiError("unknown", "Unexpected dashboard error.") };
+  }
+}
+
+async function loadAssistant(session: DevelopmentDashboardSession, assistantId: string) {
+  try {
+    const response = await getWidgetDetail(session, assistantId);
+    return { ok: true as const, data: response.data };
   } catch (error) {
     if (isDashboardApiError(error)) return { ok: false as const, error };
     return { ok: false as const, error: new DashboardApiError("unknown", "Unexpected dashboard error.") };

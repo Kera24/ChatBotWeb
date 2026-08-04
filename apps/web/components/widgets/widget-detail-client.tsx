@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -717,8 +717,8 @@ function EmbedPanel({ session, widget, setWidget, embed, setEmbed, sdkVersions, 
         </div>
         <WidgetReadinessList readiness={embed.readiness} />
         <div className="keyBlock">
-          <span>Public widget key</span>
-          <code>{embed.public_key}</code>
+          <span>Masked public widget key</span>
+          <code>{fingerprint(embed.public_key)}</code>
           <button className="smallButton" type="button" onClick={() => void copy(embed.public_key, "Public key")}>Copy key</button>
         </div>
         <pre className="snippetBlock" tabIndex={0}><code>{embed.snippet}</code></pre>

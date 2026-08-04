@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { KnowledgeBaseClient } from "./knowledge-base-client";
+import { KnowledgeBaseClient, KnowledgeBaseErrorState, KnowledgeBaseSkeleton } from "./knowledge-base-client";
 import type { DocumentRecord, DocumentVersionRecord, ChunkRecord } from "../../lib/api/documents";
 import * as documentApi from "../../lib/api/documents";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
@@ -102,23 +102,24 @@ beforeEach(() => {
 
 describe("KnowledgeBaseClient", () => {
   it("renders summary, document rows, and unsupported action guidance", () => {
-    render(<KnowledgeBaseClient session={session} initialDocuments={[documentRecord]} />);
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[documentRecord]} />);
 
-    expect(screen.getByRole("heading", { name: /operational source control/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Knowledge Base" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Assistant knowledge context")).toHaveTextContent("assistant-1");
     expect(screen.getAllByText("Admissions Handbook").length).toBeGreaterThan(0);
     expect(screen.getByText("policy")).toBeInTheDocument();
     expect(screen.getByText("Raw extracted text download is not exposed by the current API; metadata and extraction path are shown instead.")).toBeInTheDocument();
   });
 
   it("renders the empty state", () => {
-    render(<KnowledgeBaseClient session={session} initialDocuments={[]} />);
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[]} />);
 
-    expect(screen.getByRole("heading", { name: "No documents yet" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Create your assistant knowledge base" })).toBeInTheDocument();
   });
 
   it("loads versions and chunks for document details", async () => {
     const user = userEvent.setup();
-    render(<KnowledgeBaseClient session={session} initialDocuments={[documentRecord]} />);
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[documentRecord]} />);
 
     await user.click(screen.getByRole("button", { name: /view details for admissions handbook/i }));
 
@@ -129,7 +130,7 @@ describe("KnowledgeBaseClient", () => {
 
   it("uploads a document and refreshes the list", async () => {
     const user = userEvent.setup();
-    render(<KnowledgeBaseClient session={session} initialDocuments={[]} />);
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[]} />);
 
     const uploadInput = screen.getByLabelText("Document file") as HTMLInputElement;
     const file = new File(["content"], "policy.txt", { type: "text/plain" });
@@ -139,7 +140,7 @@ describe("KnowledgeBaseClient", () => {
     await user.click(screen.getByRole("button", { name: "Upload document" }));
 
     await waitFor(() => expect(documentApi.uploadDocument).toHaveBeenCalled());
-    expect(documentApi.listDocuments).toHaveBeenCalledWith(session);
+    expect(documentApi.listDocuments).toHaveBeenCalledWith(session, "assistant-1");
     expect(await screen.findByText("Admissions Handbook uploaded.")).toBeInTheDocument();
   });
 
@@ -147,7 +148,7 @@ describe("KnowledgeBaseClient", () => {
     const user = userEvent.setup();
     vi.mocked(documentApi.listDocumentVersions).mockResolvedValue(envelope([{ ...versionRecord, processing_status: "uploaded", extracted_text_path: null }]));
     vi.mocked(documentApi.listDocumentChunks).mockResolvedValue(envelope([]));
-    render(<KnowledgeBaseClient session={session} initialDocuments={[{ ...documentRecord, status: "uploaded" }]} />);
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[{ ...documentRecord, status: "uploaded" }]} />);
 
     await user.click(screen.getByRole("button", { name: /view details/i }));
     await user.click(await screen.findByRole("button", { name: "Extract" }));
@@ -157,7 +158,7 @@ describe("KnowledgeBaseClient", () => {
 
   it("confirms archive before using the lifecycle transition", async () => {
     const user = userEvent.setup();
-    render(<KnowledgeBaseClient session={session} initialDocuments={[documentRecord]} />);
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[documentRecord]} />);
 
     await user.click(screen.getByRole("button", { name: "Archive" }));
     const dialog = screen.getByRole("dialog", { name: "Archive document?" });
@@ -170,10 +171,51 @@ describe("KnowledgeBaseClient", () => {
   it("shows API errors", async () => {
     const user = userEvent.setup();
     vi.mocked(documentApi.listDocumentVersions).mockRejectedValue(new Error("network down"));
-    render(<KnowledgeBaseClient session={session} initialDocuments={[documentRecord]} />);
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[documentRecord]} />);
 
     await user.click(screen.getByRole("button", { name: /view details/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Document details could not be loaded.");
+  });
+  it("filters, sorts, and switches to card view using assistant-scoped results", async () => {
+    const user = userEvent.setup();
+    const processingDocument = { ...documentRecord, id: "doc-2", title: "Student Visa FAQ", status: "processing", category: "faq", updated_at: "2026-07-22T00:00:00.000Z" };
+    const failedDocument = { ...documentRecord, id: "doc-3", title: "Old Fees Sheet", status: "failed", category: "finance", updated_at: "2026-07-19T00:00:00.000Z" };
+
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[documentRecord, processingDocument, failedDocument]} />);
+
+    await user.type(screen.getByLabelText("Search documents"), "visa");
+    expect(screen.getByText("Student Visa FAQ")).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /Admissions Handbook/i })).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("Search documents"));
+    await user.selectOptions(screen.getByLabelText("Filter by status"), "failed");
+    expect(screen.getByText("Old Fees Sheet")).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /Student Visa FAQ/i })).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Filter by status"), "all");
+    await user.selectOptions(screen.getByLabelText("Sort documents"), "name");
+    await user.click(screen.getByRole("button", { name: "Cards" }));
+    expect(screen.getByRole("list", { name: "Assistant documents" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cards" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows loading and API error states with semantic surfaces", () => {
+    render(<KnowledgeBaseSkeleton />);
+    expect(screen.getByLabelText("Knowledge base loading")).toBeInTheDocument();
+
+    render(<KnowledgeBaseErrorState message="Select an assistant before managing knowledge." retryHref="/dashboard" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Knowledge could not be loaded");
+    expect(screen.getByRole("link", { name: "Retry" })).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("keeps archive in a keyboard-accessible supported-actions menu", async () => {
+    const user = userEvent.setup();
+    render(<KnowledgeBaseClient session={session} assistantId="assistant-1" initialDocuments={[documentRecord]} />);
+
+    await user.click(screen.getByRole("button", { name: /more actions for admissions handbook/i }));
+    const menu = screen.getByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: "Archive" })).toBeEnabled();
+    expect(within(menu).getByText("Retry and hard delete are not supported by the current API.")).toBeInTheDocument();
   });
 });

@@ -1,11 +1,9 @@
-import Link from "next/link";
-
-import { ConversationStatusBadge } from "../../../components/conversations/conversation-status-badge";
-import { formatDate, formatEnum } from "../../../components/conversations/conversation-list";
-import { MessageThread } from "../../../components/conversations/message-thread";
+import { ConversationDetailView } from "../../../components/conversations/conversation-detail-view";
+import { ConversationNotFoundState, ConversationWrongAssistantState, NoAssistantSelectedState } from "../../../components/conversations/conversation-empty-states";
 import { AccessDeniedState, ErrorState } from "../../../components/conversations/state-panels";
 import { getConversationDetail } from "../../../lib/api/conversations";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../../lib/api/errors";
+import { getWidgetDetail } from "../../../lib/api/widgets";
 import type { DevelopmentDashboardSession } from "../../../lib/auth/development-session";
 import { requireDashboardSession } from "../../../lib/auth/session";
 
@@ -20,14 +18,16 @@ export default async function ConversationDetailPage({ params, searchParams }: C
   const { conversationId } = await params;
   const query = await searchParams;
   const session = await requireDashboardSession();
-  if (!query.assistant) return <ErrorState message="Assistant context is required for conversation detail." retryHref="/conversations" />;
+  if (!query.assistant) return <NoAssistantSelectedState />;
 
-  const result = await loadConversationDetail(session, conversationId, query.assistant);
+  const [result, assistantResult] = await Promise.all([
+    loadConversationDetail(session, conversationId, query.assistant),
+    loadAssistant(session, query.assistant),
+  ]);
 
   if (!result.ok) {
-    if (result.error.kind === "forbidden") {
-      return <AccessDeniedState />;
-    }
+    if (result.error.kind === "forbidden") return <AccessDeniedState />;
+    if (result.error.kind === "not_found") return <ConversationNotFoundState assistantId={query.assistant} />;
     return (
       <ErrorState
         message={messageForApiError(result.error)}
@@ -35,45 +35,18 @@ export default async function ConversationDetailPage({ params, searchParams }: C
       />
     );
   }
+  if (!assistantResult.ok) {
+    if (assistantResult.error.kind === "forbidden") return <AccessDeniedState />;
+    return <ErrorState message={messageForApiError(assistantResult.error)} retryHref={`/conversations/${conversationId}?assistant=${query.assistant}`} />;
+  }
 
   const conversation = result.data;
+  if (conversation.assistant_id && conversation.assistant_id !== query.assistant) {
+    return <ConversationWrongAssistantState assistantId={query.assistant} />;
+  }
 
-  return (
-    <section className="conversationDetailPage" aria-labelledby="detail-title">
-      <Link className="backLink" href={`/conversations?assistant=${query.assistant}`}>Back to conversations</Link>
-      <div className="detailHero">
-        <div>
-          <p className="eyebrow">Conversation detail</p>
-          <h2 id="detail-title">{conversation.title || `Conversation ${conversation.id.slice(0, 8)}`}</h2>
-          <p>Messages are shown in deterministic sequence with citations attached to the assistant answer that used them.</p>
-        </div>
-        <ConversationStatusBadge status={conversation.status} />
-      </div>
-
-      <dl className="detailMeta">
-        <div>
-          <dt>Channel</dt>
-          <dd>{formatEnum(conversation.channel)}</dd>
-        </div>
-        <div>
-          <dt>Started</dt>
-          <dd>{formatDate(conversation.started_at)}</dd>
-        </div>
-        <div>
-          <dt>Last message</dt>
-          <dd>{conversation.last_message_at ? formatDate(conversation.last_message_at) : "None"}</dd>
-        </div>
-        <div>
-          <dt>Messages</dt>
-          <dd>{conversation.messages.length}</dd>
-        </div>
-      </dl>
-
-      <MessageThread messages={conversation.messages} />
-    </section>
-  );
+  return <ConversationDetailView conversation={conversation} assistant={assistantResult.data} />;
 }
-
 
 async function loadConversationDetail(
   session: DevelopmentDashboardSession,
@@ -87,6 +60,16 @@ async function loadConversationDetail(
     if (isDashboardApiError(error)) {
       return { ok: false as const, error };
     }
+    return { ok: false as const, error: new DashboardApiError("unknown", "Unexpected dashboard error.") };
+  }
+}
+
+async function loadAssistant(session: DevelopmentDashboardSession, assistantId: string) {
+  try {
+    const response = await getWidgetDetail(session, assistantId);
+    return { ok: true as const, data: response.data };
+  } catch (error) {
+    if (isDashboardApiError(error)) return { ok: false as const, error };
     return { ok: false as const, error: new DashboardApiError("unknown", "Unexpected dashboard error.") };
   }
 }

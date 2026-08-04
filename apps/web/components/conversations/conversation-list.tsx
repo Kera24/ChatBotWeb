@@ -1,50 +1,52 @@
+import { Layers, MessagesSquare, Clock3 } from "lucide-react";
 import Link from "next/link";
 
 import type { ConversationSummary } from "../../lib/api/types";
 import { ConversationStatusBadge } from "./conversation-status-badge";
 
-type ConversationListProps = {
+type ConversationInboxProps = {
   conversations: ConversationSummary[];
   assistantId: string;
+  assistantLabel?: string;
 };
 
-export function ConversationList({ conversations, assistantId }: ConversationListProps) {
+export function ConversationInbox({ conversations, assistantId, assistantLabel }: ConversationInboxProps) {
   return (
-    <div className="conversationList" aria-label="Conversation history results">
+    <div className="conversationInbox" role="list" aria-label="Conversation history results">
       {conversations.map((conversation) => (
-        <article className="conversationRow" key={conversation.id}>
-          <div className="conversationRowMain">
-            <div className="conversationRowTitleLine">
-              <h2>
-                <Link href={conversation.assistant_id || assistantId ? `/conversations/${conversation.id}?assistant=${conversation.assistant_id || assistantId}` : `/conversations/${conversation.id}`}>
-                  {conversation.title || `Conversation ${conversation.id.slice(0, 8)}`}
-                </Link>
-              </h2>
-              <ConversationStatusBadge status={conversation.status} />
-            </div>
-            <p>{conversation.last_message_preview || "No messages have been recorded yet."}</p>
-          </div>
-          <dl className="conversationFacts">
-            <div>
-              <dt>Channel</dt>
-              <dd>{formatEnum(conversation.channel)}</dd>
-            </div>
-            <div>
-              <dt>Messages</dt>
-              <dd>{conversation.message_count}</dd>
-            </div>
-            <div>
-              <dt>Started</dt>
-              <dd>{formatDate(conversation.started_at)}</dd>
-            </div>
-            <div>
-              <dt>Last message</dt>
-              <dd>{conversation.last_message_at ? formatDate(conversation.last_message_at) : "None"}</dd>
-            </div>
-          </dl>
-        </article>
+        <ConversationListItem key={conversation.id} conversation={conversation} assistantId={assistantId} assistantLabel={assistantLabel} />
       ))}
     </div>
+  );
+}
+
+export function ConversationListItem({ conversation, assistantId, assistantLabel }: { conversation: ConversationSummary; assistantId: string; assistantLabel?: string }) {
+  const linkAssistantId = conversation.assistant_id || assistantId;
+  const href = linkAssistantId ? `/conversations/${conversation.id}?assistant=${linkAssistantId}` : `/conversations/${conversation.id}`;
+  const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`;
+  const preview = conversation.last_message_preview || "No messages have been recorded yet.";
+
+  return (
+    <article className="conversationCard" role="listitem">
+      <Link
+        className="conversationCardLink"
+        href={href}
+        aria-label={`${title}. ${formatEnum(conversation.status)} conversation on ${formatEnum(conversation.channel)}. ${conversation.message_count} message${conversation.message_count === 1 ? "" : "s"}. Started ${formatDate(conversation.started_at)}.`}
+      >
+        <div className="conversationCardTop">
+          <h3>{title}</h3>
+          <ConversationStatusBadge status={conversation.status} />
+        </div>
+        <p className="conversationCardPreview">{preview}</p>
+        <div className="conversationCardMeta" aria-hidden="true">
+          {assistantLabel ? <span className="conversationCardAssistant"><Layers size={13} />{assistantLabel}</span> : null}
+          <span>{formatEnum(conversation.channel)}</span>
+          <span><MessagesSquare size={13} />{conversation.message_count} message{conversation.message_count === 1 ? "" : "s"}</span>
+          <span><Clock3 size={13} />Started {formatDate(conversation.started_at)}</span>
+          <span>Last activity {conversation.last_message_at ? formatDate(conversation.last_message_at) : "None"}</span>
+        </div>
+      </Link>
+    </article>
   );
 }
 

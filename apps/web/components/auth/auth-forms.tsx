@@ -21,8 +21,8 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
     <main className="authPage">
       <motion.section className="authPanel" initial={{ opacity: 0, y: reduceMotion ? 0 : 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.36 }}>
         <Link className="authBrand" href="/">
-          <Image src="/brand/yoranix-logo.png" alt="" width={38} height={38} aria-hidden="true" />
-          <span>Yoranix</span>
+          <Image src="/brand/conversa-icon.svg" alt="" width={38} height={38} aria-hidden="true" />
+          <span>Conversa</span>
         </Link>
         <div className="authHeader">
           <h1>{title}</h1>

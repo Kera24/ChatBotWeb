@@ -12,7 +12,7 @@ export const RECOMMENDED_IFRAME_ATTRIBUTES = Object.freeze({
   sandbox: "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
   allow: "",
   referrerPolicy: "strict-origin-when-cross-origin",
-  title: "Yoranix chat widget",
+  title: "Conversa chat widget",
   loading: "lazy",
 });
 

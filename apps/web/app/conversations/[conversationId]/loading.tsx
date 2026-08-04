@@ -1,5 +1,5 @@
-import { LoadingState } from "../../../components/conversations/state-panels";
+import { ConversationDetailSkeleton } from "../../../components/conversations/conversation-skeletons";
 
 export default function ConversationDetailLoading() {
-  return <LoadingState title="Loading conversation" />;
+  return <ConversationDetailSkeleton />;
 }
