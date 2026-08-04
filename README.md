@@ -1,4 +1,4 @@
-# ChatBotWeb / Yoranix AI Platform
+# Conversa
 
 A multi-tenant AI knowledge platform for building, deploying, and managing client-specific RAG chatbots and AI assistants.
 
