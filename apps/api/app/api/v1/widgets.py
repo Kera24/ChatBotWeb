@@ -37,6 +37,7 @@ from app.access.widget_admin.service import (
     update_embed_preference,
 )
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
+from app.billing.service import PlanLimitExceeded, enforce_assistant_creation_limit
 from app.db.models import CredentialAllowedOrigin, Widget, WidgetConfigurationRevision
 from app.repositories.workspace_repository import get_workspace_for_organisation
 from app.schemas.common import success_response
@@ -101,6 +102,10 @@ def create_admin_widget(
     organisation_id: str = Query(...),
 ) -> dict[str, object]:
     ensure_workspace_in_organisation(db, organisation_id=organisation_id, workspace_id=workspace_id)
+    try:
+        enforce_assistant_creation_limit(db, organisation_id=organisation_id)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=exc.message) from exc
     try:
         initial = payload.initial_configuration.model_dump(exclude_none=True) if payload.initial_configuration else None
         widget = create_widget(

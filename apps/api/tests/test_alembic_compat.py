@@ -111,20 +111,21 @@ def test_alembic_upgrade_through_head_uses_wide_version_table(tmp_path: Path) ->
     assert version_length(engine) == MIN_ALEMBIC_VERSION_LENGTH
     with engine.connect() as connection:
         current_revision = connection.execute(text(f"select {ALEMBIC_VERSION_COLUMN} from {ALEMBIC_VERSION_TABLE}")).scalar_one()
-    assert current_revision == "0014_assistant_scoping"
+    assert current_revision == "0015_billing_foundation"
 
 
 def test_revision_history_is_linear_and_identifiers_are_preserved() -> None:
     script = ScriptDirectory.from_config(alembic_config())
     revisions = list(script.walk_revisions())
 
-    assert script.get_heads() == ["0014_assistant_scoping"]
-    assert required_version_length(script) >= len("0014_assistant_scoping")
-    assert [revision.revision for revision in revisions][0] == "0014_assistant_scoping"
+    assert script.get_heads() == ["0015_billing_foundation"]
+    assert required_version_length(script) >= len("0015_billing_foundation")
+    assert [revision.revision for revision in revisions][0] == "0015_billing_foundation"
     for revision in revisions:
         down_revision = revision.down_revision
         assert not isinstance(down_revision, tuple)
     assert {revision.revision for revision in revisions} >= {
         "0011_widget_embed_preferences",
         "0014_assistant_scoping",
+        "0015_billing_foundation",
     }

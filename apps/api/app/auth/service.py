@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import AuditEvent, AuthSession, Membership, Organisation, PasswordResetToken, User, Workspace
+from app.db.models import AuditEvent, AuthSession, Membership, Organisation, PasswordResetToken, Subscription, User, Workspace
 
 PASSWORD_ITERATIONS = 210_000
 PASSWORD_SCHEME = "pbkdf2_sha256"
@@ -101,7 +101,13 @@ def provision_account(db: Session, *, full_name: str, email: str, password: str,
     organisation = Organisation(name=organisation_name.strip(), slug=organisation_slug, status="active", plan_key="starter")
     workspace = Workspace(organisation=organisation, name="Default workspace", slug=workspace_slug, status="active", default_language="en")
     membership = Membership(organisation=organisation, user=user, role="org_owner", status="active")
-    db.add_all([user, organisation, workspace, membership])
+    subscription = Subscription(
+        organisation=organisation,
+        plan_key="starter",
+        status="trialing",
+        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=settings.BILLING_TRIAL_PERIOD_DAYS),
+    )
+    db.add_all([user, organisation, workspace, membership, subscription])
     db.flush()
     db.add(AuditEvent(
         organisation_id=organisation.id,

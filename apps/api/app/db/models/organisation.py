@@ -27,3 +27,4 @@ class Organisation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     workspaces = relationship("Workspace", back_populates="organisation")
     memberships = relationship("Membership", back_populates="organisation")
+    subscription = relationship("Subscription", back_populates="organisation", uselist=False)

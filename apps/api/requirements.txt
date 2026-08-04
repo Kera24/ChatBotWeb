@@ -9,6 +9,7 @@ python-multipart
 pypdf
 python-docx
 redis
+stripe
 azure-monitor-opentelemetry
 opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-sqlalchemy

@@ -4,6 +4,7 @@ from fastapi.routing import APIRoute
 from app.ai.dependencies import create_ai_core
 from app.api.health import router as health_router
 from app.api.v1.router import API_V1_ROUTER_REGISTRATIONS
+from app.billing.gateway import create_billing_gateway
 from app.core.config import settings
 from app.operations.correlation import safe_request_id
 from app.operations.telemetry import configure_azure_monitor, normalise_route
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     )
 
     app.state.ai_core = create_ai_core()
+    app.state.billing_gateway = create_billing_gateway()
     configure_azure_monitor(app)
 
     @app.middleware("http")

@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Command,
+  CreditCard,
   Database,
   FileQuestion,
   LayoutDashboard,
@@ -52,6 +53,7 @@ const navIcons: Record<string, LucideIcon> = {
   "/review/unanswered": FileQuestion,
   "/users": Users,
   "/settings": Settings,
+  "/billing": CreditCard,
 };
 
 const quickActions = [
@@ -107,7 +109,7 @@ export function DashboardShell({ children, workspaceName: workspaceNameProp }: D
     return navigationItems.filter((item) => `${item.label} ${item.description} ${item.group}`.toLowerCase().includes(needle));
   }, [query]);
 
-  if (pathname === "/") return <>{children}</>;
+  if (pathname === "/" || pathname === "/pricing") return <>{children}</>;
 
   return (
     <div className="shell yoranixShell">

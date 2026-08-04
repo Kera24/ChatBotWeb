@@ -4,6 +4,8 @@ from app.api.v1.admin import router as admin_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.audit_events import router as audit_events_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.billing import router as billing_router
+from app.api.v1.billing_webhook import router as billing_webhook_router
 from app.api.v1.conversations import router as conversations_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.memberships import router as memberships_router
@@ -21,6 +23,8 @@ API_V1_ROUTER_REGISTRATIONS = (
     (admin_router, "/admin", ["admin"]),
     (ai_router, "/ai", ["ai-internal"]),
     (orgs_router, "/orgs", ["orgs"]),
+    (billing_router, "/orgs", ["billing"]),
+    (billing_webhook_router, "", ["billing-webhook"]),
     (system_router, "/system", ["system"]),
     (workspaces_router, "/workspaces", ["workspaces"]),
     (audit_events_router, "/workspaces", ["audit-events"]),

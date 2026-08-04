@@ -62,4 +62,11 @@ export const navigationItems = [
     description: "Workspace, security, branding, and advanced settings.",
     group: "Admin",
   },
+  {
+    label: "Billing",
+    href: "/billing",
+    glyph: "BI",
+    description: "Manage plan, trial, usage limits, and invoices.",
+    group: "Admin",
+  },
 ] as const;

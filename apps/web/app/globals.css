@@ -6209,6 +6209,11 @@ p {
   box-shadow: 0 28px 68px rgba(27, 42, 74, 0.16);
 }
 
+.planPickerCurrent {
+  border-color: var(--yoranix-primary, var(--primary)) !important;
+  box-shadow: 0 0 0 2px var(--yoranix-primary, var(--primary));
+}
+
 .priceLine {
   display: grid;
   gap: 4px;

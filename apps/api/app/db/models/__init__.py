@@ -1,5 +1,6 @@
 ﻿from app.db.models.audit_event import AuditEvent
 from app.db.models.auth_session import AuthSession
+from app.db.models.billing import Invoice, Subscription
 from app.db.models.chunk import Chunk
 from app.db.models.conversation import ChatMessage, ChatSession, Citation
 from app.db.models.document import Document
@@ -22,6 +23,7 @@ __all__ = [
     "CredentialAllowedOrigin",
     "Document",
     "DocumentVersion",
+    "Invoice",
     "Membership",
     "Organisation",
     "PasswordResetToken",
@@ -29,6 +31,7 @@ __all__ = [
     "PublicMessageRequest",
     "PublicSession",
     "ReviewAnnotation",
+    "Subscription",
     "User",
     "Widget",
     "WidgetConfiguration",
