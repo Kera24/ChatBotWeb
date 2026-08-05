@@ -1,0 +1,379 @@
+"""The evaluation execution engine.
+
+Runs a dataset's cases against one assistant by calling the real,
+already-tested `RAGOrchestrator` in-process (see app.ai.rag_orchestrator) -
+the exact same code path dashboard/widget traffic uses - rather than
+reimplementing retrieval or generation. Each case executes against its own
+`shadow_rag_session()` so the ChatSession/ChatMessage/Citation rows the
+orchestrator writes are never committed; only the EvaluationRun/Result rows
+this module writes through the caller's real `db` session persist.
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import logging
+from dataclasses import dataclass
+from typing import Literal
+
+from sqlalchemy.orm import Session
+
+from app.access.widget_admin.service import WidgetAdminNotFound, get_current_draft, get_widget
+from app.ai.dependencies import AICoreContainer, create_ai_core
+from app.ai.rag_orchestrator import (
+    RAGConversationNotFoundError,
+    RAGOrchestrationRequest,
+    RAGOrchestrator,
+    RAGOrchestratorDependencies,
+    RAGProviderExecutionError,
+    RAGTenantContextError,
+)
+from app.core.config import settings
+from app.db.models import EvaluationCase, EvaluationDataset, EvaluationRun
+from app.evaluation.categories import ISOLATION_CATEGORIES
+from app.evaluation.metrics.answer import compute_answer_metrics
+from app.evaluation.metrics.retrieval import compute_retrieval_metrics
+from app.evaluation.policy import DEFAULT_POLICY, EvaluationPolicy
+from app.evaluation.redaction import safe_error_message
+from app.evaluation.scoring import score_case
+from app.evaluation.shadow_session import shadow_rag_session
+from app.repositories import evaluation_repository
+from app.services.embeddings import build_embedding_provider
+
+logger = logging.getLogger(__name__)
+
+EvaluationMode = Literal["mock", "live"]
+
+_DEFAULT_CASE_TIMEOUT_SECONDS = 30.0
+_DEFAULT_MAX_TOKENS_PER_CASE = 2000
+
+
+class EmptyDatasetError(ValueError):
+    pass
+
+
+class LiveModeNotConfiguredError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class EvaluationRunOptions:
+    mode: EvaluationMode = "mock"
+    policy: EvaluationPolicy = DEFAULT_POLICY
+    case_timeout_seconds: float = _DEFAULT_CASE_TIMEOUT_SECONDS
+    max_tokens_per_case: int = _DEFAULT_MAX_TOKENS_PER_CASE
+    created_by: str | None = None
+    live_ai_core: AICoreContainer | None = None
+    shadow_database_url: str | None = None
+    category_filter: str | None = None
+
+
+def run_evaluation(
+    db: Session,
+    *,
+    dataset: EvaluationDataset,
+    organisation_id: str,
+    workspace_id: str,
+    widget_id: str,
+    options: EvaluationRunOptions | None = None,
+) -> EvaluationRun:
+    options = options or EvaluationRunOptions()
+    cases = evaluation_repository.list_cases_for_dataset(db, dataset_id=dataset.id)
+    if options.category_filter:
+        cases = [case for case in cases if case.category == options.category_filter]
+    if not cases:
+        raise EmptyDatasetError(
+            f"Dataset {dataset.id} has no cases to run"
+            + (f" in category {options.category_filter!r}." if options.category_filter else ".")
+        )
+
+    if options.mode == "live" and options.live_ai_core is None:
+        raise LiveModeNotConfiguredError(
+            "Live-provider evaluation requires an explicit ai_core with a real provider registered; "
+            "the deterministic mock is used unless one is supplied."
+        )
+    ai_core = options.live_ai_core if options.mode == "live" else create_ai_core()
+    embedding_provider = build_embedding_provider(
+        provider_name=settings.EMBEDDING_PROVIDER,
+        model_name=settings.EMBEDDING_MODEL,
+        dimension=settings.EMBEDDING_DIMENSION,
+    )
+
+    allowed_document_ids = _resolve_allowed_document_ids(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+
+    run = evaluation_repository.create_run(
+        db,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        widget_id=widget_id,
+        dataset=dataset,
+        mode=options.mode,
+        policy_snapshot=options.policy.as_dict(),
+        retrieval_settings={"retrieval_limit": settings.RETRIEVAL_MAX_CONTEXT_CHUNKS, "max_context_chars": settings.RETRIEVAL_MAX_CONTEXT_CHARS},
+        created_by=options.created_by,
+    )
+    run = evaluation_repository.mark_run_started(db, run=run)
+
+    total = passed = failed = hard_failures = 0
+    provider_key = model_key = provider_model_name = prompt_key = prompt_version = prompt_hash = None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        for case in cases:
+            outcome = _run_single_case(
+                executor,
+                case=case,
+                organisation_id=organisation_id,
+                workspace_id=workspace_id,
+                widget_id=widget_id,
+                allowed_document_ids=allowed_document_ids,
+                ai_core=ai_core,
+                embedding_provider=embedding_provider,
+                options=options,
+            )
+            evaluation_repository.create_result(db, run_id=run.id, case=case, payload=outcome.payload)
+            total += 1
+            passed += 1 if outcome.payload["passed"] else 0
+            failed += 0 if outcome.payload["passed"] else 1
+            hard_failures += 1 if outcome.payload["hard_failure"] else 0
+            if outcome.provider_key:
+                provider_key, model_key, provider_model_name = outcome.provider_key, outcome.model_key, outcome.provider_model_name
+                prompt_key, prompt_version, prompt_hash = outcome.prompt_key, outcome.prompt_version, outcome.prompt_hash
+
+    return evaluation_repository.mark_run_completed(
+        db,
+        run=run,
+        status="completed",
+        total_cases=total,
+        passed_cases=passed,
+        failed_cases=failed,
+        hard_failure_cases=hard_failures,
+        provider_key=provider_key,
+        model_key=model_key,
+        provider_model_name=provider_model_name,
+        prompt_key=prompt_key,
+        prompt_version=prompt_version,
+        prompt_hash=prompt_hash,
+    )
+
+
+@dataclass(frozen=True)
+class _CaseOutcome:
+    payload: dict
+    provider_key: str | None = None
+    model_key: str | None = None
+    provider_model_name: str | None = None
+    prompt_key: str | None = None
+    prompt_version: str | None = None
+    prompt_hash: str | None = None
+
+
+def _run_single_case(
+    executor: concurrent.futures.ThreadPoolExecutor,
+    *,
+    case: EvaluationCase,
+    organisation_id: str,
+    workspace_id: str,
+    widget_id: str,
+    allowed_document_ids: list[str] | None,
+    ai_core: AICoreContainer,
+    embedding_provider,
+    options: EvaluationRunOptions,
+) -> _CaseOutcome:
+    is_isolation_case = case.category in {member.value for member in ISOLATION_CATEGORIES}
+    cross_tenant_attempt = (case.metadata_json or {}).get("cross_tenant_attempt") if is_isolation_case else None
+
+    effective_organisation_id = (cross_tenant_attempt or {}).get("organisation_id", organisation_id)
+    effective_workspace_id = (cross_tenant_attempt or {}).get("workspace_id", workspace_id)
+    effective_widget_id = (cross_tenant_attempt or {}).get("widget_id", widget_id)
+
+    request = RAGOrchestrationRequest(
+        organisation_id=effective_organisation_id,
+        workspace_id=effective_workspace_id,
+        query=case.question,
+        assistant_id=effective_widget_id,
+        channel="api",
+    )
+
+    def call() -> object:
+        with shadow_rag_session(options.shadow_database_url) as shadow_db:
+            orchestrator = RAGOrchestrator(RAGOrchestratorDependencies(db=shadow_db, ai_core=ai_core, embedding_provider=embedding_provider))
+            return orchestrator.answer(request)
+
+    future = executor.submit(call)
+    try:
+        result = future.result(timeout=options.case_timeout_seconds)
+    except concurrent.futures.TimeoutError:
+        return _CaseOutcome(payload=_timeout_payload(case, options.case_timeout_seconds))
+    except (RAGTenantContextError, RAGConversationNotFoundError) as exc:
+        if is_isolation_case:
+            # The orchestrator's own tenant checks rejected the cross-tenant
+            # attempt cleanly - that is the correct, passing outcome.
+            return _CaseOutcome(payload=_isolation_held_payload(case))
+        return _CaseOutcome(payload=_unexpected_tenant_error_payload(case, exc))
+    except RAGProviderExecutionError as exc:
+        return _CaseOutcome(payload=_provider_error_payload(case, exc, allowed_document_ids=allowed_document_ids, options=options))
+    except Exception as exc:  # noqa: BLE001 - continue after any unexpected case failure
+        logger.exception("Evaluation case %s raised an unexpected error", case.id)
+        return _CaseOutcome(payload=_unexpected_error_payload(case, exc))
+
+    cross_tenant_leak_detected = is_isolation_case  # the call above only succeeds for isolation cases if isolation failed
+    payload, provider_key, model_key, provider_model_name, prompt_key, prompt_version, prompt_hash = _score_result(
+        case,
+        result,
+        allowed_document_ids=allowed_document_ids,
+        cross_tenant_leak_detected=cross_tenant_leak_detected,
+        options=options,
+    )
+    return _CaseOutcome(
+        payload=payload,
+        provider_key=provider_key,
+        model_key=model_key,
+        provider_model_name=provider_model_name,
+        prompt_key=prompt_key,
+        prompt_version=prompt_version,
+        prompt_hash=prompt_hash,
+    )
+
+
+def _score_result(case: EvaluationCase, result, *, allowed_document_ids, cross_tenant_leak_detected: bool, options: EvaluationRunOptions):
+    retrieved_document_ids = [citation.document_id for citation in result.citations]
+    retrieved_chunk_ids = [citation.chunk_id for citation in result.citations]
+    retrieved_source_labels = [citation.source_title for citation in result.citations]
+    cited_source_labels = retrieved_source_labels
+
+    retrieval_metrics = compute_retrieval_metrics(
+        expected_document_ids=case.expected_document_ids,
+        expected_source_labels=case.expected_source_labels,
+        retrieved_document_ids=retrieved_document_ids,
+        retrieved_chunk_ids=retrieved_chunk_ids,
+        retrieved_source_labels=retrieved_source_labels,
+        allowed_document_ids=allowed_document_ids if not cross_tenant_leak_detected else None,
+    )
+    answer_metrics = compute_answer_metrics(
+        answer=result.answer,
+        answer_state=result.answer_state,
+        expected_answerability=case.expected_answerability,
+        citation_document_ids=retrieved_document_ids,
+        expected_source_labels=case.expected_source_labels,
+        cited_source_labels=cited_source_labels,
+        retrieved_document_ids=retrieved_document_ids,
+        allowed_document_ids=allowed_document_ids,
+        latency_ms=result.latency_ms,
+        total_tokens=result.token_usage.total_tokens,
+        max_latency_ms=options.policy.max_p95_latency_ms,
+        max_tokens=options.max_tokens_per_case,
+        cross_tenant_leak_detected=cross_tenant_leak_detected,
+    )
+    score = score_case(
+        category=case.category,
+        expected_answerability=case.expected_answerability,
+        has_expected_documents=bool(case.expected_document_ids),
+        has_expected_sources=bool(case.expected_source_labels),
+        retrieval=retrieval_metrics,
+        answer=answer_metrics,
+        citation_required=bool((case.metadata_json or {}).get("citation_required")),
+    )
+
+    payload = {
+        "actual_answer": result.answer,
+        "answer_state": result.answer_state,
+        "retrieved_document_ids": retrieved_document_ids,
+        "retrieved_chunk_ids": retrieved_chunk_ids,
+        "citations_json": [
+            {
+                "document_id": citation.document_id,
+                "chunk_id": citation.chunk_id,
+                "source_title": citation.source_title,
+                "source_type": citation.source_type,
+                "similarity_score": citation.similarity_score,
+            }
+            for citation in result.citations
+        ],
+        "latency_ms": result.latency_ms,
+        "prompt_tokens": result.token_usage.input_tokens,
+        "completion_tokens": result.token_usage.output_tokens,
+        "total_tokens": result.token_usage.total_tokens,
+        "retrieval_metrics_json": retrieval_metrics.as_dict(),
+        "answer_metrics_json": answer_metrics.as_dict(),
+        "judge_scores_json": None,
+        "passed": score.passed,
+        "hard_failure": score.hard_failure,
+        "failure_reasons_json": score.failure_reasons,
+        "error_message": None,
+    }
+    return payload, result.provider_key, result.model_key, result.provider_model_name, result.prompt_key, result.prompt_version, result.prompt_hash
+
+
+def _isolation_held_payload(case: EvaluationCase) -> dict:
+    return {
+        "actual_answer": None,
+        "answer_state": None,
+        "retrieved_document_ids": [],
+        "retrieved_chunk_ids": [],
+        "citations_json": [],
+        "latency_ms": None,
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "total_tokens": None,
+        "retrieval_metrics_json": None,
+        "answer_metrics_json": None,
+        "judge_scores_json": None,
+        "passed": True,
+        "hard_failure": False,
+        "failure_reasons_json": [],
+        "error_message": None,
+    }
+
+
+def _unexpected_tenant_error_payload(case: EvaluationCase, exc: Exception) -> dict:
+    return _failure_payload(safe_error_message(exc), hard_failure=False, reason="unexpected_tenant_context_error")
+
+
+def _provider_error_payload(case: EvaluationCase, exc: Exception, *, allowed_document_ids, options: EvaluationRunOptions) -> dict:
+    # A provider failure on a case that expected an answer is a normal quality
+    # failure, not a launch-critical hard failure, unless the case explicitly
+    # required a fallback (in which case a "failed" answer_state still counts
+    # as a correctly-refused answer).
+    reason = "provider_execution_failed"
+    payload = _failure_payload(safe_error_message(exc), hard_failure=False, reason=reason)
+    payload["answer_state"] = "failed"
+    return payload
+
+
+def _timeout_payload(case: EvaluationCase, timeout_seconds: float) -> dict:
+    return _failure_payload(f"Case timed out after {timeout_seconds:.0f}s", hard_failure=False, reason="case_timeout")
+
+
+def _unexpected_error_payload(case: EvaluationCase, exc: Exception) -> dict:
+    return _failure_payload(safe_error_message(exc), hard_failure=False, reason="unexpected_engine_error")
+
+
+def _failure_payload(error_message: str, *, hard_failure: bool, reason: str) -> dict:
+    return {
+        "actual_answer": None,
+        "answer_state": None,
+        "retrieved_document_ids": [],
+        "retrieved_chunk_ids": [],
+        "citations_json": [],
+        "latency_ms": None,
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "total_tokens": None,
+        "retrieval_metrics_json": None,
+        "answer_metrics_json": None,
+        "judge_scores_json": None,
+        "passed": False,
+        "hard_failure": hard_failure,
+        "failure_reasons_json": [reason],
+        "error_message": error_message,
+    }
+
+
+def _resolve_allowed_document_ids(db: Session, *, organisation_id: str, workspace_id: str, widget_id: str) -> list[str] | None:
+    try:
+        widget = get_widget(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
+        draft = get_current_draft(db, widget=widget)
+    except WidgetAdminNotFound:
+        return None
+    scope = list(draft.knowledge_scope_json or [])
+    return scope or None

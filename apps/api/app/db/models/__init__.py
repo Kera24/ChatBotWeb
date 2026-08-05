@@ -5,6 +5,7 @@ from app.db.models.chunk import Chunk
 from app.db.models.conversation import ChatMessage, ChatSession, Citation
 from app.db.models.document import Document
 from app.db.models.document_version import DocumentVersion
+from app.db.models.evaluation import EvaluationCase, EvaluationDataset, EvaluationResult, EvaluationRun
 from app.db.models.membership import Membership
 from app.db.models.organisation import Organisation
 from app.db.models.password_reset_token import PasswordResetToken
@@ -23,6 +24,10 @@ __all__ = [
     "CredentialAllowedOrigin",
     "Document",
     "DocumentVersion",
+    "EvaluationCase",
+    "EvaluationDataset",
+    "EvaluationResult",
+    "EvaluationRun",
     "Invoice",
     "Membership",
     "Organisation",

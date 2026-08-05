@@ -49,6 +49,13 @@ export const navigationItems = [
     group: "Quality",
   },
   {
+    label: "Evaluation",
+    href: "/evaluation",
+    glyph: "EV",
+    description: "Review evaluation datasets, runs, gates, and results.",
+    group: "Quality",
+  },
+  {
     label: "Users",
     href: "/users",
     glyph: "US",

@@ -1447,6 +1447,11 @@ code {
   gap: 22px;
 }
 
+.evaluationPage {
+  display: grid;
+  gap: 22px;
+}
+
 .widgetHero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 280px);
@@ -12101,6 +12106,12 @@ pre:not(.embedCard pre) {
 
 /* Widget Builder premium overhaul */
 .widgetAdminPage {
+  display: grid;
+  gap: 22px;
+  color: var(--text-primary);
+}
+
+.evaluationPage {
   display: grid;
   gap: 22px;
   color: var(--text-primary);

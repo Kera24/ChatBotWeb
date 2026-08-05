@@ -8,6 +8,7 @@ from app.api.v1.billing import router as billing_router
 from app.api.v1.billing_webhook import router as billing_webhook_router
 from app.api.v1.conversations import router as conversations_router
 from app.api.v1.documents import router as documents_router
+from app.api.v1.evaluation import router as evaluation_router
 from app.api.v1.memberships import router as memberships_router
 from app.api.v1.orgs import router as orgs_router
 from app.api.v1.public_credentials import router as public_credentials_router
@@ -36,6 +37,7 @@ API_V1_ROUTER_REGISTRATIONS = (
     (public_widget_router, "", ["public-widget"]),
     (conversations_router, "/workspaces", ["conversations"]),
     (review_router, "/workspaces", ["review"]),
+    (evaluation_router, "/workspaces", ["evaluation"]),
 )
 
 

@@ -9,6 +9,13 @@ def _get_int(name: str, default: int) -> int:
     return int(raw_value)
 
 
+def _get_float(name: str, default: float) -> float:
+    raw_value = getenv(name)
+    if raw_value is None:
+        return default
+    return float(raw_value)
+
+
 @dataclass(frozen=True)
 class Settings:
     APP_ENV: str = getenv("APP_ENV", getenv("NODE_ENV", "development"))
@@ -66,6 +73,14 @@ class Settings:
     EMBEDDING_DIMENSION: int = _get_int("EMBEDDING_DIMENSION", 1536)
     RETRIEVAL_MAX_CONTEXT_CHUNKS: int = _get_int("RETRIEVAL_MAX_CONTEXT_CHUNKS", 10)
     RETRIEVAL_MAX_CONTEXT_CHARS: int = _get_int("RETRIEVAL_MAX_CONTEXT_CHARS", 12000)
+    # Defaults to 0.0 (no-op / off) rather than a positive floor: the bundled
+    # "local-mock" embedding provider hashes text with no semantic content, so
+    # its cosine-similarity scores are empirically uncorrelated with true
+    # relevance (see docs/04_Engineering/Evaluation_Task_Specification.md,
+    # Phase 8 finding) - a nonzero default here would filter retrieval
+    # essentially at random until a real/semantic embedding provider exists.
+    # Set this explicitly once one does.
+    RETRIEVAL_MIN_SIMILARITY_SCORE: float = _get_float("RETRIEVAL_MIN_SIMILARITY_SCORE", 0.0)
     PROMPT_VERSION: str = getenv("PROMPT_VERSION", "grounded-answer-v1")
     DEFAULT_AI_PROVIDER_KEY: str = getenv("DEFAULT_AI_PROVIDER_KEY", "mock")
     DEFAULT_AI_MODEL_KEY: str = getenv("DEFAULT_AI_MODEL_KEY", "mock-grounded-answer")

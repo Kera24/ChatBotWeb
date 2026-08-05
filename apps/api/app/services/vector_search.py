@@ -33,13 +33,31 @@ def search_embedded_chunks(
     limit: int,
     provider: EmbeddingProvider,
     document_ids: list[str] | None = None,
+    min_similarity_score: float = 0.0,
 ) -> list[VectorSearchMatch]:
+    # `document_ids=None` means "no scope restriction requested" (e.g. a raw
+    # workspace-level dashboard-test query with no assistant selected) and
+    # correctly falls through to an unfiltered search below. `document_ids=[]`
+    # means an assistant WAS resolved and its configured knowledge scope is
+    # explicitly empty - every widget defaults to `knowledge_scope_json=[]`
+    # until an admin attaches documents (see
+    # app.access.widget_admin.service.create_widget and the "may use fallback
+    # answers until scope is configured" warning surfaced in the admin UI).
+    # Without this guard, `if document_ids:` / `not bool(document_ids)` checks
+    # in the two backend-specific search functions below both treat `[]` the
+    # same as `None` and silently return every workspace document - meaning
+    # any newly created, not-yet-configured assistant could answer from any
+    # other assistant's documents in the same workspace. An explicitly empty
+    # scope must always retrieve zero chunks, never "everything".
+    if document_ids is not None and len(document_ids) == 0:
+        return []
+
     query_vector = provider.embed(query)
     if len(query_vector) != provider.dimension:
         raise ValueError("Embedding provider returned the wrong dimension.")
 
     if db.bind is not None and db.bind.dialect.name == "postgresql":
-        return _search_postgresql(
+        matches = _search_postgresql(
             db,
             organisation_id=organisation_id,
             workspace_id=workspace_id,
@@ -48,15 +66,27 @@ def search_embedded_chunks(
             limit=limit,
             document_ids=document_ids,
         )
-    return _search_sqlite(
-        db,
-        organisation_id=organisation_id,
-        workspace_id=workspace_id,
-        query_vector=query_vector,
-        provider=provider,
-        limit=limit,
-        document_ids=document_ids,
-    )
+    else:
+        matches = _search_sqlite(
+            db,
+            organisation_id=organisation_id,
+            workspace_id=workspace_id,
+            query_vector=query_vector,
+            provider=provider,
+            limit=limit,
+            document_ids=document_ids,
+        )
+
+    # Applied uniformly across both backends here (rather than duplicated in
+    # each backend's own SQL) so the threshold semantics are identical
+    # regardless of dialect. A match's `score` is already the same
+    # cosine-similarity number in both backends. Filtering after the
+    # backend's own top-`limit` selection is safe: since results are always
+    # ordered by descending score, no higher-scored match beyond the returned
+    # set exists to miss.
+    if min_similarity_score > 0.0:
+        matches = [match for match in matches if match.score >= min_similarity_score]
+    return matches
 
 
 def _search_sqlite(

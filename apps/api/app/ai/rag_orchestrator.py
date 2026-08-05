@@ -148,6 +148,7 @@ class RAGOrchestrator:
             max_context_chars=max_context_chars,
             provider=self.embedding_provider,
             document_ids=self._knowledge_scope_for_request(request, assistant),
+            min_similarity_score=settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
         )
         context = "\n\n".join(block.context_text for block in retrieval.context_blocks)
         model_key = request.model_key or DEFAULT_RAG_MODEL_KEY

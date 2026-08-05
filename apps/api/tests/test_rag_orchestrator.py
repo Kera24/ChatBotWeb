@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.access.widget_admin.service import create_widget
 from app.ai.rag_orchestrator import RAGOrchestrationRequest, RAGOrchestrator, RAGOrchestratorDependencies, RAGProviderExecutionError
 from app.core.config import settings
 from app.db.base import Base
@@ -148,6 +149,7 @@ def rag_answer(
     conversation_id: str | None = None,
     retrieval_limit: int | None = None,
     max_context_chars: int | None = None,
+    assistant_id: str | None = None,
 ):
     body: dict[str, object] = {"query": query}
     if conversation_id is not None:
@@ -156,6 +158,8 @@ def rag_answer(
         body["retrieval_limit"] = retrieval_limit
     if max_context_chars is not None:
         body["max_context_chars"] = max_context_chars
+    if assistant_id is not None:
+        body["assistant_id"] = assistant_id
     return client.post(
         f"/api/v1/workspaces/{workspace_id}/rag/answer",
         params={"organisation_id": organisation_id},
@@ -371,6 +375,57 @@ def test_empty_retrieval_produces_fallback_and_zero_citations(client: TestClient
         messages = list_messages(db, organisation_id=organisation_id, workspace_id=workspace_id, conversation_id=data["conversation_id"])
         assert [message.role for message in messages] == ["user", "assistant"]
         assert messages[1].answer_state == "fallback"
+
+
+def test_widget_with_empty_knowledge_scope_does_not_leak_workspace_documents(client: TestClient) -> None:
+    """Regression test for a fixed bug: `knowledge_scope_json == []` (the
+    default for every newly created widget before an admin attaches
+    documents) was being treated identically to `knowledge_scope_json is
+    None` ("no restriction"), so a brand-new, not-yet-configured widget could
+    answer using ANY document in its workspace, including documents intended
+    for a different assistant. An explicitly empty scope must retrieve zero
+    chunks and fall back, never leak workspace-wide content."""
+    organisation_id, workspace_id, user_id = seed_tenant(
+        client,
+        organisation_name="Beta College",
+        organisation_slug="beta-empty-scope",
+        user_email="owner@example.test",
+        role="org_owner",
+    )
+    add_embedded_chunk(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        content="Applications close on March 1st for the fall semester.",
+        title="Admissions Deadlines",
+    )
+    with client.app.state.testing_session() as db:
+        widget = create_widget(
+            db,
+            organisation_id=organisation_id,
+            workspace_id=workspace_id,
+            display_name="Freshly Created Assistant",
+            environment="development",
+            actor_user_id=user_id,
+        )
+        assert widget.id  # created with the service's own default: knowledge_scope_json=[]
+
+    response = rag_answer(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        email="owner@example.test",
+        role="org_owner",
+        query="When do applications close?",
+        assistant_id=widget.id,
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["answer_state"] == "fallback"
+    assert data["fallback_used"] is True
+    assert data["citations"] == []
+    assert data["retrieved_chunk_count"] == 0
 
 
 def test_retrieval_and_context_limits_respected(client: TestClient) -> None:
