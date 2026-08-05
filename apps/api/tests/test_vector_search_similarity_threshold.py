@@ -102,6 +102,30 @@ def test_min_similarity_score_excludes_low_scoring_matches(db_session: Session) 
     assert [match.source_title for match in filtered] == ["relevant"]
 
 
+def test_min_similarity_score_boundary_is_inclusive(db_session: Session) -> None:
+    """A chunk scoring exactly the threshold value must pass (>=, not >) -
+    otherwise the documented threshold value would not behave as advertised
+    at its own boundary."""
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="boundary")
+    provider = ControlledEmbeddingProvider(vectors={
+        "the query": [1.0, 0.0],
+        "exact match content": [0.6, 0.8],  # cosine similarity to [1,0] is exactly 0.6
+    }, dimension=2)
+    _seed_chunk(db_session, organisation_id=organisation_id, workspace_id=workspace_id, key="exact", content="exact match content", provider=provider)
+
+    at_threshold = search_embedded_chunks(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="the query", limit=10, provider=provider,
+        min_similarity_score=0.6,
+    )
+    assert len(at_threshold) == 1
+
+    just_above_threshold = search_embedded_chunks(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="the query", limit=10, provider=provider,
+        min_similarity_score=0.6000001,
+    )
+    assert just_above_threshold == []
+
+
 def test_min_similarity_score_of_zero_is_a_no_op(db_session: Session) -> None:
     organisation_id, workspace_id = _seed_tenant(db_session, suffix="noop")
     provider = ControlledEmbeddingProvider(vectors={

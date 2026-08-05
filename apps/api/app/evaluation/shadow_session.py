@@ -43,6 +43,13 @@ def _build_shadow_engine(database_url: str) -> Engine:
         @event.listens_for(engine, "connect")
         def _disable_pysqlite_implicit_transactions(dbapi_connection, _connection_record) -> None:
             dbapi_connection.isolation_level = None
+            # See app.db.session for why: without this, a case that times out
+            # (its worker thread keeps running and holding this connection's
+            # lock even after `future.result(timeout=...)` gives up on it -
+            # Python threads cannot be forcibly cancelled) can make the next
+            # case's write to the shared database fail immediately with
+            # "database is locked" instead of waiting briefly.
+            dbapi_connection.execute("PRAGMA busy_timeout = 10000")
 
         @event.listens_for(engine, "begin")
         def _start_explicit_transaction(connection) -> None:

@@ -4,6 +4,7 @@ from hashlib import sha256
 from struct import unpack
 from typing import Protocol
 
+import httpx
 from sqlalchemy.orm import Session
 
 from app.db.models import Chunk, DocumentVersion
@@ -76,11 +77,109 @@ class FailingEmbeddingProvider:
         raise EmbeddingProviderError("Configured embedding provider failed.")
 
 
-def build_embedding_provider(*, provider_name: str, model_name: str, dimension: int) -> EmbeddingProvider:
+@dataclass(frozen=True)
+class OllamaEmbeddingProvider:
+    """A real, local, credential-free semantic embedding provider backed by a
+    running Ollama instance. Unlike `LocalMockEmbeddingProvider` (a SHA-256
+    hash with no semantic content), this produces vectors whose cosine
+    similarity genuinely reflects text relevance - required for any retrieval
+    similarity-threshold to be meaningful (see
+    docs/04_Engineering/Evaluation_Real_Embedding_Provider.md).
+
+    Deliberately has NO fallback to the mock provider on any failure -
+    `embed()` always raises `EmbeddingProviderError` with an actionable
+    message rather than silently degrading to hash-based vectors, since a
+    caller who explicitly asked for real embeddings must never unknowingly
+    get meaningless ones back.
+    """
+
+    dimension: int
+    model_name: str
+    base_url: str = "http://localhost:11434"
+    provider_name: str = "ollama"
+    timeout_seconds: float = 30.0
+
+    def embed(self, text: str) -> list[float]:
+        try:
+            response = httpx.post(
+                f"{self.base_url.rstrip('/')}/api/embed",
+                json={"model": self.model_name, "input": text},
+                timeout=self.timeout_seconds,
+            )
+        except httpx.HTTPError as exc:
+            raise EmbeddingProviderError(
+                f"Could not reach Ollama at {self.base_url!r} to embed text with model {self.model_name!r}: {exc}. "
+                "Is the Ollama runtime running (`ollama serve`) and is EVAL_EMBEDDING_BASE_URL correct?"
+            ) from exc
+        if response.status_code != 200:
+            raise EmbeddingProviderError(
+                f"Ollama returned HTTP {response.status_code} embedding with model {self.model_name!r}: {response.text[:500]}. "
+                f"Confirm the model is installed (`ollama pull {self.model_name}`) and supports embeddings."
+            )
+        payload = response.json()
+        embeddings = payload.get("embeddings")
+        if not embeddings or not embeddings[0]:
+            raise EmbeddingProviderError(f"Ollama returned no embedding vector for model {self.model_name!r}. Response: {payload!r}")
+        vector = embeddings[0]
+        if len(vector) != self.dimension:
+            raise EmbeddingProviderError(
+                f"Ollama model {self.model_name!r} returned a {len(vector)}-dimension vector, but this provider was "
+                f"configured for dimension {self.dimension}. Set EVAL_EMBEDDING_DIMENSION to {len(vector)}, or verify "
+                "you configured the model you intended."
+            )
+        return vector
+
+
+def check_ollama_embedding_model_available(*, base_url: str, model_name: str, timeout_seconds: float = 5.0) -> None:
+    """Fail clearly and immediately if the requested Ollama runtime/model is
+    not available, rather than letting a real-embedding evaluation run
+    silently fall back to nothing or fail deep inside a retrieval call with a
+    confusing error. Raises EmbeddingProviderError with an actionable message
+    on any problem; returns None (does nothing) when everything checks out."""
+    try:
+        response = httpx.get(f"{base_url.rstrip('/')}/api/tags", timeout=timeout_seconds)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise EmbeddingProviderError(
+            f"Could not reach Ollama at {base_url!r}: {exc}. Start it with `ollama serve` and confirm EVAL_EMBEDDING_BASE_URL."
+        ) from exc
+
+    models = response.json().get("models", [])
+
+    def _matches(installed_name: str) -> bool:
+        # Ollama model names are typically "name:tag" (e.g. "name:latest").
+        # Accept either the fully-qualified name or the bare name so
+        # EVAL_EMBEDDING_MODEL does not have to spell out ":latest".
+        return installed_name == model_name or installed_name.split(":", 1)[0] == model_name
+
+    matching = next((model for model in models if _matches(model.get("name", "")) or _matches(model.get("model", ""))), None)
+    if matching is None:
+        installed = sorted({model.get("name", model.get("model", "?")) for model in models})
+        raise EmbeddingProviderError(
+            f"Model {model_name!r} is not installed in the local Ollama runtime at {base_url!r}. "
+            f"Installed models: {installed or '(none)'}. Install an embedding-capable model with `ollama pull {model_name}`, "
+            "or set EVAL_EMBEDDING_MODEL to one of the installed models above."
+        )
+    capabilities = matching.get("capabilities", [])
+    if capabilities and "embedding" not in capabilities:
+        raise EmbeddingProviderError(
+            f"Model {model_name!r} is installed but does not report an 'embedding' capability "
+            f"(capabilities: {capabilities}). Choose a dedicated embedding model instead."
+        )
+
+
+def build_embedding_provider(*, provider_name: str, model_name: str, dimension: int, base_url: str | None = None) -> EmbeddingProvider:
     if provider_name == "local-mock":
         return LocalMockEmbeddingProvider(dimension=dimension, model_name=model_name)
     if provider_name == "failing-mock":
         return FailingEmbeddingProvider(dimension=dimension, model_name=model_name)
+    if provider_name == "ollama":
+        if not model_name:
+            raise EmbeddingProviderError(
+                "provider_name='ollama' requires an explicit model_name (set EVAL_EMBEDDING_MODEL) - "
+                "no default model is assumed, since which models are installed varies by machine."
+            )
+        return OllamaEmbeddingProvider(dimension=dimension, model_name=model_name, base_url=base_url or "http://localhost:11434")
     raise EmbeddingProviderError("Unsupported embedding provider.")
 
 

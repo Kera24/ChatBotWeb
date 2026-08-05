@@ -66,6 +66,7 @@ class RAGOrchestrationRequest:
     prompt_key: str | None = None
     retrieval_limit: int | None = None
     max_context_chars: int | None = None
+    min_similarity_score: float | None = None
     metadata: dict | None = None
     simulate_failure: bool = False
     simulate_timeout: bool = False
@@ -148,7 +149,7 @@ class RAGOrchestrator:
             max_context_chars=max_context_chars,
             provider=self.embedding_provider,
             document_ids=self._knowledge_scope_for_request(request, assistant),
-            min_similarity_score=settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
+            min_similarity_score=request.min_similarity_score if request.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
         )
         context = "\n\n".join(block.context_text for block in retrieval.context_blocks)
         model_key = request.model_key or DEFAULT_RAG_MODEL_KEY

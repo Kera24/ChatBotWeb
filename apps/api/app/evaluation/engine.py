@@ -38,7 +38,7 @@ from app.evaluation.redaction import safe_error_message
 from app.evaluation.scoring import score_case
 from app.evaluation.shadow_session import shadow_rag_session
 from app.repositories import evaluation_repository
-from app.services.embeddings import build_embedding_provider
+from app.services.embeddings import EmbeddingProvider, build_embedding_provider
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,13 @@ class EvaluationRunOptions:
     live_ai_core: AICoreContainer | None = None
     shadow_database_url: str | None = None
     category_filter: str | None = None
+    # Explicit override so a caller (e.g. a real-embedding evaluation run) can
+    # inject a specific embedding provider - most importantly, one that must
+    # exactly match whatever provider/model/dimension the dataset's chunks
+    # were seeded with - without mutating the global app.core.config settings
+    # object, which also governs real customer document embedding.
+    embedding_provider: EmbeddingProvider | None = None
+    min_similarity_score: float | None = None
 
 
 def run_evaluation(
@@ -93,11 +100,12 @@ def run_evaluation(
             "the deterministic mock is used unless one is supplied."
         )
     ai_core = options.live_ai_core if options.mode == "live" else create_ai_core()
-    embedding_provider = build_embedding_provider(
+    embedding_provider = options.embedding_provider or build_embedding_provider(
         provider_name=settings.EMBEDDING_PROVIDER,
         model_name=settings.EMBEDDING_MODEL,
         dimension=settings.EMBEDDING_DIMENSION,
     )
+    min_similarity_score = options.min_similarity_score if options.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE
 
     allowed_document_ids = _resolve_allowed_document_ids(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
 
@@ -109,7 +117,15 @@ def run_evaluation(
         dataset=dataset,
         mode=options.mode,
         policy_snapshot=options.policy.as_dict(),
-        retrieval_settings={"retrieval_limit": settings.RETRIEVAL_MAX_CONTEXT_CHUNKS, "max_context_chars": settings.RETRIEVAL_MAX_CONTEXT_CHARS},
+        retrieval_settings={
+            "retrieval_limit": settings.RETRIEVAL_MAX_CONTEXT_CHUNKS,
+            "max_context_chars": settings.RETRIEVAL_MAX_CONTEXT_CHARS,
+            "min_similarity_score": min_similarity_score,
+            "embedding_provider": embedding_provider.provider_name,
+            "embedding_model": embedding_provider.model_name,
+            "embedding_dimension": embedding_provider.dimension,
+            "category_filter": options.category_filter,
+        },
         created_by=options.created_by,
     )
     run = evaluation_repository.mark_run_started(db, run=run)
@@ -128,6 +144,7 @@ def run_evaluation(
                 allowed_document_ids=allowed_document_ids,
                 ai_core=ai_core,
                 embedding_provider=embedding_provider,
+                min_similarity_score=min_similarity_score,
                 options=options,
             )
             evaluation_repository.create_result(db, run_id=run.id, case=case, payload=outcome.payload)
@@ -177,6 +194,7 @@ def _run_single_case(
     allowed_document_ids: list[str] | None,
     ai_core: AICoreContainer,
     embedding_provider,
+    min_similarity_score: float,
     options: EvaluationRunOptions,
 ) -> _CaseOutcome:
     is_isolation_case = case.category in {member.value for member in ISOLATION_CATEGORIES}
@@ -192,6 +210,7 @@ def _run_single_case(
         query=case.question,
         assistant_id=effective_widget_id,
         channel="api",
+        min_similarity_score=min_similarity_score,
     )
 
     def call() -> object:
