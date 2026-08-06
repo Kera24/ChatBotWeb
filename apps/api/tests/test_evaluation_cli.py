@@ -22,6 +22,8 @@ from app.db.models import (
     User,
     Workspace,
 )
+from app.ai.guardrails.evidence_sufficiency import EvidenceSufficiencyVerdict, RequestedFact
+from app.ai.guardrails.reason_codes import GuardrailReasonCode
 from app.evaluation.engine import EvaluationRunOptions, run_evaluation
 from app.operations import eval_launch, eval_report, eval_run
 
@@ -170,16 +172,31 @@ def test_eval_report_cli_gate_flag_fails_exit_code_on_hard_failure(db_session: S
     document_id = _seed_document(db_session, organisation_id=organisation.id, workspace_id=workspace.id, key="faq", title="FAQ", content="Applications close on March 1st.")
     widget = create_widget(db_session, organisation_id=organisation.id, workspace_id=workspace.id, display_name="Assistant", environment="development", actor_user_id=user_id, initial_configuration={"knowledge_scope_json": [document_id]})
 
-    # No similarity threshold exists in retrieval today, so an "unanswerable" case
-    # against a widget with any document in scope will always get an answer - a
-    # documented hard failure ("answer_returned_when_fallback_required"), used here
-    # as a deterministic way to force the gate to fail without monkeypatching internals.
+    # The evidence-sufficiency guardrail (app.ai.guardrails.evidence_sufficiency)
+    # now reliably catches an "unanswerable" case against an in-scope but
+    # unrelated document regardless of question phrasing - which is the whole
+    # point of that guardrail, but it means this test can no longer force a
+    # hard failure through question wording alone. This test's actual purpose
+    # is the CLI gate/exit-code plumbing (not guardrail correctness, which has
+    # its own dedicated tests in tests/test_guardrails.py), so bypass the
+    # guardrail directly to deterministically simulate "the model answered
+    # when it should have fallen back" - the exact hard-failure condition the
+    # gate must report on.
+    monkeypatch.setattr(
+        "app.ai.rag_orchestrator.verify_evidence_sufficiency",
+        lambda **kwargs: EvidenceSufficiencyVerdict(
+            sufficient=True,
+            reason_code=GuardrailReasonCode.SUFFICIENT_EVIDENCE,
+            requested_fact=RequestedFact(entities=(), attribute_type=None, off_topic_likely=False),
+            chunk_outcomes=(),
+        ),
+    )
     dataset = EvaluationDataset(organisation_id=organisation.id, workspace_id=workspace.id, widget_id=widget.id, name="Gate failure dataset", version="1", status="active")
     db_session.add(dataset)
     db_session.flush()
     db_session.add(EvaluationCase(
         dataset_id=dataset.id, organisation_id=organisation.id, workspace_id=workspace.id,
-        question="What is the weather on Mars?", expected_answerability="unanswerable", category="unanswerable",
+        question="What is the weather like today?", expected_answerability="unanswerable", category="unanswerable",
     ))
     db_session.commit()
     db_session.refresh(dataset)

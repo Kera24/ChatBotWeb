@@ -153,10 +153,15 @@ def test_run_evaluation_continues_after_an_individual_case_failure(db_session: S
     dataset = EvaluationDataset(organisation_id=organisation.id, workspace_id=workspace.id, widget_id=widget.id, name="Partial failure dataset", version="1", status="active")
     db_session.add(dataset)
     db_session.flush()
+    # Real, on-topic questions (not placeholder "Q1"/"Q2"/"Q3" text) so the
+    # evidence-sufficiency guardrail (app.ai.guardrails.evidence_sufficiency)
+    # finds genuine supporting evidence and does not itself introduce a
+    # fallback - this test is about engine resilience to an unexpected
+    # exception, not guardrail behaviour.
     db_session.add_all([
-        EvaluationCase(dataset_id=dataset.id, organisation_id=organisation.id, workspace_id=workspace.id, question="Q1", expected_document_ids=[document_id], expected_answerability="answerable", category="answerable_factual"),
-        EvaluationCase(dataset_id=dataset.id, organisation_id=organisation.id, workspace_id=workspace.id, question="Q2", expected_document_ids=[document_id], expected_answerability="answerable", category="answerable_factual"),
-        EvaluationCase(dataset_id=dataset.id, organisation_id=organisation.id, workspace_id=workspace.id, question="Q3", expected_document_ids=[document_id], expected_answerability="answerable", category="answerable_factual"),
+        EvaluationCase(dataset_id=dataset.id, organisation_id=organisation.id, workspace_id=workspace.id, question="When do applications close?", expected_document_ids=[document_id], expected_answerability="answerable", category="answerable_factual"),
+        EvaluationCase(dataset_id=dataset.id, organisation_id=organisation.id, workspace_id=workspace.id, question="When is the application deadline?", expected_document_ids=[document_id], expected_answerability="answerable", category="answerable_factual"),
+        EvaluationCase(dataset_id=dataset.id, organisation_id=organisation.id, workspace_id=workspace.id, question="When does the application period end?", expected_document_ids=[document_id], expected_answerability="answerable", category="answerable_factual"),
     ])
     db_session.commit()
     db_session.refresh(dataset)

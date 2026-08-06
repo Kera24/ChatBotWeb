@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass, field
+﻿from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -7,6 +7,12 @@ from app.ai.accounting import AIUsageRecord
 from app.ai.contracts import FinishReason, TokenUsage
 from app.ai.dependencies import AICoreContainer
 from app.ai.errors import AIProviderError
+from app.ai.guardrails.citation_policy import verify_citations
+from app.ai.guardrails.document_sanitizer import sanitise_evidence_content
+from app.ai.guardrails.evidence_sufficiency import verify_evidence_sufficiency
+from app.ai.guardrails.input_policy import evaluate_input_policy
+from app.ai.guardrails.output_safety import check_output_safety
+from app.ai.guardrails.reason_codes import GuardrailReasonCode
 from app.ai.model_registry import ModelConfig
 from app.ai.service import AICoreGenerateInput
 from app.core.config import settings
@@ -20,7 +26,7 @@ from app.services.conversation import (
     start_conversation,
 )
 from app.services.embeddings import EmbeddingProvider
-from app.services.retrieval_context import RetrievalCitationData, assemble_retrieval_context
+from app.services.retrieval_context import RetrievalCitationData, RetrievalContextBlockData, assemble_retrieval_context
 
 
 DEFAULT_RAG_PROMPT_KEY = "grounded_rag_answer"
@@ -137,8 +143,25 @@ class RAGOrchestrator:
             metadata_json=request.metadata,
         )
 
+        model_key = request.model_key or DEFAULT_RAG_MODEL_KEY
+        prompt_key = request.prompt_key or DEFAULT_RAG_PROMPT_KEY
+        model = self.ai_core.model_registry.get(model_key, require_enabled=True)
+
+        # Layers C+D: capability/intent boundaries and direct prompt-injection
+        # defence run BEFORE retrieval or generation - a blocked request never
+        # reaches the AI provider at all, so this is fully enforced and
+        # testable regardless of which provider is configured.
+        input_verdict = evaluate_input_policy(request.query)
+        if not input_verdict.allowed:
+            return self._persist_fallback(
+                request=request, conversation_id=conversation.id, user_message_id=user_message.id,
+                model=model, prompt_key=prompt_key,
+                content=input_verdict.safe_message or FALLBACK_ANSWER, reason_code=input_verdict.reason_code.value,
+            )
+
         retrieval_limit = request.retrieval_limit or settings.RETRIEVAL_MAX_CONTEXT_CHUNKS
         max_context_chars = request.max_context_chars or settings.RETRIEVAL_MAX_CONTEXT_CHARS
+        allowed_document_ids = self._knowledge_scope_for_request(request, assistant)
         retrieval = assemble_retrieval_context(
             self.db,
             organisation_id=request.organisation_id,
@@ -148,21 +171,50 @@ class RAGOrchestrator:
             max_context_chunks=settings.RETRIEVAL_MAX_CONTEXT_CHUNKS,
             max_context_chars=max_context_chars,
             provider=self.embedding_provider,
-            document_ids=self._knowledge_scope_for_request(request, assistant),
+            document_ids=allowed_document_ids,
             min_similarity_score=request.min_similarity_score if request.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
         )
-        context = "\n\n".join(block.context_text for block in retrieval.context_blocks)
-        model_key = request.model_key or DEFAULT_RAG_MODEL_KEY
-        prompt_key = request.prompt_key or DEFAULT_RAG_PROMPT_KEY
-        model = self.ai_core.model_registry.get(model_key, require_enabled=True)
 
         if not retrieval.context_blocks:
             return self._persist_fallback(
-                request=request,
-                conversation_id=conversation.id,
-                user_message_id=user_message.id,
-                model=model,
-                prompt_key=prompt_key,
+                request=request, conversation_id=conversation.id, user_message_id=user_message.id,
+                model=model, prompt_key=prompt_key,
+            )
+
+        # Layer F: citation enforcement (defence-in-depth assertion - see
+        # app.ai.guardrails.citation_policy's docstring for why this should
+        # never actually fire given the retrieval query's own scoping).
+        citation_verdict = verify_citations(retrieval.citations, allowed_document_ids=allowed_document_ids)
+        if not citation_verdict.passed:
+            return self._persist_fallback(
+                request=request, conversation_id=conversation.id, user_message_id=user_message.id,
+                model=model, prompt_key=prompt_key,
+                content=citation_verdict.safe_message or FALLBACK_ANSWER, reason_code=citation_verdict.reason_code.value,
+            )
+
+        # Layer E: strip injected-instruction-style text from retrieved
+        # document content before it is ever assembled into context - the
+        # generation model never sees the attempted override.
+        sanitised_blocks = [_sanitise_block(block) for block in retrieval.context_blocks]
+        context = "\n\n".join(block.context_text for block in sanitised_blocks)
+
+        # Layers A+B: does the retrieved evidence actually support the
+        # *specific* fact requested, not just the general topic (see
+        # app.ai.guardrails.evidence_sufficiency for the full multi-signal
+        # method - requested-attribute/value-type extraction, sentence-level
+        # proximity, and retrieval-confidence-based domain relevance - and
+        # its honest limitations).
+        evidence_verdict = verify_evidence_sufficiency(
+            question=request.query,
+            chunk_contents=[block.content for block in sanitised_blocks],
+            chunk_titles=[block.source_title for block in sanitised_blocks],
+            retrieval_scores=[block.score for block in sanitised_blocks],
+        )
+        if not evidence_verdict.sufficient:
+            return self._persist_fallback(
+                request=request, conversation_id=conversation.id, user_message_id=user_message.id,
+                model=model, prompt_key=prompt_key,
+                content=evidence_verdict.safe_message or FALLBACK_ANSWER, reason_code=evidence_verdict.reason_code.value,
             )
 
         execution_id = self.ai_core.accounting_service.create_execution_id()
@@ -213,13 +265,20 @@ class RAGOrchestrator:
 
         record = self._find_usage_record(execution_id)
         estimated_cost = record.total_estimated_cost if record else Decimal("0")
+
+        # Layers G+H: never persist or return raw generated text without a
+        # post-generation check - markup is always neutralised, and any
+        # secret/prompt-leakage pattern is replaced with a safe refusal
+        # rather than partially redacted (see output_safety's docstring).
+        output_verdict = check_output_safety(ai_response.text)
+        final_answer_state = "answered" if output_verdict.safe else "fallback"
         assistant_message = append_assistant_message(
             self.db,
             organisation_id=request.organisation_id,
             workspace_id=request.workspace_id,
             conversation_id=conversation.id,
-            content=ai_response.text,
-            answer_state="answered",
+            content=output_verdict.sanitised_text,
+            answer_state=final_answer_state,
             model_key=ai_response.model_key,
             provider_key=ai_response.provider_key,
             provider_model_name=ai_response.provider_model_name,
@@ -234,6 +293,7 @@ class RAGOrchestrator:
             latency_ms=ai_response.latency_ms,
             finish_reason=ai_response.finish_reason.value,
             metadata_json={
+                "guardrail_reason_code": output_verdict.reason_code.value,
                 "prompt_version": ai_response.prompt_version,
                 "provider_metadata": ai_response.provider_metadata.model_dump(mode="json"),
                 "ai_response_metadata": ai_response.metadata,
@@ -244,7 +304,10 @@ class RAGOrchestrator:
                 },
             },
         )
-        citation_payloads = [_citation_payload(citation, block.content) for citation, block in zip(retrieval.citations, retrieval.context_blocks, strict=True)]
+        if output_verdict.safe:
+            citation_payloads = [_citation_payload(citation, block.content) for citation, block in zip(retrieval.citations, sanitised_blocks, strict=True)]
+        else:
+            citation_payloads = []
         persisted_citations = attach_citations_to_assistant_message(
             self.db,
             organisation_id=request.organisation_id,
@@ -257,8 +320,8 @@ class RAGOrchestrator:
             conversation_id=conversation.id,
             user_message_id=user_message.id,
             assistant_message_id=assistant_message.id,
-            answer=ai_response.text,
-            answer_state="answered",
+            answer=output_verdict.sanitised_text,
+            answer_state=final_answer_state,
             citations=[
                 RAGCitationResult(
                     citation_index=citation.citation_index,
@@ -286,8 +349,8 @@ class RAGOrchestrator:
             estimated_cost=estimated_cost,
             latency_ms=ai_response.latency_ms,
             finish_reason=ai_response.finish_reason,
-            fallback_used=False,
-            metadata={"total_context_chars": retrieval.total_context_chars},
+            fallback_used=not output_verdict.safe,
+            metadata={"total_context_chars": retrieval.total_context_chars, "guardrail_reason_code": output_verdict.reason_code.value},
         )
 
     def _validate_workspace(self, request: RAGOrchestrationRequest) -> None:
@@ -345,6 +408,9 @@ class RAGOrchestrator:
         user_message_id: str,
         model: ModelConfig,
         prompt_key: str,
+        content: str = FALLBACK_ANSWER,
+        reason_code: str = GuardrailReasonCode.RETRIEVAL_EMPTY.value,
+        answer_state: str = "fallback",
     ) -> RAGOrchestrationResult:
         prompt_version = self.ai_core.prompt_registry.resolve_active(prompt_key)
         execution_id = self.ai_core.accounting_service.create_execution_id()
@@ -353,8 +419,8 @@ class RAGOrchestrator:
             organisation_id=request.organisation_id,
             workspace_id=request.workspace_id,
             conversation_id=conversation_id,
-            content=FALLBACK_ANSWER,
-            answer_state="fallback",
+            content=content,
+            answer_state=answer_state,
             model_key=model.model_key,
             provider_key=model.provider_key,
             provider_model_name=model.provider_model_name,
@@ -368,14 +434,17 @@ class RAGOrchestrator:
             estimated_cost=Decimal("0"),
             latency_ms=0,
             finish_reason=FinishReason.STOP.value,
-            metadata_json={"fallback_reason": "retrieval_empty", "prompt_version": prompt_version.version},
+            # `guardrail_reason_code` is metadata only, never a new answer_state
+            # value - see app.ai.guardrails.reason_codes for why this keeps API
+            # schema and dashboard rendering compatibility intact.
+            metadata_json={"guardrail_reason_code": reason_code, "prompt_version": prompt_version.version},
         )
         return RAGOrchestrationResult(
             conversation_id=conversation_id,
             user_message_id=user_message_id,
             assistant_message_id=assistant_message.id,
-            answer=FALLBACK_ANSWER,
-            answer_state="fallback",
+            answer=content,
+            answer_state=answer_state,
             citations=[],
             retrieved_chunk_count=0,
             provider_key=model.provider_key,
@@ -390,7 +459,7 @@ class RAGOrchestrator:
             latency_ms=0,
             finish_reason=FinishReason.STOP,
             fallback_used=True,
-            metadata={"fallback_reason": "retrieval_empty"},
+            metadata={"guardrail_reason_code": reason_code},
         )
 
     def _find_usage_record(self, execution_id: str) -> AIUsageRecord | None:
@@ -398,6 +467,17 @@ class RAGOrchestrator:
             if record.execution_id == execution_id:
                 return record
         return None
+
+
+def _sanitise_block(block: RetrievalContextBlockData) -> RetrievalContextBlockData:
+    """Layer E: applies document_sanitizer's injected-instruction stripping
+    to one retrieved chunk, preserving the citation prefix (`[n] Title | ...`)
+    unchanged - only the underlying document content is ever modified."""
+    sanitised = sanitise_evidence_content(block.content)
+    if not sanitised.was_modified:
+        return block
+    prefix = block.context_text[: len(block.context_text) - len(block.content)]
+    return replace(block, content=sanitised.content, context_text=prefix + sanitised.content)
 
 
 def _citation_payload(citation: RetrievalCitationData, quoted_text: str) -> dict:
