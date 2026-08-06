@@ -1,0 +1,148 @@
+{
+  "run_id": "e77db79e-9b34-477c-8c65-b61a76d1e857",
+  "graded_result_count": 83,
+  "disclaimer": "All scores below are model-generated estimates from an LLM grader, not objective truth. Advisory only - see Grader_Architecture.md for the advisory/gating policy.",
+  "dimensions": {
+    "relevance": {
+      "dimension": "relevance",
+      "graded_count": 40,
+      "error_count": 0,
+      "average_score": 0.0,
+      "pass_rate": 0.0,
+      "score_distribution": {
+        "0.0-0.2": 40,
+        "0.2-0.4": 0,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 0
+      }
+    },
+    "groundedness": {
+      "dimension": "groundedness",
+      "graded_count": 40,
+      "error_count": 0,
+      "average_score": 0.09452499999999997,
+      "pass_rate": 0.0,
+      "score_distribution": {
+        "0.0-0.2": 38,
+        "0.2-0.4": 2,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 0
+      }
+    },
+    "faithfulness": {
+      "dimension": "faithfulness",
+      "graded_count": 40,
+      "error_count": 0,
+      "average_score": 0.09452499999999997,
+      "pass_rate": 0.0,
+      "score_distribution": {
+        "0.0-0.2": 38,
+        "0.2-0.4": 2,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 0
+      }
+    },
+    "completeness": {
+      "dimension": "completeness",
+      "graded_count": 40,
+      "error_count": 0,
+      "average_score": 0.005875000000000003,
+      "pass_rate": 0.0,
+      "score_distribution": {
+        "0.0-0.2": 40,
+        "0.2-0.4": 0,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 0
+      }
+    },
+    "citation_support": {
+      "dimension": "citation_support",
+      "graded_count": 40,
+      "error_count": 0,
+      "average_score": 0.09452499999999997,
+      "pass_rate": 0.0,
+      "score_distribution": {
+        "0.0-0.2": 38,
+        "0.2-0.4": 2,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 0
+      }
+    },
+    "clarity": {
+      "dimension": "clarity",
+      "graded_count": 40,
+      "error_count": 0,
+      "average_score": 0.8999999999999992,
+      "pass_rate": 1.0,
+      "score_distribution": {
+        "0.0-0.2": 0,
+        "0.2-0.4": 0,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 40
+      }
+    },
+    "directness": {
+      "dimension": "directness",
+      "graded_count": 40,
+      "error_count": 0,
+      "average_score": 0.8999999999999992,
+      "pass_rate": 1.0,
+      "score_distribution": {
+        "0.0-0.2": 0,
+        "0.2-0.4": 0,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 40
+      }
+    },
+    "fallback_appropriateness": {
+      "dimension": "fallback_appropriateness",
+      "graded_count": 33,
+      "error_count": 0,
+      "average_score": 0.8999999999999995,
+      "pass_rate": 1.0,
+      "score_distribution": {
+        "0.0-0.2": 0,
+        "0.2-0.4": 0,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 33
+      }
+    },
+    "clarification_quality": {
+      "dimension": "clarification_quality",
+      "graded_count": 4,
+      "error_count": 0,
+      "average_score": 0.3,
+      "pass_rate": 0.0,
+      "score_distribution": {
+        "0.0-0.2": 0,
+        "0.2-0.4": 4,
+        "0.4-0.6": 0,
+        "0.6-0.8": 0,
+        "0.8-1.0": 0
+      }
+    }
+  },
+  "low_confidence_cases": [],
+  "deterministic_vs_grader_disagreement": [],
+  "run_stats": {
+    "total_calls": 951,
+    "cache_hits": 0,
+    "cache_misses": 0,
+    "total_latency_ms": 125.0,
+    "errors": 0,
+    "graded_cases": 83
+  },
+  "cache_stats": {
+    "hits": 0,
+    "misses": 0,
+    "entries": 0
+  }
+}

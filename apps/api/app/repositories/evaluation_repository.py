@@ -239,3 +239,11 @@ def list_results_for_run(db: Session, *, run_id: str, only_failed: bool = False)
 def get_result_for_case(db: Session, *, run_id: str, case_id: str) -> EvaluationResult | None:
     statement = select(EvaluationResult).where(EvaluationResult.run_id == run_id, EvaluationResult.case_id == case_id)
     return db.execute(statement).scalar_one_or_none()
+
+
+def update_result(db: Session, *, result: EvaluationResult, updates: dict) -> EvaluationResult:
+    for field, value in updates.items():
+        setattr(result, field, value)
+    db.commit()
+    db.refresh(result)
+    return result

@@ -1,0 +1,116 @@
+{
+  "calibration_set_version": "v1",
+  "notes": "Synthetic examples only, built from the same fictional Northwind Cloud Storage corpus used by golden_dataset.json - no customer data. Each example was hand-labelled by a human reviewer for one primary rubric dimension (app.evaluation.graders.rubrics).",
+  "examples": [
+    {
+      "id": "excellent_answer",
+      "question": "How much does the Team plan cost per month?",
+      "answer": "The Team plan costs $29 per month and includes 1TB of storage for up to 10 members. [1]",
+      "answer_state": "answered",
+      "category": "answerable_factual",
+      "evidence": [{"evidence_id": "1", "document_title": "Pricing Plans", "content": "Team costs $29 per month and includes 1TB of storage for up to 10 members."}],
+      "rubric_dimension": "groundedness",
+      "human_label": {"score_band": [0.9, 1.0], "passed": true},
+      "reviewer_notes": "Every number in the answer is stated verbatim in the cited evidence. Textbook example."
+    },
+    {
+      "id": "partially_complete_answer",
+      "question": "How much does the Team plan cost and how much storage does it include?",
+      "answer": "The Team plan costs $29 per month. [1]",
+      "answer_state": "answered",
+      "category": "answerable_factual",
+      "evidence": [{"evidence_id": "1", "document_title": "Pricing Plans", "content": "Team costs $29 per month and includes 1TB of storage for up to 10 members."}],
+      "rubric_dimension": "completeness",
+      "human_label": {"score_band": [0.3, 0.5], "passed": false},
+      "reviewer_notes": "The evidence contains the storage figure but the answer omits it despite the question asking for both facts."
+    },
+    {
+      "id": "unsupported_answer",
+      "question": "What is the refund policy for annual subscriptions?",
+      "answer": "Annual subscribers receive a 30-day money-back guarantee. [1]",
+      "answer_state": "answered",
+      "category": "similar_but_absent",
+      "evidence": [{"evidence_id": "1", "document_title": "Refund Policy for Monthly Subscriptions", "content": "Monthly subscription customers are covered by a 14-day money-back guarantee starting from the date of purchase."}],
+      "rubric_dimension": "groundedness",
+      "human_label": {"score_band": [0.0, 0.15], "passed": false},
+      "reviewer_notes": "The evidence is about monthly subscriptions and states 14 days, not 30 - the answer both extends beyond the evidence and states a figure the evidence never gives. Clear hallucination."
+    },
+    {
+      "id": "correct_fallback",
+      "question": "What is the refund policy for annual subscriptions?",
+      "answer": "The available knowledge base doesn't contain that specific detail. I found related information, but not the exact fact you asked about.",
+      "answer_state": "fallback",
+      "category": "similar_but_absent",
+      "evidence": [{"evidence_id": "1", "document_title": "Refund Policy for Monthly Subscriptions", "content": "Monthly subscription customers are covered by a 14-day money-back guarantee starting from the date of purchase."}],
+      "rubric_dimension": "fallback_appropriateness",
+      "human_label": {"score_band": [0.85, 1.0], "passed": true},
+      "reviewer_notes": "States the limitation plainly, invents nothing, no guessed value."
+    },
+    {
+      "id": "unnecessary_fallback",
+      "question": "How much does the Team plan cost per month?",
+      "answer": "The available knowledge base doesn't contain that specific detail.",
+      "answer_state": "fallback",
+      "category": "answerable_factual",
+      "evidence": [{"evidence_id": "1", "document_title": "Pricing Plans", "content": "Team costs $29 per month and includes 1TB of storage for up to 10 members."}],
+      "rubric_dimension": "fallback_appropriateness",
+      "human_label": {"score_band": [0.0, 0.2], "passed": false},
+      "reviewer_notes": "The evidence clearly answers the question - this fallback is unnecessary and a quality regression, not a safety win. (Note: fallback_appropriateness rubric assumes the fallback decision itself was already made; whether the fallback should have happened at all is a retrieval/evidence-sufficiency question, not this dimension's job - flagged here for the calibration reviewer's own awareness.)"
+    },
+    {
+      "id": "good_clarification",
+      "question": "How much storage do I get?",
+      "answer": "That depends on your plan - Starter, Team, Business, and Enterprise each include different storage allowances. Which plan are you on?",
+      "answer_state": "answered",
+      "category": "ambiguous",
+      "evidence": [{"evidence_id": "1", "document_title": "Pricing Plans", "content": "Northwind Cloud Storage offers four plans. Starter costs $9 per month and includes 100GB of storage. Team costs $29 per month and includes 1TB of storage."}],
+      "rubric_dimension": "clarification_quality",
+      "human_label": {"score_band": [0.75, 1.0], "passed": true},
+      "reviewer_notes": "Names the specific missing detail (which tier) rather than a generic 'please clarify'."
+    },
+    {
+      "id": "poor_clarification",
+      "question": "How much storage do I get?",
+      "answer": "Could you please provide more context so I can help you?",
+      "answer_state": "answered",
+      "category": "ambiguous",
+      "evidence": [{"evidence_id": "1", "document_title": "Pricing Plans", "content": "Northwind Cloud Storage offers four plans. Starter costs $9 per month and includes 100GB of storage."}],
+      "rubric_dimension": "clarification_quality",
+      "human_label": {"score_band": [0.0, 0.25], "passed": false},
+      "reviewer_notes": "Generic, does not name the actual missing detail (plan tier) even though the evidence makes it obvious what's needed."
+    },
+    {
+      "id": "valid_citation_support",
+      "question": "What encryption is used for data in transit?",
+      "answer": "Data in transit between clients and Northwind servers is encrypted using TLS 1.3. [1]",
+      "answer_state": "answered",
+      "category": "answerable_factual",
+      "evidence": [{"evidence_id": "1", "document_title": "Security and Encryption", "content": "All customer data is encrypted at rest using AES-256 encryption. Data in transit between clients and Northwind servers is encrypted using TLS 1.3."}],
+      "rubric_dimension": "citation_support",
+      "human_label": {"score_band": [0.9, 1.0], "passed": true},
+      "reviewer_notes": "The cited chunk contains the exact claim being made."
+    },
+    {
+      "id": "citation_present_but_unsupported",
+      "question": "What is Northwind's SLA response time guarantee for Starter tier support tickets?",
+      "answer": "Starter tier support tickets have a guaranteed 4-hour response time. [1]",
+      "answer_state": "answered",
+      "category": "similar_but_absent",
+      "evidence": [{"evidence_id": "1", "document_title": "Support Policy", "content": "Standard customer support is available from 9am to 6pm Eastern Time, Monday through Friday, for all subscription tiers. Typical first-response time is under four hours during business hours."}],
+      "rubric_dimension": "citation_support",
+      "human_label": {"score_band": [0.1, 0.3], "passed": false},
+      "reviewer_notes": "The cited chunk gives a general, tier-agnostic 'typical' response time, not a Starter-specific guarantee - the citation is attached but does not actually support the specific claim made (a tier-specific SLA guarantee)."
+    },
+    {
+      "id": "concise_vs_verbose",
+      "question": "How much does the Team plan cost per month?",
+      "answer": "That's a wonderful question, and I'm happy to help! Northwind Cloud Storage offers a range of plans designed to meet different needs. Speaking specifically to the Team plan, which is a popular choice among growing teams, the monthly cost comes to $29, and I hope that information is helpful to you today!",
+      "answer_state": "answered",
+      "category": "answerable_factual",
+      "evidence": [{"evidence_id": "1", "document_title": "Pricing Plans", "content": "Team costs $29 per month and includes 1TB of storage for up to 10 members."}],
+      "rubric_dimension": "directness",
+      "human_label": {"score_band": [0.05, 0.25], "passed": false},
+      "reviewer_notes": "Correct and grounded, but buried in filler - the answer is 5x longer than necessary for a single-fact lookup."
+    }
+  ]
+}

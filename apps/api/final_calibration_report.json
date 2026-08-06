@@ -1,0 +1,130 @@
+{
+  "total_examples": 10,
+  "calibration_gating_threshold": 0.8,
+  "dimensions": {
+    "groundedness": {
+      "agreement_rate": 1.0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "score_bias": 0.2105,
+      "meets_gating_threshold": true,
+      "examples": [
+        {
+          "id": "excellent_answer",
+          "human_passed": true,
+          "grader_passed": true,
+          "agrees": true,
+          "error": null
+        },
+        {
+          "id": "unsupported_answer",
+          "human_passed": false,
+          "grader_passed": false,
+          "agrees": true,
+          "error": null
+        }
+      ]
+    },
+    "completeness": {
+      "agreement_rate": 1.0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "score_bias": 0.043999999999999984,
+      "meets_gating_threshold": true,
+      "examples": [
+        {
+          "id": "partially_complete_answer",
+          "human_passed": false,
+          "grader_passed": false,
+          "agrees": true,
+          "error": null
+        }
+      ]
+    },
+    "fallback_appropriateness": {
+      "agreement_rate": 0.5,
+      "false_positives": 1,
+      "false_negatives": 0,
+      "score_bias": 0.3875,
+      "meets_gating_threshold": false,
+      "examples": [
+        {
+          "id": "correct_fallback",
+          "human_passed": true,
+          "grader_passed": true,
+          "agrees": true,
+          "error": null
+        },
+        {
+          "id": "unnecessary_fallback",
+          "human_passed": false,
+          "grader_passed": true,
+          "agrees": false,
+          "error": null
+        }
+      ]
+    },
+    "clarification_quality": {
+      "agreement_rate": 0.5,
+      "false_positives": 1,
+      "false_negatives": 0,
+      "score_bias": 0.30000000000000004,
+      "meets_gating_threshold": false,
+      "examples": [
+        {
+          "id": "good_clarification",
+          "human_passed": true,
+          "grader_passed": true,
+          "agrees": true,
+          "error": null
+        },
+        {
+          "id": "poor_clarification",
+          "human_passed": false,
+          "grader_passed": true,
+          "agrees": false,
+          "error": null
+        }
+      ]
+    },
+    "citation_support": {
+      "agreement_rate": 1.0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "score_bias": 0.09150000000000003,
+      "meets_gating_threshold": true,
+      "examples": [
+        {
+          "id": "valid_citation_support",
+          "human_passed": true,
+          "grader_passed": true,
+          "agrees": true,
+          "error": null
+        },
+        {
+          "id": "citation_present_but_unsupported",
+          "human_passed": false,
+          "grader_passed": false,
+          "agrees": true,
+          "error": null
+        }
+      ]
+    },
+    "directness": {
+      "agreement_rate": 1.0,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "score_bias": 0.15,
+      "meets_gating_threshold": true,
+      "examples": [
+        {
+          "id": "concise_vs_verbose",
+          "human_passed": false,
+          "grader_passed": false,
+          "agrees": true,
+          "error": null
+        }
+      ]
+    }
+  }
+}
