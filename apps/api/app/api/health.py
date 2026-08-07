@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import text
 
 from app.api.deps import DbSession
@@ -15,8 +15,21 @@ def live() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def check_redis() -> str:
+    """Ping Redis for visibility only; overridden in tests via dependency_overrides."""
+    try:
+        import redis as redis_module
+
+        client = redis_module.Redis.from_url(
+            settings.REDIS_URL, socket_timeout=1.5, socket_connect_timeout=1.5
+        )
+        return "ok" if client.ping() else "failed"
+    except Exception:
+        return "failed"
+
+
 @router.get("/health/ready")
-def ready(response: Response, db: DbSession) -> dict:
+def ready(response: Response, db: DbSession, redis_status: str = Depends(check_redis)) -> dict:
     checks: dict[str, str] = {}
     ready_status = "ready"
     try:
@@ -35,6 +48,13 @@ def ready(response: Response, db: DbSession) -> dict:
     except Exception:
         checks["retrieval"] = "failed"
         ready_status = "not_ready"
+    # Redis backs public-widget rate limiting and idempotency. It is reported
+    # as a visible check but does not flip overall readiness to not_ready:
+    # core chat/RAG functionality keeps working without Redis, only rate
+    # limiting degrades (see docs/06_Operations/Monitoring_Runbook.md) - an
+    # orchestrator should not kill/restart the app over this alone, but a
+    # human/alert should still see it.
+    checks["redis"] = redis_status
     checks["public_widget"] = "ok"
     if ready_status != "ready":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

@@ -1,0 +1,223 @@
+# Production Docker Compose for a single Linux VPS.
+#
+# Differences from docker-compose.yml (local development):
+#   - no source bind mounts; images are built from committed Dockerfiles only
+#   - Postgres/Redis are not published to the host, only reachable on the
+#     internal network
+#   - a one-shot "migrate" job runs Alembic to head before the API starts
+#   - Caddy terminates HTTPS and is the only service publishing host ports
+#   - resource limits, log rotation, and healthcheck-gated startup ordering
+#
+# Usage:
+#   cp .env.production.example .env.production   # fill in real secrets, do not commit
+#   docker compose -f docker-compose.prod.yml --env-file .env.production build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# All service env vars are read from --env-file; nothing is hardcoded here.
+#
+# IMPORTANT: this file sets an explicit Compose project `name` and does not
+# set `container_name` on any service, specifically so it can never collide
+# with containers/volumes/networks from the local-development
+# docker-compose.yml (which has no explicit project name and defaults to the
+# working-directory name). Do not add `container_name:` overrides here or add
+# a `name:` matching another compose project on the same host - Docker
+# container names are global to the daemon, not scoped per project, so a
+# collision silently stops/recreates someone else's container.
+
+name: chatbotweb-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+networks:
+  internal:
+    driver: bridge
+  edge:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+  backups_data:
+  widget_assets:
+  caddy_data:
+  caddy_config:
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384m
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: "no"
+    logging: *default-logging
+    command: ["python", "-m", "app.operations.database_migration", "upgrade"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      APP_ENV: production
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*", "--log-level", "${LOG_LEVEL:-info}"]
+    env_file:
+      - .env.production
+    environment:
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    volumes:
+      - uploads_data:/app/apps/api/local_uploads
+      - backups_data:/backups
+    networks:
+      - internal
+      - edge
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health/live', timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1g
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    networks:
+      - edge
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768m
+
+  widget-assets:
+    build:
+      context: .
+      dockerfile: deployment/widget/Dockerfile
+      args:
+        WIDGET_RELEASE_ENVIRONMENT: ${WIDGET_RELEASE_ENVIRONMENT:-production}
+        WIDGET_RELEASE_CHANNEL: ${WIDGET_RELEASE_CHANNEL:-stable}
+        WIDGET_PUBLIC_ORIGIN: ${WIDGET_PUBLIC_ORIGIN}
+        WIDGET_PUBLIC_API_ORIGIN: ${WIDGET_PUBLIC_API_ORIGIN}
+        WIDGET_SDK_PUBLIC_ORIGIN: ${WIDGET_SDK_PUBLIC_ORIGIN}
+    restart: "no"
+    logging: *default-logging
+    volumes:
+      - widget_assets:/out
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      WIDGET_DOMAIN: ${WIDGET_DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL}
+    volumes:
+      - ./deployment/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - widget_assets:/srv/widget:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - edge
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      widget-assets:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m

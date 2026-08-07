@@ -1,0 +1,156 @@
+# Production reverse proxy for a single-VPS Conversa deployment.
+#
+# Domains are environment-driven (set WEB_DOMAIN / API_DOMAIN / WIDGET_DOMAIN /
+# TLS_EMAIL in .env.production) - no real domain is hardcoded here. Caddy
+# obtains and renews Let's Encrypt certificates automatically for whatever
+# domains are configured; ensure DNS A/AAAA records point at this VPS before
+# starting the stack, or certificate issuance will fail.
+#
+# WIDGET_DOMAIN may equal API_DOMAIN with a distinct path prefix instead of a
+# separate domain - see docs/06_Operations/Domain_and_HTTPS_Guide.md for both
+# options.
+
+{
+	email {$TLS_EMAIL}
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# ---------------------------------------------------------------------------
+# Web application (Next.js)
+# ---------------------------------------------------------------------------
+{$WEB_DOMAIN} {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+
+	request_body {
+		max_size 5MB
+	}
+
+	reverse_proxy web:3000 {
+		flush_interval -1
+		transport http {
+			read_timeout 120s
+			write_timeout 120s
+			dial_timeout 5s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# ---------------------------------------------------------------------------
+# API (FastAPI / uvicorn)
+# ---------------------------------------------------------------------------
+{$API_DOMAIN} {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Document uploads and chat payloads; app-level MAX_UPLOAD_BYTES /
+	# PUBLIC_MESSAGE_MAX_BYTES enforce the real per-feature limits, this is
+	# only a coarse edge backstop against oversized requests.
+	request_body {
+		max_size 15MB
+	}
+
+	# Long timeouts and immediate flushing for streaming/SSE-style AI
+	# responses and slower generation-provider round-trips.
+	reverse_proxy api:8000 {
+		flush_interval -1
+		transport http {
+			read_timeout 180s
+			write_timeout 180s
+			dial_timeout 5s
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# ---------------------------------------------------------------------------
+# Public widget static assets (SDK loader + iframe bundle)
+#
+# Served from the widget_assets volume populated by the widget-assets
+# one-shot build service, using the same layout produced by
+# `npm run widget:release:build` and documented in
+# deployment/widget/headers.json.
+# ---------------------------------------------------------------------------
+{$WIDGET_DOMAIN} {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Cross-Origin-Resource-Policy "cross-origin"
+		-Server
+	}
+
+	root * /srv/widget
+
+	# Immutable, semver-pinned SDK loader.
+	@sdk_immutable path_regexp sdk ^/widget-sdk/v\d+\.\d+\.\d+([^/]*)?/loader\.js$
+	handle @sdk_immutable {
+		header Cache-Control "public, max-age=31536000, immutable"
+		header Content-Type "application/javascript; charset=utf-8"
+		rewrite * /sdk/{re.sdk.1}loader.js
+		file_server
+	}
+
+	# Mutable major-version alias, short cache with revalidation.
+	@sdk_alias path_regexp alias ^/widget-sdk/v(\d+)/loader\.js$
+	handle @sdk_alias {
+		header Cache-Control "public, max-age=300, must-revalidate"
+		header Content-Type "application/javascript; charset=utf-8"
+		rewrite * /sdk/v{re.alias.1}/loader.js
+		file_server
+	}
+
+	# Iframe HTML shell - never cached.
+	handle /embed/index.html {
+		header Cache-Control "no-cache"
+		header Content-Type "text/html; charset=utf-8"
+		header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; connect-src https:; img-src https: data:; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; frame-ancestors https:; upgrade-insecure-requests"
+		header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=()"
+		rewrite * /widget/index.html
+		file_server
+	}
+
+	# Content-hashed iframe assets - immutable.
+	handle_path /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		root * /srv/widget/widget/assets
+		file_server
+	}
+
+	handle {
+		respond 404
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

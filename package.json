@@ -74,6 +74,10 @@
     "azure:staging:alerts": "node scripts/azure-alert-validate.mjs",
     "azure:staging:rollback-drill": "node scripts/azure-rollback-drill.mjs",
     "azure:staging:seed-synthetic-widgets": "cd apps/api && python -m app.operations.staging_synthetic_widgets",
-    "azure:staging:seed-synthetic-widgets:job": "node scripts/azure-run-staging-synthetic-widgets.mjs"
+    "azure:staging:seed-synthetic-widgets:job": "node scripts/azure-run-staging-synthetic-widgets.mjs",
+    "vps:release:gate": "node scripts/release-gate.mjs",
+    "vps:smoke": "node scripts/vps-smoke.mjs",
+    "vps:backup": "bash deployment/backup/backup.sh",
+    "vps:restore": "bash deployment/backup/restore.sh"
   }
 }

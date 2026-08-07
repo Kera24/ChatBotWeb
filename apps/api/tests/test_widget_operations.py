@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 from app.access.observability.events import InMemoryAccessEventSink
 from app.access.rate_limit.redis_store import InMemoryRateLimitStore
 from app.api.deps import get_db
+from app.api.health import check_redis
 from app.db.base import Base
 from app.main import create_app
 from app.operations.alerts import validate_alert_policy
@@ -43,6 +44,7 @@ def operational_client() -> TestClient:
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[check_redis] = lambda: "ok"
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -57,7 +59,7 @@ def test_liveness_and_readiness_are_safe_and_dependency_bounded(operational_clie
     assert live.json() == {"status": "ok"}
     assert ready.status_code == 200
     assert ready.json()["status"] == "ready"
-    assert ready.json()["checks"] == {"database": "ok", "retrieval": "ok", "public_widget": "ok"}
+    assert ready.json()["checks"] == {"database": "ok", "retrieval": "ok", "redis": "ok", "public_widget": "ok"}
     assert "DATABASE_URL" not in ready.text
     assert "mock-grounded-answer" not in ready.text
 
@@ -73,6 +75,7 @@ def test_readiness_fails_closed_when_database_check_fails() -> None:
         yield BrokenDb()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[check_redis] = lambda: "ok"
     client = TestClient(app)
     response = client.get("/health/ready")
 
@@ -80,6 +83,16 @@ def test_readiness_fails_closed_when_database_check_fails() -> None:
     assert response.json()["status"] == "not_ready"
     assert response.json()["checks"]["database"] == "failed"
     assert "db unavailable" not in response.text
+
+
+def test_readiness_reports_redis_failure_visibly_without_failing_closed(operational_client: TestClient) -> None:
+    operational_client.app.dependency_overrides[check_redis] = lambda: "failed"
+
+    response = operational_client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+    assert response.json()["checks"]["redis"] == "failed"
 
 
 def test_correlation_id_validation_replaces_invalid_values() -> None:

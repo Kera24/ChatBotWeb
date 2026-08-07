@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Python
 __pycache__/
@@ -47,5 +48,11 @@ artifacts/azure-deployment/
 artifacts/azure-static-publish-test*/
 artifacts/test-azure-release-tools/
 artifacts/azure-staging-validation/
+artifacts/release-gate/
+artifacts/vps-deployment/
 
 infrastructure/azure/environments/*.generated.bicepparam
+
+# VPS backup/restore drill output (local only, never committed)
+backups/
+backups-drill/
