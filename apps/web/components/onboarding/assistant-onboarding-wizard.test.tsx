@@ -167,7 +167,7 @@ const embed = {
   protocol_major: 1,
   api_version: "v1",
   sri: null,
-  snippet: '<script async src="https://cdn.example.com/widget-sdk/v1/loader.js" data-widget-key="wpk_live_123"></script>',
+  snippet: '<script async src="https://embed.conversa-widgets.io/widget-sdk/v1/loader.js" data-widget-key="wpk_live_123" integrity="sha384-real-sri-hash" crossorigin="anonymous"></script>',
   allowed_origins: [],
   active_published_revision_id: "published-1",
   active_revision_number: 2,
@@ -178,7 +178,6 @@ const embed = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
   vi.mocked(widgetApi.createWidget).mockResolvedValue({ success: true, data: widget });
   vi.mocked(documentApi.uploadDocument).mockResolvedValue({ success: true, data: uploadResult });
   vi.mocked(documentApi.extractDocumentVersion).mockResolvedValue({ success: true, data: uploadResult.document_version, meta: { success: true } });
@@ -233,6 +232,8 @@ describe("assistant onboarding wizard", () => {
 
   it("uploads, trains, indexes selected knowledge, tests chat, publishes, and completes onboarding", async () => {
     const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<AssistantOnboardingWizard session={session} />);
 
     await advanceToKnowledge(user);
@@ -253,10 +254,22 @@ describe("assistant onboarding wizard", () => {
     expect(screen.getByText("[1] handbook.txt")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getByText("Create the assistant to generate embed code.")).toBeTruthy();
+    expect(screen.queryByText(/cdn\.example\.com/)).toBeNull();
+    expect(screen.getByRole("button", { name: /copy/i })).toBeDisabled();
+
     await user.click(screen.getByRole("button", { name: "Publish assistant" }));
     await waitFor(() => expect(widgetApi.publishWidget).toHaveBeenCalledWith(session, "widget-1", { draft_revision_id: "draft-1", expected_concurrency_version: 2 }));
     expect(await screen.findByText("Published successfully")).toBeTruthy();
-    expect(screen.getByText(/data-widget-key/)).toBeTruthy();
+
+    expect(screen.getByText(embed.snippet)).toBeTruthy();
+    expect(screen.queryByText(/cdn\.example\.com/)).toBeNull();
+    expect(screen.queryByText("Create the assistant to generate embed code.")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /copy/i }));
+    expect(writeText).toHaveBeenCalledWith(embed.snippet);
+
     await user.click(screen.getByRole("button", { name: "Finish onboarding" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
   });
