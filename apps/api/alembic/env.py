@@ -17,7 +17,12 @@ if config.get_main_option("sqlalchemy.url") in {None, "", "sqlite:///./local.db"
     config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: Alembic runs embedded in-process here
+    # (tests invoke app.db.alembic_compat / alembic.command directly, not a
+    # separate CLI process), and fileConfig's default of True permanently
+    # disables every logger that already existed at call time process-wide -
+    # including the app's own loggers - for the remainder of the process.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 install_wide_alembic_version_table()

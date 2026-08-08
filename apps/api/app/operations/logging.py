@@ -62,5 +62,5 @@ def redact(value: Any) -> Any:
     return value
 
 
-def log_operational_event(logger: logging.Logger, event: Mapping[str, Any]) -> None:
-    logger.info(json.dumps(redact(dict(event)), sort_keys=True, separators=(",", ":")))
+def log_operational_event(logger: logging.Logger, event: Mapping[str, Any], *, level: int = logging.INFO) -> None:
+    logger.log(level, json.dumps(redact(dict(event)), sort_keys=True, separators=(",", ":")))
