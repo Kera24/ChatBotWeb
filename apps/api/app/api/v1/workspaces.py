@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
 from app.ai.dependencies import AICoreContainer, get_ai_core
@@ -27,6 +27,8 @@ from app.ai.rag_orchestrator import (
     RAGProviderExecutionError,
     RAGTenantContextError,
 )
+from app.observability.context import AITraceContext, new_trace_id
+from app.observability.dependencies import build_ai_trace_recorder
 from app.repositories.workspace_repository import get_workspace_for_organisation
 from app.schemas.common import success_response
 from app.schemas.prompt import RetrievalPromptRequest, RetrievalPromptResponse
@@ -64,6 +66,7 @@ def answer_workspace_rag_question(
     db: DbSession,
     _current_user: WorkspaceViewerDependency,
     ai_core: AICoreDependency,
+    http_request: Request,
     organisation_id: str = Query(
         ...,
         description=(
@@ -83,11 +86,16 @@ def answer_workspace_rag_question(
             model_name=settings.EMBEDDING_MODEL,
             dimension=settings.EMBEDDING_DIMENSION,
         )
+        trace_context = AITraceContext(
+            trace_id=getattr(http_request.state, "trace_id", None) or new_trace_id(),
+            request_id=getattr(http_request.state, "request_id", None),
+        )
         result = RAGOrchestrator(
             RAGOrchestratorDependencies(
                 db=db,
                 ai_core=ai_core,
                 embedding_provider=provider,
+                trace_recorder=build_ai_trace_recorder(db),
             )
         ).answer(
             RAGOrchestrationRequest(
@@ -102,6 +110,7 @@ def answer_workspace_rag_question(
                 max_context_chars=payload.max_context_chars,
                 channel="dashboard_test",
                 metadata=payload.metadata,
+                trace_context=trace_context,
             )
         )
     except RAGTenantContextError as exc:
@@ -148,6 +157,7 @@ def answer_workspace_rag_question(
         latency_ms=result.latency_ms,
         finish_reason=result.finish_reason,
         fallback_used=result.fallback_used,
+        trace_id=result.trace_id,
     )
     return success_response(response_data.model_dump(mode="json"))
 

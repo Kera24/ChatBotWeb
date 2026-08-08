@@ -31,6 +31,9 @@ from app.ai.rag_orchestrator import (
 from app.core.config import settings
 from app.db.models import EvaluationCase, EvaluationDataset, EvaluationRun
 from app.evaluation.categories import ISOLATION_CATEGORIES
+from app.observability.ai_trace_recorder import AITraceRecorder, NoOpAITraceRecorder
+from app.observability.context import AITraceContext, new_trace_id
+from app.observability.dependencies import build_ai_trace_recorder
 from app.evaluation.metrics.answer import compute_answer_metrics
 from app.evaluation.metrics.retrieval import compute_retrieval_metrics
 from app.evaluation.policy import DEFAULT_POLICY, EvaluationPolicy
@@ -46,6 +49,32 @@ EvaluationMode = Literal["mock", "live"]
 
 _DEFAULT_CASE_TIMEOUT_SECONDS = 30.0
 _DEFAULT_MAX_TOKENS_PER_CASE = 2000
+
+
+def _build_evaluation_trace_recorder(db: Session) -> AITraceRecorder:
+    """AI trace recording for evaluation-triggered RAG calls is skipped on
+    SQLite specifically (falls back to a no-op), not because recording is
+    unsafe in general, but because of a real, reproduced SQLite-only failure
+    mode: `_run_single_case` below executes RAGOrchestrator on a
+    ThreadPoolExecutor worker thread while `db` (the caller's long-lived
+    session, used for EvaluationRun/EvaluationResult writes across the whole
+    run) may still be alive on the main thread. SQLite allows only one writer
+    at a time process-wide; a trace-recorder write from the worker thread can
+    contend with `db`'s own writes on the main thread badly enough to
+    surface "database is locked" errors on `db`'s side too, not just the
+    recorder's - i.e. this is one of the few places where a naive recorder
+    wiring could actually degrade the primary feature, which the observability
+    project's own fail-safety requirement rules out.
+
+    Production evaluation runs use Postgres (proper MVCC, no single-writer
+    file lock), where this class of error does not occur - eval-tagged AI
+    traces are fully recorded there. SQLite is dev/test-tier only. See
+    docs/03_AI/AI_Observability_Architecture.md's limitations section.
+    """
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == "sqlite":
+        return NoOpAITraceRecorder()
+    return build_ai_trace_recorder(db)
 
 
 class EmptyDatasetError(ValueError):
@@ -73,6 +102,23 @@ class EvaluationRunOptions:
     # object, which also governs real customer document embedding.
     embedding_provider: EmbeddingProvider | None = None
     min_similarity_score: float | None = None
+    # Restricts the run to an explicit subset of case ids - used by the
+    # focused/nightly production-feedback-loop CLI (app.operations.eval_focused_run)
+    # to re-run only newly-promoted cases instead of the whole dataset.
+    # Independent of category_filter; both apply together if both are set.
+    case_ids: frozenset[str] | None = None
+    # "manual" (default/None → dashboard-triggered), "nightly", "weekly", or
+    # "focused" - set by the scheduled-evaluation CLIs so the dashboard's
+    # Scheduled Runs view can distinguish them from ad-hoc runs.
+    trigger_source: str | None = None
+    # Forces every case's RAGOrchestrationRequest to resolve one specific
+    # PromptVersion candidate (see app.prompts.resolution) instead of the
+    # widget's normal deployment/experiment assignment - set by
+    # app.evaluation.prompt_promotion_gate when gating a candidate before
+    # approval/deployment. Resolution raises loudly on any failure to honour
+    # this exact version, rather than silently falling back, since the whole
+    # point of a gate run is to test this specific candidate.
+    prompt_version_override_id: str | None = None
 
 
 def run_evaluation(
@@ -88,10 +134,13 @@ def run_evaluation(
     cases = evaluation_repository.list_cases_for_dataset(db, dataset_id=dataset.id)
     if options.category_filter:
         cases = [case for case in cases if case.category == options.category_filter]
+    if options.case_ids is not None:
+        cases = [case for case in cases if case.id in options.case_ids]
     if not cases:
         raise EmptyDatasetError(
             f"Dataset {dataset.id} has no cases to run"
             + (f" in category {options.category_filter!r}." if options.category_filter else ".")
+            + (f" matching the requested case_ids." if options.case_ids is not None else "")
         )
 
     if options.mode == "live" and options.live_ai_core is None:
@@ -127,11 +176,14 @@ def run_evaluation(
             "category_filter": options.category_filter,
         },
         created_by=options.created_by,
+        trigger_source=options.trigger_source,
     )
     run = evaluation_repository.mark_run_started(db, run=run)
 
     total = passed = failed = hard_failures = 0
     provider_key = model_key = provider_model_name = prompt_key = prompt_version = prompt_hash = None
+
+    trace_recorder = _build_evaluation_trace_recorder(db)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         for case in cases:
@@ -146,6 +198,8 @@ def run_evaluation(
                 embedding_provider=embedding_provider,
                 min_similarity_score=min_similarity_score,
                 options=options,
+                trace_recorder=trace_recorder,
+                eval_run_id=run.id,
             )
             evaluation_repository.create_result(db, run_id=run.id, case=case, payload=outcome.payload)
             total += 1
@@ -170,6 +224,7 @@ def run_evaluation(
         prompt_key=prompt_key,
         prompt_version=prompt_version,
         prompt_hash=prompt_hash,
+        prompt_version_id=options.prompt_version_override_id,
     )
 
 
@@ -196,6 +251,8 @@ def _run_single_case(
     embedding_provider,
     min_similarity_score: float,
     options: EvaluationRunOptions,
+    trace_recorder,
+    eval_run_id: str,
 ) -> _CaseOutcome:
     is_isolation_case = case.category in {member.value for member in ISOLATION_CATEGORIES}
     cross_tenant_attempt = (case.metadata_json or {}).get("cross_tenant_attempt") if is_isolation_case else None
@@ -204,6 +261,11 @@ def _run_single_case(
     effective_workspace_id = (cross_tenant_attempt or {}).get("workspace_id", workspace_id)
     effective_widget_id = (cross_tenant_attempt or {}).get("widget_id", widget_id)
 
+    # A fresh trace_id per case, tagged with eval_run_id/eval_case_id so
+    # evaluation-triggered RAG calls are distinguishable from real traffic in
+    # the AI trace tables (see app.observability.context.AITraceContext -
+    # ThreadPoolExecutor workers don't propagate contextvars, so this must be
+    # passed explicitly rather than relying on ambient context).
     request = RAGOrchestrationRequest(
         organisation_id=effective_organisation_id,
         workspace_id=effective_workspace_id,
@@ -211,11 +273,15 @@ def _run_single_case(
         assistant_id=effective_widget_id,
         channel="api",
         min_similarity_score=min_similarity_score,
+        trace_context=AITraceContext(trace_id=new_trace_id(), eval_run_id=eval_run_id, eval_case_id=case.id),
+        prompt_version_override_id=options.prompt_version_override_id,
     )
 
     def call() -> object:
         with shadow_rag_session(options.shadow_database_url) as shadow_db:
-            orchestrator = RAGOrchestrator(RAGOrchestratorDependencies(db=shadow_db, ai_core=ai_core, embedding_provider=embedding_provider))
+            orchestrator = RAGOrchestrator(
+                RAGOrchestratorDependencies(db=shadow_db, ai_core=ai_core, embedding_provider=embedding_provider, trace_recorder=trace_recorder)
+            )
             return orchestrator.answer(request)
 
     future = executor.submit(call)

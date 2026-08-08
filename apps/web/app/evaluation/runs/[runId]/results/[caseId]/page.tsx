@@ -3,8 +3,9 @@ import Link from "next/link";
 import { AccessDeniedState, ErrorState } from "../../../../../../components/conversations/state-panels";
 import { EvaluationStatusBadge } from "../../../../../../components/evaluation/badges";
 import { formatCategory, formatMs, toneForCase } from "../../../../../../components/evaluation/format";
+import { CreateCandidateLink } from "../../../../../../components/feedback-loop/create-candidate-link";
 import { DashboardApiError, isDashboardApiError, messageForApiError } from "../../../../../../lib/api/errors";
-import { getEvaluationRunResult } from "../../../../../../lib/api/evaluation";
+import { getEvaluationRun, getEvaluationRunResult } from "../../../../../../lib/api/evaluation";
 import type { DevelopmentDashboardSession } from "../../../../../../lib/auth/development-session";
 import { requireDashboardSession } from "../../../../../../lib/auth/session";
 
@@ -25,6 +26,8 @@ export default async function EvaluationResultPage({ params }: EvaluationResultP
   }
 
   const { result: caseResult, case: evaluationCase } = result.data;
+  const runResult = await loadRun(session, runId);
+  const assistantId = runResult.ok ? runResult.data.run.widget_id : undefined;
 
   return (
     <>
@@ -41,6 +44,14 @@ export default async function EvaluationResultPage({ params }: EvaluationResultP
               label={caseResult.hard_failure ? "hard failure" : caseResult.passed ? "passed" : "failed"}
               tone={toneForCase(caseResult.passed, caseResult.hard_failure)}
             />
+            {!caseResult.passed && assistantId ? (
+              <CreateCandidateLink
+                sourceType="eval_result"
+                assistantId={assistantId}
+                prefillQuestion={evaluationCase?.question}
+                prefillResponse={caseResult.actual_answer ?? undefined}
+              />
+            ) : null}
           </div>
         </div>
 
@@ -128,6 +139,16 @@ function formatMetricValue(value: unknown): string {
 async function loadResult(session: DevelopmentDashboardSession, runId: string, caseId: string) {
   try {
     const response = await getEvaluationRunResult(session, runId, caseId);
+    return { ok: true as const, data: response.data };
+  } catch (error) {
+    if (isDashboardApiError(error)) return { ok: false as const, error };
+    return { ok: false as const, error: new DashboardApiError("unknown", "Unexpected dashboard error.") };
+  }
+}
+
+async function loadRun(session: DevelopmentDashboardSession, runId: string) {
+  try {
+    const response = await getEvaluationRun(session, runId);
     return { ok: true as const, data: response.data };
   } catch (error) {
     if (isDashboardApiError(error)) return { ok: false as const, error };

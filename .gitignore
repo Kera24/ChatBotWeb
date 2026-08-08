@@ -56,3 +56,6 @@ infrastructure/azure/environments/*.generated.bicepparam
 # VPS backup/restore drill output (local only, never committed)
 backups/
 backups-drill/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/

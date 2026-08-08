@@ -13,3 +13,5 @@ stripe
 azure-monitor-opentelemetry
 opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-sqlalchemy
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http

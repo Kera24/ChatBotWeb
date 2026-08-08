@@ -103,5 +103,32 @@ class Settings:
     AZURE_MONITOR_REQUIRE_CONNECTION_STRING: str = getenv("AZURE_MONITOR_REQUIRE_CONNECTION_STRING", "false")
     AZURE_MONITOR_SAMPLING_RATIO: float = float(getenv("AZURE_MONITOR_SAMPLING_RATIO", "1.0"))
 
+    # Vendor-neutral OpenTelemetry export - an alternative to (never both at
+    # once with) the Azure Monitor OTel Distro above. See
+    # app.operations.telemetry.configure_observability for precedence rules.
+    OTEL_ENABLED: str = getenv("OTEL_ENABLED", "false")
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    OTEL_SERVICE_NAME: str = getenv("OTEL_SERVICE_NAME", "")
+    OTEL_RESOURCE_ATTRIBUTES: str = getenv("OTEL_RESOURCE_ATTRIBUTES", "")
+    OTEL_CONSOLE_EXPORT: str = getenv("OTEL_CONSOLE_EXPORT", "false")
+
+    # AI observability trace persistence (app.observability.*).
+    AI_TRACE_ENABLED: str = getenv("AI_TRACE_ENABLED", "true")
+    AI_TRACE_RETENTION_DAYS: int = _get_int("AI_TRACE_RETENTION_DAYS", 90)
+    AI_TRACE_CONTENT_MODE: str = getenv("AI_TRACE_CONTENT_MODE", "metadata_only")
+    AI_TRACE_CUSTOM_REDACTION_PATTERNS: str = getenv("AI_TRACE_CUSTOM_REDACTION_PATTERNS", "")
+
+    # AI observability alert thresholds (app.observability.alerts). All
+    # percentages are 0-100. Evaluated over a trailing window (see
+    # evaluate_alerts's `window_hours` parameter, default 1h).
+    AI_ALERT_P95_LATENCY_MS: int = _get_int("AI_ALERT_P95_LATENCY_MS", 8000)
+    AI_ALERT_PROVIDER_ERROR_RATE_PCT: float = _get_float("AI_ALERT_PROVIDER_ERROR_RATE_PCT", 10.0)
+    AI_ALERT_FALLBACK_RATE_PCT: float = _get_float("AI_ALERT_FALLBACK_RATE_PCT", 40.0)
+    AI_ALERT_EVIDENCE_INSUFFICIENT_RATE_PCT: float = _get_float("AI_ALERT_EVIDENCE_INSUFFICIENT_RATE_PCT", 30.0)
+    AI_ALERT_GUARDRAIL_BLOCK_RATE_PCT: float = _get_float("AI_ALERT_GUARDRAIL_BLOCK_RATE_PCT", 20.0)
+    AI_ALERT_COST_PER_REQUEST_USD: float = _get_float("AI_ALERT_COST_PER_REQUEST_USD", 0.0)
+    AI_ALERT_ZERO_TRAFFIC_MINUTES: int = _get_int("AI_ALERT_ZERO_TRAFFIC_MINUTES", 60)
+    AI_ALERT_MIN_SAMPLE_SIZE: int = _get_int("AI_ALERT_MIN_SAMPLE_SIZE", 5)
+
 
 settings = Settings()

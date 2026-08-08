@@ -49,3 +49,4 @@ class RAGAnswerResponse(BaseModel):
     latency_ms: int
     finish_reason: FinishReason
     fallback_used: bool
+    trace_id: str | None = None

@@ -38,6 +38,7 @@ from app.access.widget_admin.service import record_installation_observation
 from app.access.widget_config.repository import get_configuration_for_credential
 from app.api.deps import DbSession
 from app.core.config import settings
+from app.observability.dependencies import build_ai_trace_recorder
 from app.operations.correlation import safe_request_id
 from app.operations.logging import log_operational_event, pseudonymous_identifier
 from app.operations.metrics import metric_name_for_event
@@ -329,7 +330,10 @@ def _gateway(request: Request, db: Session, event_sink: InMemoryAccessEventSink)
         )
         rag_adapter = PublicWidgetRAGAdapter(
             orchestrator=RAGOrchestrator(
-                RAGOrchestratorDependencies(db=db, ai_core=ai_core, embedding_provider=embedding_provider)
+                RAGOrchestratorDependencies(
+                    db=db, ai_core=ai_core, embedding_provider=embedding_provider,
+                    trace_recorder=build_ai_trace_recorder(db),
+                )
             ),
             idempotency_service=idempotency_service,
             event_sink=event_sink,

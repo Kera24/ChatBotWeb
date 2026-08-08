@@ -95,6 +95,10 @@ def safe_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in redacted.items() if key in APPROVED_ATTRIBUTE_KEYS and value is not None}
 
 
+def _truthy(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def configure_azure_monitor(app: FastAPI) -> None:
     config = telemetry_config()
     app.state.telemetry_config = config
@@ -123,6 +127,96 @@ def configure_azure_monitor(app: FastAPI) -> None:
         app.state.telemetry_enabled = True
     except Exception as exc:
         logger.warning("Azure Monitor OpenTelemetry initialization failed; continuing without export: %s", exc)
+
+
+def configure_observability(app: FastAPI) -> None:
+    """Entry point called once at app startup (replaces a direct
+    `configure_azure_monitor(app)` call in app.main.create_app).
+
+    Precedence: Azure Monitor OTel Distro (if configured) always wins over the
+    generic OTLP/console/no-export path below - only one global OTel
+    `TracerProvider` can ever be registered process-wide, and the Azure
+    Monitor distro already calls `trace.set_tracer_provider()` internally, so
+    attempting both would either silently no-op or partially reconfigure
+    shared processors. If neither is configured, behavior is identical to
+    today: spans are created (via `telemetry_span()`) but never exported,
+    because the OTel API's default global tracer provider is a no-op proxy
+    until something calls `set_tracer_provider()`.
+    """
+    config = telemetry_config()
+    otel_generic_requested = _truthy(settings.OTEL_ENABLED)
+
+    if config.export_enabled:
+        if otel_generic_requested:
+            logger.warning(
+                "Both Azure Monitor OTel and OTEL_ENABLED are configured; Azure Monitor takes "
+                "precedence to avoid registering a second global TracerProvider."
+            )
+        configure_azure_monitor(app)
+        return
+
+    # Azure Monitor path is inactive (disabled, or enabled without a
+    # connection string) - still record its own state for the
+    # /system health/config surface, exactly as configure_azure_monitor does.
+    app.state.telemetry_config = config
+    app.state.telemetry_config_failures = validate_telemetry_config(config)
+    app.state.telemetry_enabled = False
+
+    if otel_generic_requested:
+        _configure_generic_otel(app)
+
+
+def _configure_generic_otel(app: FastAPI) -> None:
+    try:
+        from opentelemetry import trace
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+    except Exception as exc:
+        logger.warning("Generic OpenTelemetry SDK packages unavailable; telemetry export disabled: %s", exc)
+        return
+
+    try:
+        config = telemetry_config()
+        resource_attributes = {
+            "service.name": settings.OTEL_SERVICE_NAME or config.service_name,
+            "deployment.environment": config.environment,
+            "service.version": config.release_version,
+            **_parse_otel_resource_attributes(settings.OTEL_RESOURCE_ATTRIBUTES),
+        }
+        provider = TracerProvider(resource=Resource.create(resource_attributes))
+
+        endpoint = settings.OTEL_EXPORTER_OTLP_ENDPOINT.strip()
+        if endpoint:
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+            provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+        elif _truthy(settings.OTEL_CONSOLE_EXPORT):
+            provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+        # else: no span processor registered - spans are created but
+        # discarded in-process ("local/no-export mode" from the spec).
+
+        trace.set_tracer_provider(provider)
+        FastAPIInstrumentor.instrument_app(app, excluded_urls="/health/live,/health/ready")
+        SQLAlchemyInstrumentor().instrument(enable_commenter=False)
+        app.state.telemetry_enabled = bool(endpoint or _truthy(settings.OTEL_CONSOLE_EXPORT))
+    except Exception as exc:
+        logger.warning("Generic OpenTelemetry initialization failed; continuing without export: %s", exc)
+
+
+def _parse_otel_resource_attributes(raw: str) -> dict[str, str]:
+    attributes: dict[str, str] = {}
+    for pair in raw.split(","):
+        if "=" not in pair:
+            continue
+        key, _, value = pair.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            attributes[key] = value
+    return attributes
 
 
 @contextmanager

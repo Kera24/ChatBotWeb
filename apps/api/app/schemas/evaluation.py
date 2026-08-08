@@ -107,6 +107,7 @@ class EvaluationRunRead(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime
+    trigger_source: str | None = None
 
 
 class EvaluationResultRead(BaseModel):

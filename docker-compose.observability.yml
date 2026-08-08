@@ -1,0 +1,138 @@
+# Optional "recommended tier" observability stack for the low-cost VPS
+# deployment - OpenTelemetry Collector + Prometheus + Loki + Tempo + Grafana.
+#
+# NOT required for launch. The "minimum tier" (structured JSON logs + AI
+# traces persisted in Postgres + health checks + the existing
+# deployment/monitoring/check.sh uptime check) runs with just
+# docker-compose.prod.yml alone. This file is additive only - the core
+# product runs fully without it.
+#
+# Usage (combine with the prod compose file so these services join its
+# `internal` network and can reach the `api` service):
+#   docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml --env-file .env.production up -d
+#
+# Then point the API at the collector by setting in .env.production:
+#   OTEL_ENABLED=true
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+#
+# Resource estimate for a small VPS (see
+# docs/06_Operations/Grafana_Prometheus_Loki_Tempo_VPS_Guide.md for detail):
+# roughly 1 vCPU / 1.5GB RAM combined for all five services at pilot-scale
+# traffic volumes, on top of the core product's own footprint.
+#
+# See docker-compose.prod.yml's own header comment for the shared `name:`/
+# network rationale - this file intentionally does not redeclare `name:` so
+# it joins the SAME Compose project (and its `internal` network) when passed
+# together with -f docker-compose.prod.yml.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+volumes:
+  prometheus_data:
+  loki_data:
+  tempo_data:
+  grafana_data:
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./deployment/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    networks:
+      - internal
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384m
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    logging: *default-logging
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./deployment/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512m
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./deployment/observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384m
+
+  loki:
+    image: grafana/loki:2.9.10
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./deployment/observability/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256m
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set a real Grafana admin password in .env.production}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # No public port published here on purpose - reach Grafana via an SSH
+      # tunnel (`ssh -L 3001:localhost:3001 <vps>`) or add a Caddy route with
+      # basic auth / an access-restricted subdomain. Never expose Grafana
+      # directly to the internet without authentication in front of it.
+    volumes:
+      - ./deployment/observability/grafana-provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    networks:
+      - internal
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256m

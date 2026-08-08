@@ -1,0 +1,51 @@
+# Minimal OTel Collector pipeline: receives OTLP (http/grpc) from the API
+# (see OTEL_EXPORTER_OTLP_ENDPOINT), fans traces out to Tempo, metrics out to
+# Prometheus (via a scrape-friendly exporter), and logs out to Loki.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  # Drops anything that slipped through app-level redaction before it leaves
+  # this process - a defence-in-depth backstop, not the primary control (see
+  # app.observability.redaction, which is the primary control applied before
+  # any content ever reaches a span/log attribute).
+  attributes/redact_secrets:
+    actions:
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/redact_secrets, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [attributes/redact_secrets, batch]
+      exporters: [loki]

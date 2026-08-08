@@ -45,6 +45,15 @@ class EvaluationCase(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     category: Mapped[str] = mapped_column(String(60), nullable=False)
     tags: Mapped[list | None] = mapped_column(JSON, nullable=True)
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Provenance: set when this case originated from a promoted production
+    # EvaluationCandidate (see app.repositories.evaluation_candidate_repository
+    # .promote_candidate). Null for hand-authored/fixture-seeded cases.
+    # use_alter=True breaks the 3-way FK cycle
+    # evaluation_cases -> evaluation_candidates -> ai_traces -> evaluation_cases
+    # (via eval_case_id) so SQLAlchemy can order CREATE/DROP TABLE statements.
+    source_candidate_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("evaluation_candidates.id", use_alter=True, name="fk_evaluation_cases_source_candidate_id"), nullable=True, index=True
+    )
 
     dataset = relationship("EvaluationDataset", back_populates="cases")
     results = relationship("EvaluationResult", back_populates="case")
@@ -69,6 +78,11 @@ class EvaluationRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     prompt_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
     prompt_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
     prompt_hash: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # Set only when this run was triggered with an explicit
+    # prompt_version_override_id (see app.evaluation.prompt_promotion_gate) -
+    # the structured FK counterpart to the scalar prompt_key/version/hash
+    # fields above, which only ever reflect "whichever case ran last."
+    prompt_version_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("prompt_versions.id"), nullable=True)
     retrieval_settings_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     policy_snapshot_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     mode: Mapped[str] = mapped_column(String(20), nullable=False, default="mock", server_default="mock")
@@ -80,6 +94,11 @@ class EvaluationRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    # Who/what triggered this run - null for the pre-existing manual/dashboard
+    # path, "nightly"/"weekly"/"focused" for the new scheduled CLIs (see
+    # app.operations.production_signal_scan / eval_focused_run). Lets the
+    # dashboard's "Scheduled Runs" view filter without a new table.
+    trigger_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     dataset = relationship("EvaluationDataset", back_populates="runs")
     results = relationship("EvaluationResult", back_populates="run", cascade="all, delete-orphan")

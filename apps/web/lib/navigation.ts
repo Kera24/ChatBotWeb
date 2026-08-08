@@ -56,6 +56,27 @@ export const navigationItems = [
     group: "Quality",
   },
   {
+    label: "Observability",
+    href: "/observability",
+    glyph: "OB",
+    description: "Trace every AI request from input policy to final response.",
+    group: "Quality",
+  },
+  {
+    label: "Continuous Evaluation",
+    href: "/feedback-loop",
+    glyph: "CE",
+    description: "Triage production failures into golden evaluation cases, versioned and regression-gated.",
+    group: "Quality",
+  },
+  {
+    label: "Prompts",
+    href: "/prompts",
+    glyph: "PR",
+    description: "Draft, version, evaluate, approve, deploy, experiment, and roll back assistant prompts.",
+    group: "Quality",
+  },
+  {
     label: "Users",
     href: "/users",
     glyph: "US",

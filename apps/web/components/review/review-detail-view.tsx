@@ -13,6 +13,7 @@ import type { ReviewItemDetail } from "../../lib/api/types";
 import type { WidgetDetail } from "../../lib/api/widgets";
 import type { DevelopmentDashboardSession } from "../../lib/auth/development-session";
 import { assistantLifecycle } from "../assistants/assistant-management";
+import { CreateCandidateLink } from "../feedback-loop/create-candidate-link";
 import { KnowledgeGapPanel } from "./knowledge-gap-panel";
 import { ReviewArchivedNotice, ReviewDetailHeader } from "./review-header";
 import { ReviewDecisionForm } from "./review-decision-form";
@@ -38,10 +39,13 @@ export function ReviewDetailView({
 
   return (
     <motion.section className="reviewDetailPage premiumReviewDetailPage" aria-labelledby="review-detail-title" {...pageMotion}>
-      <Link className="backLink premiumBackLink" href={`/review/unanswered?assistant=${assistant.id}`}>
-        <ArrowLeft size={15} aria-hidden="true" />
-        Back to review queue
-      </Link>
+      <div className="observabilityTraceDetailActions">
+        <Link className="backLink premiumBackLink" href={`/review/unanswered?assistant=${assistant.id}`}>
+          <ArrowLeft size={15} aria-hidden="true" />
+          Back to review queue
+        </Link>
+        <CreateCandidateLink sourceType="review_item" sourceId={item.assistant_message_id} assistantId={assistant.id} />
+      </div>
 
       <ReviewDetailHeader item={item} assistant={assistant} />
       {lifecycle === "Archived" ? <ReviewArchivedNotice /> : null}

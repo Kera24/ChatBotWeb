@@ -23,6 +23,13 @@ const args = parseArgs(process.argv.slice(2));
 const envFilePath = args["env-file"] ? resolveRepoPath(String(args["env-file"])) : null;
 const smokeBaseUrl = args["smoke-base-url"] ? String(args["smoke-base-url"]) : null;
 const skipBuild = Boolean(args["skip-build"]);
+// Production feedback loop gate (app.evaluation.production_gate) needs an
+// explicit assistant/dataset scope this generic script cannot infer on its
+// own - same reasoning as smokeBaseUrl above. Advisory/skipped unless all
+// four are supplied.
+const feedbackLoopScope = ["feedback-loop-organisation", "feedback-loop-workspace", "feedback-loop-assistant", "feedback-loop-dataset"].every(
+  (key) => typeof args[key] === "string",
+);
 
 const MANDATORY_ENV_VARS = [
   "WEB_DOMAIN",
@@ -165,6 +172,37 @@ run("eval_framework_tests", "npm", ["run", "eval:test"]);
 // wiring, category scoring) is still visible.
 // ---------------------------------------------------------------------------
 run("eval_launch_mock_mode", "npm", ["run", "eval:launch"], { blocking: false });
+
+// ---------------------------------------------------------------------------
+// 4b. Production feedback loop gate (app.evaluation.production_gate) - blocks
+// when an approved production-failure case still fails, the latest completed
+// run has hard failures, isolation/citation regressed, the dataset version
+// changed without a completed evaluation, the baseline is stale, or required
+// regression-report evidence is missing. Skipped (advisory) unless the four
+// --feedback-loop-* scope flags are all supplied, since this generic script
+// has no way to infer which assistant/dataset to check.
+// ---------------------------------------------------------------------------
+if (feedbackLoopScope) {
+  run("production_feedback_gate", "npm", [
+    "run",
+    "eval:release-gate-check",
+    "--",
+    "--organisation",
+    String(args["feedback-loop-organisation"]),
+    "--workspace",
+    String(args["feedback-loop-workspace"]),
+    "--assistant",
+    String(args["feedback-loop-assistant"]),
+    "--dataset",
+    String(args["feedback-loop-dataset"]),
+  ]);
+} else {
+  gate("production_feedback_gate", {
+    passed: true,
+    blocking: false,
+    detail: { reason: "no --feedback-loop-organisation/-workspace/-assistant/-dataset given; skipped" },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // 5. Real-embedding evaluation - the actual quality bar (this is the run that

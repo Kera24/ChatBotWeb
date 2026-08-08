@@ -1,5 +1,6 @@
 ﻿from dataclasses import dataclass, field, replace
 from decimal import Decimal
+from time import perf_counter
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,11 @@ from app.ai.guardrails.reason_codes import GuardrailReasonCode
 from app.ai.model_registry import ModelConfig
 from app.ai.service import AICoreGenerateInput
 from app.core.config import settings
+from app.db.models.prompt import LAYER_PLATFORM_CORE
+from app.observability import context as trace_stages
+from app.observability.ai_trace_recorder import AITraceRecorder, NoOpAITraceRecorder, RetrievalTraceEntry
+from app.observability.context import AITraceContext, new_trace_id
+from app.prompts.resolution import ResolvedComposite, resolve_composite_prompt
 from app.repositories import conversation_repository
 from app.access.widget_admin.service import WidgetAdminNotFound, get_current_draft, get_widget
 from app.repositories.workspace_repository import get_workspace_for_organisation
@@ -27,6 +33,10 @@ from app.services.conversation import (
 )
 from app.services.embeddings import EmbeddingProvider
 from app.services.retrieval_context import RetrievalCitationData, RetrievalContextBlockData, assemble_retrieval_context
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((perf_counter() - started_at) * 1000)
 
 
 DEFAULT_RAG_PROMPT_KEY = "grounded_rag_answer"
@@ -76,6 +86,13 @@ class RAGOrchestrationRequest:
     metadata: dict | None = None
     simulate_failure: bool = False
     simulate_timeout: bool = False
+    trace_context: AITraceContext | None = None
+    # Forces prompt resolution to use one specific PromptVersion for its layer
+    # (see app.prompts.resolution) instead of the widget's current
+    # deployment/experiment assignment. Set only by
+    # app.evaluation.prompt_promotion_gate / app.evaluation.engine when
+    # gating a candidate version - never set for organic production traffic.
+    prompt_version_override_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -114,6 +131,7 @@ class RAGOrchestrationResult:
     finish_reason: FinishReason
     fallback_used: bool
     metadata: dict = field(default_factory=dict)
+    trace_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -121,6 +139,7 @@ class RAGOrchestratorDependencies:
     db: Session
     ai_core: AICoreContainer
     embedding_provider: EmbeddingProvider
+    trace_recorder: AITraceRecorder | None = None
 
 
 class RAGOrchestrator:
@@ -128,12 +147,44 @@ class RAGOrchestrator:
         self.db = dependencies.db
         self.ai_core = dependencies.ai_core
         self.embedding_provider = dependencies.embedding_provider
+        # Every existing call site that doesn't construct a trace_recorder
+        # keeps working unchanged - see app.observability.ai_trace_recorder.
+        self.trace_recorder = dependencies.trace_recorder or NoOpAITraceRecorder()
 
     def answer(self, request: RAGOrchestrationRequest) -> RAGOrchestrationResult:
-        self._validate_workspace(request)
-        assistant = self._resolve_assistant(request)
-        assistant_id = assistant.id if assistant is not None else None
-        conversation = self._resolve_conversation(request, assistant_id=assistant_id)
+        trace_context = request.trace_context or AITraceContext(trace_id=new_trace_id())
+        request_started_at = perf_counter()
+        self.trace_recorder.start_trace(
+            trace_context,
+            organisation_id=request.organisation_id,
+            workspace_id=request.workspace_id,
+            assistant_id=request.assistant_id,
+            channel=request.channel,
+        )
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_REQUEST_ACCEPTED, status="ok")
+
+        tenant_stage_started_at = perf_counter()
+        try:
+            self._validate_workspace(request)
+            assistant = self._resolve_assistant(request)
+            assistant_id = assistant.id if assistant is not None else None
+            conversation = self._resolve_conversation(request, assistant_id=assistant_id)
+        except RAGOrchestratorError as exc:
+            self.trace_recorder.record_stage(
+                trace_context, trace_stages.STAGE_AUTH_TENANT_RESOLUTION, status="error",
+                latency_ms=_elapsed_ms(tenant_stage_started_at), error_class=exc.code,
+            )
+            self.trace_recorder.finish_trace(
+                trace_context, status="failed", answer_state=None, fallback_used=False,
+                total_latency_ms=_elapsed_ms(request_started_at), error_class=exc.code,
+            )
+            raise
+        self.trace_recorder.record_stage(
+            trace_context, trace_stages.STAGE_AUTH_TENANT_RESOLUTION, status="ok",
+            latency_ms=_elapsed_ms(tenant_stage_started_at),
+        )
+        trace_context = replace(trace_context, conversation_id=conversation.id)
+
         user_message = append_user_message(
             self.db,
             organisation_id=request.organisation_id,
@@ -151,17 +202,30 @@ class RAGOrchestrator:
         # defence run BEFORE retrieval or generation - a blocked request never
         # reaches the AI provider at all, so this is fully enforced and
         # testable regardless of which provider is configured.
+        input_policy_started_at = perf_counter()
         input_verdict = evaluate_input_policy(request.query)
+        self.trace_recorder.record_stage(
+            trace_context, trace_stages.STAGE_INPUT_POLICY,
+            status="ok" if input_verdict.allowed else "blocked",
+            latency_ms=_elapsed_ms(input_policy_started_at),
+            reason_code=None if input_verdict.allowed else input_verdict.reason_code.value,
+        )
+        self.trace_recorder.record_guardrail(
+            trace_context, layer="C+D", guardrail_name="input_policy",
+            verdict="passed" if input_verdict.allowed else "blocked", blocked=not input_verdict.allowed,
+            reason_code=None if input_verdict.allowed else input_verdict.reason_code.value,
+        )
         if not input_verdict.allowed:
             return self._persist_fallback(
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
-                model=model, prompt_key=prompt_key,
+                model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
                 content=input_verdict.safe_message or FALLBACK_ANSWER, reason_code=input_verdict.reason_code.value,
             )
 
         retrieval_limit = request.retrieval_limit or settings.RETRIEVAL_MAX_CONTEXT_CHUNKS
         max_context_chars = request.max_context_chars or settings.RETRIEVAL_MAX_CONTEXT_CHARS
         allowed_document_ids = self._knowledge_scope_for_request(request, assistant)
+        retrieval_started_at = perf_counter()
         retrieval = assemble_retrieval_context(
             self.db,
             organisation_id=request.organisation_id,
@@ -174,21 +238,57 @@ class RAGOrchestrator:
             document_ids=allowed_document_ids,
             min_similarity_score=request.min_similarity_score if request.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
         )
+        retrieval_latency_ms = _elapsed_ms(retrieval_started_at)
+        # Embedding happens inside assemble_retrieval_context and isn't
+        # separately timed there - recorded as its own (unmeasured, bundled
+        # into retrieval_latency_ms) stage so the pipeline stays explainable
+        # even without deeper instrumentation of app.services.vector_search.
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_QUERY_EMBEDDING, status="ok")
+        self.trace_recorder.record_stage(
+            trace_context, trace_stages.STAGE_RETRIEVAL, status="ok" if retrieval.context_blocks else "empty",
+            latency_ms=retrieval_latency_ms,
+            safe_counts={"chunks_returned": len(retrieval.context_blocks), "total_context_chars": retrieval.total_context_chars},
+        )
+        # Only chunks actually selected into the context window are visible
+        # here - app.services.retrieval_context does not currently return
+        # candidates rejected before selection, so "rejected chunk" capture
+        # is not yet implemented (see docs/.../AI_Trace_Data_and_Privacy_Policy.md
+        # deferred-scope notes).
+        self.trace_recorder.record_retrieval(
+            trace_context,
+            entries=[
+                RetrievalTraceEntry(
+                    rank=index + 1, selected=True, chunk_id=block.chunk_id, document_id=block.document_id,
+                    similarity_score=block.score, source_title=block.source_title, content=block.content,
+                )
+                for index, block in enumerate(retrieval.context_blocks)
+            ],
+        )
 
         if not retrieval.context_blocks:
             return self._persist_fallback(
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
-                model=model, prompt_key=prompt_key,
+                model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
             )
 
         # Layer F: citation enforcement (defence-in-depth assertion - see
         # app.ai.guardrails.citation_policy's docstring for why this should
         # never actually fire given the retrieval query's own scoping).
         citation_verdict = verify_citations(retrieval.citations, allowed_document_ids=allowed_document_ids)
+        self.trace_recorder.record_stage(
+            trace_context, trace_stages.STAGE_CITATION_VALIDATION,
+            status="ok" if citation_verdict.passed else "blocked",
+            reason_code=None if citation_verdict.passed else citation_verdict.reason_code.value,
+        )
+        self.trace_recorder.record_guardrail(
+            trace_context, layer="F", guardrail_name="citation_policy",
+            verdict="passed" if citation_verdict.passed else "blocked", blocked=not citation_verdict.passed,
+            reason_code=None if citation_verdict.passed else citation_verdict.reason_code.value,
+        )
         if not citation_verdict.passed:
             return self._persist_fallback(
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
-                model=model, prompt_key=prompt_key,
+                model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
                 content=citation_verdict.safe_message or FALLBACK_ANSWER, reason_code=citation_verdict.reason_code.value,
             )
 
@@ -197,6 +297,11 @@ class RAGOrchestrator:
         # generation model never sees the attempted override.
         sanitised_blocks = [_sanitise_block(block) for block in retrieval.context_blocks]
         context = "\n\n".join(block.context_text for block in sanitised_blocks)
+        modified_count = sum(1 for original, sanitised in zip(retrieval.context_blocks, sanitised_blocks, strict=True) if original.content != sanitised.content)
+        self.trace_recorder.record_guardrail(
+            trace_context, layer="E", guardrail_name="document_sanitizer", verdict="modified" if modified_count else "passed",
+            blocked=False, safe_detail={"chunks_sanitised": modified_count},
+        )
 
         # Layers A+B: does the retrieved evidence actually support the
         # *specific* fact requested, not just the general topic (see
@@ -204,20 +309,69 @@ class RAGOrchestrator:
         # method - requested-attribute/value-type extraction, sentence-level
         # proximity, and retrieval-confidence-based domain relevance - and
         # its honest limitations).
+        evidence_started_at = perf_counter()
         evidence_verdict = verify_evidence_sufficiency(
             question=request.query,
             chunk_contents=[block.content for block in sanitised_blocks],
             chunk_titles=[block.source_title for block in sanitised_blocks],
             retrieval_scores=[block.score for block in sanitised_blocks],
         )
+        self.trace_recorder.record_stage(
+            trace_context, trace_stages.STAGE_EVIDENCE_SUFFICIENCY,
+            status="ok" if evidence_verdict.sufficient else "blocked",
+            latency_ms=_elapsed_ms(evidence_started_at),
+            reason_code=None if evidence_verdict.sufficient else evidence_verdict.reason_code.value,
+        )
+        self.trace_recorder.record_guardrail(
+            trace_context, layer="A+B", guardrail_name="evidence_sufficiency",
+            verdict="passed" if evidence_verdict.sufficient else "blocked", blocked=not evidence_verdict.sufficient,
+            reason_code=None if evidence_verdict.sufficient else evidence_verdict.reason_code.value,
+        )
+        # Grounding is currently only functionally covered by evidence
+        # sufficiency above - app.ai.guardrails.grounding.verify_grounding is
+        # not wired into the live pipeline, so this stage is recorded as
+        # explicitly skipped rather than fabricating a pass/fail it never ran.
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_GROUNDING_VERIFICATION, status="skipped", reason_code="not_wired_into_pipeline")
         if not evidence_verdict.sufficient:
             return self._persist_fallback(
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
-                model=model, prompt_key=prompt_key,
+                model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
                 content=evidence_verdict.safe_message or FALLBACK_ANSWER, reason_code=evidence_verdict.reason_code.value,
             )
 
+        # Composite prompt resolution (app.prompts.resolution) is fully
+        # additive/opt-in: a widget with zero prompt-management activity gets
+        # `composite is None` back and generation below proceeds exactly as
+        # before. Fail-open (log a degraded stage, fall through to the
+        # default) for organic traffic; fail-loud (propagate) only when the
+        # evaluation/promotion-gate engine explicitly asked for one specific
+        # candidate version - see docs/architecture/prompts.md.
+        composite: ResolvedComposite | None = None
+        composite_degraded = False
+        try:
+            composite = resolve_composite_prompt(
+                self.db, prompt_key=prompt_key, organisation_id=request.organisation_id, workspace_id=request.workspace_id,
+                widget_id=assistant_id, question=request.query, context=context, conversation_id=conversation.id,
+                prompt_version_override_id=request.prompt_version_override_id,
+            )
+        except Exception:
+            if request.prompt_version_override_id is not None:
+                raise
+            composite = None
+            composite_degraded = True
+        self.trace_recorder.record_stage(
+            trace_context, trace_stages.STAGE_PROMPT_CONSTRUCTION,
+            status="degraded" if composite_degraded else "ok",
+            reason_code="prompt_resolution_fallback" if composite_degraded else None,
+            provider_model_config_version=composite.rendered.version if composite is not None else prompt_key,
+        )
+        resolved_layer_version_ids = composite.resolved_layer_version_ids if composite is not None else None
+        experiment_id = composite.experiment_id if composite is not None else None
+        experiment_arm = composite.experiment_arm if composite is not None else None
+        composite_prompt_version_id = resolved_layer_version_ids.get(LAYER_PLATFORM_CORE) if resolved_layer_version_ids else None
+
         execution_id = self.ai_core.accounting_service.create_execution_id()
+        provider_started_at = perf_counter()
         try:
             ai_response = self.ai_core.service.generate(
                 AICoreGenerateInput(
@@ -229,10 +383,29 @@ class RAGOrchestrator:
                     workspace_id=request.workspace_id,
                     simulate_failure=request.simulate_failure,
                     simulate_timeout=request.simulate_timeout,
+                    override_rendered_prompt=composite.rendered if composite is not None else None,
                 )
             )
         except AIProviderError as exc:
             record = self._find_usage_record(execution_id)
+            self.trace_recorder.record_stage(
+                trace_context, trace_stages.STAGE_PROVIDER_GENERATION, status="error",
+                latency_ms=_elapsed_ms(provider_started_at), error_class=exc.code,
+            )
+            self.trace_recorder.record_model_call(
+                trace_context, model=model, provider_model_name=model.provider_model_name, prompt_key=prompt_key,
+                prompt_version=record.prompt_version if record else None, prompt_hash=record.prompt_hash if record else None,
+                token_usage=TokenUsage(
+                    input_tokens=record.prompt_tokens if record else 0,
+                    output_tokens=record.completion_tokens if record else 0,
+                    total_tokens=record.total_tokens if record else 0,
+                ),
+                latency_ms=record.latency_ms if record else _elapsed_ms(provider_started_at),
+                finish_reason=(record.finish_reason.value if record else FinishReason.ERROR.value),
+                outcome="failed", error_code=exc.code,
+                prompt_version_id=composite_prompt_version_id, experiment_id=experiment_id, experiment_arm=experiment_arm,
+                resolved_layer_version_ids=resolved_layer_version_ids,
+            )
             assistant_message = append_assistant_message(
                 self.db,
                 organisation_id=request.organisation_id,
@@ -256,6 +429,11 @@ class RAGOrchestrator:
                 error_code=exc.code,
                 metadata_json={"provider_error_code": exc.code, "provider_error_message": exc.message},
             )
+            self.trace_recorder.finish_trace(
+                trace_context, status="failed", answer_state="failed", fallback_used=False,
+                total_latency_ms=_elapsed_ms(request_started_at), provider_key=model.provider_key, model_key=model.model_key,
+                provider_model_name=model.provider_model_name, error_class=exc.code,
+            )
             raise RAGProviderExecutionError(
                 "AI provider execution failed while preserving conversation state.",
                 provider_error_code=exc.code,
@@ -265,13 +443,34 @@ class RAGOrchestrator:
 
         record = self._find_usage_record(execution_id)
         estimated_cost = record.total_estimated_cost if record else Decimal("0")
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_PROVIDER_GENERATION, status="ok", latency_ms=ai_response.latency_ms)
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_STRUCTURED_OUTPUT_PARSING, status="ok")
+        self.trace_recorder.record_model_call(
+            trace_context, model=model, provider_model_name=ai_response.provider_model_name, prompt_key=ai_response.prompt_key,
+            prompt_version=ai_response.prompt_version, prompt_hash=ai_response.prompt_hash, token_usage=ai_response.token_usage,
+            latency_ms=ai_response.latency_ms, finish_reason=ai_response.finish_reason.value, outcome="success",
+            raw_prompt=context, raw_response=ai_response.text,
+            prompt_version_id=composite_prompt_version_id, experiment_id=experiment_id, experiment_arm=experiment_arm,
+            resolved_layer_version_ids=resolved_layer_version_ids,
+        )
 
         # Layers G+H: never persist or return raw generated text without a
         # post-generation check - markup is always neutralised, and any
         # secret/prompt-leakage pattern is replaced with a safe refusal
         # rather than partially redacted (see output_safety's docstring).
+        output_safety_started_at = perf_counter()
         output_verdict = check_output_safety(ai_response.text)
         final_answer_state = "answered" if output_verdict.safe else "fallback"
+        self.trace_recorder.record_stage(
+            trace_context, trace_stages.STAGE_OUTPUT_SANITISATION, status="ok" if output_verdict.safe else "blocked",
+            latency_ms=_elapsed_ms(output_safety_started_at),
+            reason_code=None if output_verdict.safe else output_verdict.reason_code.value,
+        )
+        self.trace_recorder.record_guardrail(
+            trace_context, layer="G+H", guardrail_name="output_safety",
+            verdict="passed" if output_verdict.safe else "blocked", blocked=not output_verdict.safe,
+            reason_code=None if output_verdict.safe else output_verdict.reason_code.value,
+        )
         assistant_message = append_assistant_message(
             self.db,
             organisation_id=request.organisation_id,
@@ -302,6 +501,14 @@ class RAGOrchestrator:
                     "returned_chunks": len(retrieval.context_blocks),
                     "total_context_chars": retrieval.total_context_chars,
                 },
+                # Composite prompt identity (see app.prompts.resolution) is
+                # kept here as supplementary metadata rather than a new
+                # ChatMessage column - ChatMessage.prompt_version (Integer)
+                # cannot represent a composite label, and the authoritative
+                # structured record already lives on AIModelCallTrace.
+                "resolved_layer_version_ids": resolved_layer_version_ids,
+                "experiment_id": experiment_id,
+                "experiment_arm": experiment_arm,
             },
         )
         if output_verdict.safe:
@@ -315,6 +522,16 @@ class RAGOrchestrator:
             conversation_id=conversation.id,
             message_id=assistant_message.id,
             citations=citation_payloads,
+        )
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_PERSISTENCE, status="ok", safe_counts={"citations_persisted": len(persisted_citations)})
+        total_latency_ms = _elapsed_ms(request_started_at)
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_RESPONSE_COMPLETED, status="ok", latency_ms=total_latency_ms)
+        self.trace_recorder.finish_trace(
+            trace_context, status="completed", answer_state=final_answer_state, fallback_used=not output_verdict.safe,
+            total_latency_ms=total_latency_ms, provider_key=ai_response.provider_key, model_key=ai_response.model_key,
+            provider_model_name=ai_response.provider_model_name, embedding_provider=self.embedding_provider.provider_name,
+            embedding_model=self.embedding_provider.model_name, total_tokens=ai_response.token_usage.total_tokens,
+            estimated_cost=estimated_cost,
         )
         return RAGOrchestrationResult(
             conversation_id=conversation.id,
@@ -351,6 +568,7 @@ class RAGOrchestrator:
             finish_reason=ai_response.finish_reason,
             fallback_used=not output_verdict.safe,
             metadata={"total_context_chars": retrieval.total_context_chars, "guardrail_reason_code": output_verdict.reason_code.value},
+            trace_id=trace_context.trace_id,
         )
 
     def _validate_workspace(self, request: RAGOrchestrationRequest) -> None:
@@ -408,6 +626,8 @@ class RAGOrchestrator:
         user_message_id: str,
         model: ModelConfig,
         prompt_key: str,
+        trace_context: AITraceContext,
+        request_started_at: float,
         content: str = FALLBACK_ANSWER,
         reason_code: str = GuardrailReasonCode.RETRIEVAL_EMPTY.value,
         answer_state: str = "fallback",
@@ -439,6 +659,16 @@ class RAGOrchestrator:
             # schema and dashboard rendering compatibility intact.
             metadata_json={"guardrail_reason_code": reason_code, "prompt_version": prompt_version.version},
         )
+        total_latency_ms = _elapsed_ms(request_started_at)
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_PERSISTENCE, status="ok", safe_counts={"citations_persisted": 0})
+        self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_RESPONSE_COMPLETED, status="ok", latency_ms=total_latency_ms)
+        self.trace_recorder.finish_trace(
+            trace_context, status="completed", answer_state=answer_state, fallback_used=True,
+            total_latency_ms=total_latency_ms, provider_key=model.provider_key, model_key=model.model_key,
+            provider_model_name=model.provider_model_name, embedding_provider=self.embedding_provider.provider_name,
+            embedding_model=self.embedding_provider.model_name, total_tokens=0, estimated_cost=Decimal("0"),
+            metadata={"guardrail_reason_code": reason_code},
+        )
         return RAGOrchestrationResult(
             conversation_id=conversation_id,
             user_message_id=user_message_id,
@@ -460,6 +690,7 @@ class RAGOrchestrator:
             finish_reason=FinishReason.STOP,
             fallback_used=True,
             metadata={"guardrail_reason_code": reason_code},
+            trace_id=trace_context.trace_id,
         )
 
     def _find_usage_record(self, execution_id: str) -> AIUsageRecord | None:

@@ -6,8 +6,9 @@ from app.api.health import router as health_router
 from app.api.v1.router import API_V1_ROUTER_REGISTRATIONS
 from app.billing.gateway import create_billing_gateway
 from app.core.config import settings
+from app.observability.context import new_trace_id
 from app.operations.correlation import safe_request_id
-from app.operations.telemetry import configure_azure_monitor, normalise_route
+from app.operations.telemetry import configure_observability, normalise_route
 
 _REQUIRED_PUBLIC_ROUTES = {
     "/api/v1/widget/{public_key}/config",
@@ -25,18 +26,25 @@ def create_app() -> FastAPI:
 
     app.state.ai_core = create_ai_core()
     app.state.billing_gateway = create_billing_gateway()
-    configure_azure_monitor(app)
+    configure_observability(app)
 
     @app.middleware("http")
     async def request_context_middleware(request: Request, call_next):
         request_id = safe_request_id(request.headers.get("x-request-id"))
         request.state.request_id = request_id
+        # Server-generated, per-request AI observability correlation id - see
+        # app.observability.context.AITraceContext. Distinct from request_id:
+        # request_id already exists for every HTTP request, trace_id is the
+        # root key for the AI trace tables (only meaningful on AI-serving
+        # routes, but cheap to generate unconditionally here).
+        request.state.trace_id = new_trace_id()
         request.state.telemetry_route = normalise_route(request)
         if _is_auth_preflight(request):
             response = Response(status_code=204)
         else:
             response = await call_next(request)
         response.headers.setdefault("X-Request-ID", request_id)
+        response.headers.setdefault("X-Trace-ID", request.state.trace_id)
         if request.url.path.startswith(f"{settings.API_V1_PREFIX}/auth"):
             _apply_auth_cors(response)
         return response

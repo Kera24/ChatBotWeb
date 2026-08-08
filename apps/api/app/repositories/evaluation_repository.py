@@ -131,6 +131,7 @@ def create_run(
     policy_snapshot: dict,
     retrieval_settings: dict | None,
     created_by: str | None,
+    trigger_source: str | None = None,
 ) -> EvaluationRun:
     run = EvaluationRun(
         organisation_id=organisation_id,
@@ -143,6 +144,7 @@ def create_run(
         policy_snapshot_json=policy_snapshot,
         retrieval_settings_json=retrieval_settings,
         created_by=created_by,
+        trigger_source=trigger_source,
     )
     db.add(run)
     db.commit()
@@ -173,6 +175,7 @@ def mark_run_completed(
     prompt_key: str | None,
     prompt_version: str | None,
     prompt_hash: str | None,
+    prompt_version_id: str | None = None,
 ) -> EvaluationRun:
     run.status = status
     run.total_cases = total_cases
@@ -185,6 +188,7 @@ def mark_run_completed(
     run.prompt_key = prompt_key
     run.prompt_version = prompt_version
     run.prompt_hash = prompt_hash
+    run.prompt_version_id = prompt_version_id
     run.completed_at = _now()
     db.commit()
     db.refresh(run)

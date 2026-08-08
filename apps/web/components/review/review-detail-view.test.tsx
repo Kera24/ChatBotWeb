@@ -123,6 +123,9 @@ describe("ReviewDetailView", () => {
     expect(screen.getByText("Execution metadata")).toBeTruthy();
     expect(screen.queryByText("rendered prompt")).toBeNull();
     expect(screen.queryByText("secret")).toBeNull();
+    expect(screen.getByRole("link", { name: /Create evaluation candidate/ }).getAttribute("href")).toBe(
+      "/feedback-loop/candidates/new?source_type=review_item&source_id=assistant-1&assistant=assistant-1",
+    );
   });
 
   it("shows the knowledge improvement panel with rule-based guidance", () => {

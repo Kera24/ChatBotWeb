@@ -15,7 +15,7 @@ from app.ai.execution_policy import ProviderExecutionPolicy
 from app.ai.executor import ProviderRetryExecutor
 from app.ai.health import ProviderHealthService, ProviderHealthStatus
 from app.ai.model_registry import ModelRegistry
-from app.ai.prompt_registry import PromptRegistry
+from app.ai.prompt_registry import PromptRegistry, RenderedPrompt
 from app.ai.provider_registry import ProviderRegistry
 
 
@@ -31,6 +31,14 @@ class AICoreGenerateInput:
     timeout_seconds: float | None = None
     organisation_id: str | None = None
     workspace_id: str | None = None
+    # Set only by app.ai.rag_orchestrator when app.prompts.resolution resolved
+    # a DB-backed composite prompt for this request - bypasses
+    # self.prompt_registry.render() entirely when present, using this
+    # already-rendered result instead. None (the default) reproduces today's
+    # behavior exactly. See docs/architecture/prompts.md's rendering-bridge
+    # design decision for why this is a single RenderedPrompt-shaped field
+    # rather than loose system/user prompt strings.
+    override_rendered_prompt: RenderedPrompt | None = None
 
 
 class AICoreService:
@@ -56,7 +64,7 @@ class AICoreService:
     def generate(self, request_input: AICoreGenerateInput) -> AIResponse:
         model = self.model_registry.get(request_input.model_key, require_enabled=True)
         provider = self.provider_registry.get(model.provider_key)
-        rendered_prompt = self.prompt_registry.render(
+        rendered_prompt = request_input.override_rendered_prompt or self.prompt_registry.render(
             request_input.prompt_key,
             request_input.variables,
         )

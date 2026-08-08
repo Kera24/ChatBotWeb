@@ -79,6 +79,9 @@ describe("ConversationDetailView", () => {
     expect(screen.getByRole("log", { name: "Conversation messages" })).toBeTruthy();
     expect(screen.getByText("Grounded answer")).toBeTruthy();
     expect(screen.getByRole("complementary", { name: "Quality & metadata" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Create evaluation candidate/ }).getAttribute("href")).toBe(
+      "/feedback-loop/candidates/new?source_type=conversation&source_id=conversation-1&assistant=assistant-1",
+    );
   });
 
   it("shows an archived-assistant notice when the assistant is archived", () => {

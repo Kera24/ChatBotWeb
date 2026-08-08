@@ -22,6 +22,11 @@ class ModelConfig(BaseModel):
     context_window: int
     input_cost_per_million_tokens: Decimal | None = None
     output_cost_per_million_tokens: Decimal | None = None
+    # Bumped manually whenever this model's configured pricing changes, so
+    # historical AI trace/cost rows can be told apart from rows priced under
+    # a different rate - the "versioned price snapshot" requirement without a
+    # separate pricing-config subsystem.
+    cost_calc_version: str = "v1"
     capabilities: ModelCapabilities = ModelCapabilities()
 
 

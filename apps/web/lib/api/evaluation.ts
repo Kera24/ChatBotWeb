@@ -54,6 +54,7 @@ export type EvaluationRun = {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  trigger_source: string | null;
 };
 
 export type EvaluationCategoryBreakdown = Record<string, { total: number; passed: number; failed: number; hard_failure: number }>;

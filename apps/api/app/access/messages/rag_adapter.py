@@ -11,6 +11,7 @@ from app.access.messages.security import SecuredPublicMessage
 from app.access.observability.events import AccessEvent, InMemoryAccessEventSink
 from app.access.widget_config.repository import get_configuration_for_credential
 from app.ai.rag_orchestrator import RAGOrchestrationRequest, RAGOrchestrator, RAGOrchestratorError, RAGProviderExecutionError
+from app.observability.context import AITraceContext
 
 _RESPONSE_SCHEMA_VERSION = "1.1"
 
@@ -42,6 +43,11 @@ class PublicWidgetRAGAdapter:
     def execute(self, secured: SecuredPublicMessage) -> PublicRAGAdapterResult:
         prepared = secured.prepared
         self._emit("widget.message.rag_started", secured, outcome="started")
+        # Reuses the trace_id already generated upstream in
+        # app.access.tenant_resolution.service (NormalisedAccessContext.trace_id)
+        # rather than minting a second one, so one widget request has exactly
+        # one AI trace_id end-to-end.
+        trace_context = AITraceContext(trace_id=prepared.trace_id, request_id=prepared.request_id, conversation_id=prepared.conversation_id)
         try:
             result = self.orchestrator.answer(
                 RAGOrchestrationRequest(
@@ -61,6 +67,7 @@ class PublicWidgetRAGAdapter:
                         "public_session_id": prepared.public_session_id,
                         "idempotency_record_id": prepared.idempotency_record_id,
                     },
+                    trace_context=trace_context,
                 )
             )
         except RAGProviderExecutionError:
