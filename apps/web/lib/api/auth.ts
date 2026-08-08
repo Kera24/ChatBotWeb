@@ -67,6 +67,10 @@ export function resetPassword(token: string, password: string, confirm_password:
   return authRequest<{ message: string }>("/api/v1/auth/reset-password", { token, password, confirm_password });
 }
 
+export function verifyEmail(token: string) {
+  return authRequest<{ message: string }>("/api/v1/auth/verify-email", { token });
+}
+
 export function completeOnboarding() {
   return authRequest<AuthContext>("/api/v1/auth/onboarding/complete", {});
 }

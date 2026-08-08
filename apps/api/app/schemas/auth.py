@@ -75,6 +75,10 @@ class ResetPasswordRequest(BaseModel):
         return self
 
 
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(..., min_length=24, max_length=256)
+
+
 class AuthUserRead(BaseModel):
     id: str
     email: str

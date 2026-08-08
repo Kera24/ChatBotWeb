@@ -1,6 +1,7 @@
 ﻿from datetime import datetime, timezone
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.deps import AuthenticatedUserDependency, DbSession
 from app.auth.rate_limit import auth_rate_limiter
@@ -9,20 +10,28 @@ from app.auth.service import (
     InactiveAccountError,
     InvalidCredentialsError,
     InvalidResetTokenError,
+    InvalidVerificationTokenError,
     authenticate_user,
     complete_onboarding,
     create_auth_session,
+    create_email_verification,
     create_password_reset,
     provision_account,
     reset_password,
     revoke_session,
     session_context,
+    verify_email,
 )
 from app.core.config import settings
-from app.schemas.auth import AuthContextRead, AuthMessageRead, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest
+from app.email.dependencies import get_email_provider
+from app.email.providers.base import TransactionalEmailProvider
+from app.email.service import send_password_reset_email, send_verification_email
+from app.schemas.auth import AuthContextRead, AuthMessageRead, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, VerifyEmailRequest
 from app.schemas.common import success_response
 
 router = APIRouter()
+
+EmailProviderDependency = Annotated[TransactionalEmailProvider, Depends(get_email_provider)]
 
 
 def _client_key(request: Request, email: str | None = None) -> str:
@@ -75,7 +84,7 @@ def _auth_context(db: DbSession, user) -> AuthContextRead:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, request: Request, response: Response, db: DbSession) -> dict[str, object]:
+def register(payload: RegisterRequest, request: Request, response: Response, db: DbSession, email_provider: EmailProviderDependency) -> dict[str, object]:
     if not auth_rate_limiter.check(_client_key(request, payload.email)):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many authentication attempts. Try again shortly.")
     try:
@@ -84,6 +93,12 @@ def register(payload: RegisterRequest, request: Request, response: Response, db:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists.") from exc
     token, _session = create_auth_session(db, user=account.user, user_agent=request.headers.get("user-agent"), ip_address=_client_key(request), remember=False)
     _set_session_cookie(response, token)
+    # Best-effort: a verification-email delivery failure must never block
+    # registration - create_email_verification/send_verification_email are
+    # already fail-safe internally (see app.email.service._send).
+    verification_token = create_email_verification(db, user=account.user)
+    if verification_token is not None:
+        send_verification_email(email_provider, to_email=account.user.email, verification_token=verification_token)
     return success_response(_auth_context(db, account.user).model_dump(mode="json"))
 
 
@@ -122,11 +137,24 @@ def complete_onboarding_endpoint(current_user: AuthenticatedUserDependency, db: 
 
 
 @router.post("/forgot-password")
-def forgot_password(payload: ForgotPasswordRequest, request: Request, db: DbSession) -> dict[str, object]:
+def forgot_password(payload: ForgotPasswordRequest, request: Request, db: DbSession, email_provider: EmailProviderDependency) -> dict[str, object]:
     if not auth_rate_limiter.check(_client_key(request, payload.email)):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many authentication attempts. Try again shortly.")
-    create_password_reset(db, email=payload.email)
-    return success_response(AuthMessageRead(message="If an account exists, password reset instructions will be sent when email delivery is configured.").model_dump(mode="json"))
+    # create_password_reset returns None for both "no such account" and "account
+    # exists but has no password" - the response below is identical either way,
+    # so this never reveals account existence. reset_delivery_supported/the
+    # message text reflect only which provider is configured deployment-wide
+    # (never whether a matching account was found).
+    reset_token = create_password_reset(db, email=payload.email)
+    if reset_token is not None:
+        send_password_reset_email(email_provider, to_email=payload.email, reset_token=reset_token)
+    delivery_supported = email_provider.provider_key != "dev"
+    message = (
+        "If an account exists, password reset instructions have been sent."
+        if delivery_supported
+        else "If an account exists, password reset instructions will be sent when email delivery is configured."
+    )
+    return success_response(AuthMessageRead(message=message, reset_delivery_supported=delivery_supported).model_dump(mode="json"))
 
 
 @router.post("/reset-password")
@@ -138,6 +166,10 @@ def reset_password_endpoint(payload: ResetPasswordRequest, db: DbSession) -> dic
     return success_response(AuthMessageRead(message="Password updated. You can now log in.").model_dump(mode="json"))
 
 
-@router.get("/verify-email")
-def verify_email_unsupported() -> dict[str, object]:
-    return success_response(AuthMessageRead(message="Email verification is not configured for this environment.").model_dump(mode="json"))
+@router.post("/verify-email")
+def verify_email_endpoint(payload: VerifyEmailRequest, db: DbSession) -> dict[str, object]:
+    try:
+        verify_email(db, token=payload.token)
+    except InvalidVerificationTokenError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email verification link is invalid or expired.") from exc
+    return success_response(AuthMessageRead(message="Email verified. You can now log in.").model_dump(mode="json"))

@@ -11,12 +11,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import AuditEvent, AuthSession, Membership, Organisation, PasswordResetToken, Subscription, User, Workspace
+from app.db.models import AuditEvent, AuthSession, EmailVerificationToken, Membership, Organisation, PasswordResetToken, Subscription, User, Workspace
 
 PASSWORD_ITERATIONS = 210_000
 PASSWORD_SCHEME = "pbkdf2_sha256"
 SESSION_TOKEN_BYTES = 32
 RESET_TOKEN_BYTES = 32
+VERIFICATION_TOKEN_BYTES = 32
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
 
@@ -37,6 +38,10 @@ class InactiveAccountError(AuthError):
 
 
 class InvalidResetTokenError(AuthError):
+    pass
+
+
+class InvalidVerificationTokenError(AuthError):
     pass
 
 
@@ -87,6 +92,10 @@ def create_session_token() -> str:
 
 def create_reset_token() -> str:
     return secrets.token_urlsafe(RESET_TOKEN_BYTES)
+
+
+def create_verification_token() -> str:
+    return secrets.token_urlsafe(VERIFICATION_TOKEN_BYTES)
 
 
 def provision_account(db: Session, *, full_name: str, email: str, password: str, organisation_name: str) -> ProvisionedAccount:
@@ -222,6 +231,48 @@ def reset_password(db: Session, *, token: str, password: str) -> User:
         workspace_id=_first_workspace(db, _first_membership(db, user.id).organisation_id).id,
         actor_user_id=user.id,
         action="auth.password.reset",
+        entity_type="user",
+        entity_id=user.id,
+        metadata_json={},
+    ))
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def create_email_verification(db: Session, *, user: User) -> str | None:
+    if user.email_verified_at is not None:
+        return None
+    token = create_verification_token()
+    db.add(
+        EmailVerificationToken(
+            user_id=user.id,
+            token_hash=hash_token(token),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=settings.AUTH_EMAIL_VERIFICATION_MINUTES),
+        )
+    )
+    db.commit()
+    return token
+
+
+def verify_email(db: Session, *, token: str) -> User:
+    verification = db.execute(select(EmailVerificationToken).where(EmailVerificationToken.token_hash == hash_token(token))).scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    if verification is None or verification.used_at is not None:
+        raise InvalidVerificationTokenError()
+    expires_at = verification.expires_at if verification.expires_at.tzinfo else verification.expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= now:
+        raise InvalidVerificationTokenError()
+    user = db.get(User, verification.user_id)
+    if user is None or user.status != "active":
+        raise InvalidVerificationTokenError()
+    user.email_verified_at = now
+    verification.used_at = now
+    db.add(AuditEvent(
+        organisation_id=_first_membership(db, user.id).organisation_id,
+        workspace_id=_first_workspace(db, _first_membership(db, user.id).organisation_id).id,
+        actor_user_id=user.id,
+        action="auth.email.verified",
         entity_type="user",
         entity_id=user.id,
         metadata_json={},

@@ -4,10 +4,10 @@ import { motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 
-import { AuthApiError, completeOnboarding, loginAccount, registerAccount, requestPasswordReset, resetPassword } from "../../lib/api/auth";
+import { AuthApiError, completeOnboarding, loginAccount, registerAccount, requestPasswordReset, resetPassword, verifyEmail } from "../../lib/api/auth";
 
 type AuthShellProps = {
   title: string;
@@ -162,6 +162,44 @@ export function ResetPasswordForm() {
   }
 
   return <form className="authForm" onSubmit={submit}>{message ? <p className="authNotice" role="status">{message}</p> : null}{error ? <p className="authError" role="alert">{error}</p> : null}<AuthInput icon={<LockKeyhole size={17} />} label="New password" value={form.password} onChange={(value) => setForm({ ...form, password: value })} type="password" autoComplete="new-password" /><AuthInput icon={<LockKeyhole size={17} />} label="Confirm password" value={form.confirm_password} onChange={(value) => setForm({ ...form, confirm_password: value })} type="password" autoComplete="new-password" /><button className="authSubmit" disabled={pending || !token}>{pending ? "Updating" : "Reset password"}</button><p className="authSwitch"><Link href="/login">Back to login</Link></p></form>;
+}
+
+export function VerifyEmailForm() {
+  const params = useSearchParams();
+  const token = params.get("token") || "";
+  const [status, setStatus] = useState<"pending" | "success" | "error">(token ? "pending" : "error");
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) {
+      setMessage("This verification link is missing its token.");
+      return;
+    }
+    let cancelled = false;
+    verifyEmail(token)
+      .then((response) => {
+        if (cancelled) return;
+        setStatus("success");
+        setMessage(response.data.message);
+      })
+      .catch((caught) => {
+        if (cancelled) return;
+        setStatus("error");
+        setMessage(messageForAuthError(caught, "Email verification failed."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  return (
+    <div className="authForm">
+      {status === "pending" ? <p className="authNotice" role="status">Verifying your email…</p> : null}
+      {status === "success" ? <p className="authNotice" role="status">{message}</p> : null}
+      {status === "error" ? <p className="authError" role="alert">{message}</p> : null}
+      <Link className="authSubmit" href="/login">Back to login</Link>
+    </div>
+  );
 }
 
 export function OnboardingPanel() {

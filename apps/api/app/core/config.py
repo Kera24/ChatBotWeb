@@ -34,6 +34,17 @@ class Settings:
     AUTH_SESSION_DAYS: int = _get_int("AUTH_SESSION_DAYS", 7)
     AUTH_REMEMBER_SESSION_DAYS: int = _get_int("AUTH_REMEMBER_SESSION_DAYS", 30)
     AUTH_PASSWORD_RESET_MINUTES: int = _get_int("AUTH_PASSWORD_RESET_MINUTES", 30)
+    AUTH_EMAIL_VERIFICATION_MINUTES: int = _get_int("AUTH_EMAIL_VERIFICATION_MINUTES", 1440)
+
+    # Transactional email provider selection (app.email.dependencies.build_email_provider).
+    # Only "dev" and "resend" are recognised today - see the P0-2
+    # launch-readiness task for the provider-abstraction rationale (mirrors
+    # AI_PROVIDER's shape in app.ai.dependencies.create_ai_core).
+    TRANSACTIONAL_EMAIL_PROVIDER: str = getenv("TRANSACTIONAL_EMAIL_PROVIDER", "dev")
+    RESEND_API_KEY: str = getenv("RESEND_API_KEY", "")
+    EMAIL_FROM_ADDRESS: str = getenv("EMAIL_FROM_ADDRESS", "")
+    EMAIL_FROM_NAME: str = getenv("EMAIL_FROM_NAME", "Conversa")
+
     DATABASE_URL: str = getenv("DATABASE_URL", "sqlite:///./local.db")
     REDIS_URL: str = getenv("REDIS_URL", "redis://localhost:6379/0")
     RATE_LIMIT_IDENTITY_SECRET: str = getenv("RATE_LIMIT_IDENTITY_SECRET", "dev-rate-limit-identity-secret-change-me")
