@@ -2,7 +2,7 @@
 
 ## Current
 
-Cookie-session auth (`yoranix_session`, HMAC-hashed token storage), dev-header fallback for local/test environments, membership-based RBAC (`org_owner`/`client_admin`/`contributor`/`viewer`/`super_admin`). Full detail: `docs/architecture/authentication.md`.
+Cookie-session auth (`yoranix_session`, HMAC-hashed token storage), dev-header fallback for local/test environments (gated by both `APP_ENV` **and** an explicit `ALLOW_DEV_AUTH=true` opt-in, fail-closed by default — see P1-2 of the launch-readiness review), membership-based RBAC (`org_owner`/`client_admin`/`contributor`/`viewer`/`super_admin`). Full detail: `docs/architecture/authentication.md`.
 
 ## Future
 

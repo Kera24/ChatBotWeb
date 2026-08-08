@@ -39,6 +39,27 @@ def get_authenticated_user(
 
 AuthenticatedUserDependency = Annotated[object, Depends(get_authenticated_user)]
 
+# Development-header auth (X-Development-User-Email/X-Development-Role) is
+# only ever trusted when APP_ENV is one of these AND settings.ALLOW_DEV_AUTH
+# is explicitly enabled (P1-2 of the launch-readiness review) - APP_ENV
+# alone is not a security boundary, since it defaults to "development" and a
+# missing/mistaken value in a real deployment must never silently grant
+# dev-auth access. See assert_dev_auth_policy_safe for the matching startup
+# guard that refuses to boot on an unsafe combination.
+_DEV_AUTH_APP_ENVS = {"development", "test", "testing"}
+
+
+def assert_dev_auth_policy_safe() -> None:
+    """Called once at app startup (see app.main.create_app) - raises
+    immediately rather than deferring an unsafe configuration to the first
+    request. Mirrors app.ai.dependencies._assert_mock_provider_allowed and
+    app.email.dependencies._assert_dev_provider_allowed."""
+    if settings.ALLOW_DEV_AUTH and settings.APP_ENV.strip().lower() not in _DEV_AUTH_APP_ENVS:
+        raise RuntimeError(
+            f"ALLOW_DEV_AUTH=true is set but APP_ENV={settings.APP_ENV!r} is not development/test/testing. "
+            "Refusing to start with development-header authentication enabled outside development/test."
+        )
+
 
 def get_development_current_user(
     db: DbSession,
@@ -59,7 +80,7 @@ def get_development_current_user(
             membership = db.execute(select(Membership).where(Membership.user_id == user.id, Membership.status == "active").order_by(Membership.created_at)).scalar_one_or_none()
         return DevelopmentCurrentUser(email=user.email, role=membership.role if membership is not None else "viewer", user_id=user.id)
 
-    if settings.APP_ENV.lower() not in {"development", "test", "testing"}:
+    if settings.APP_ENV.strip().lower() not in _DEV_AUTH_APP_ENVS or not settings.ALLOW_DEV_AUTH:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
     email = x_development_user_email or "dev-super-admin@example.test"

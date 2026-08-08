@@ -36,6 +36,15 @@ class Settings:
     AUTH_PASSWORD_RESET_MINUTES: int = _get_int("AUTH_PASSWORD_RESET_MINUTES", 30)
     AUTH_EMAIL_VERIFICATION_MINUTES: int = _get_int("AUTH_EMAIL_VERIFICATION_MINUTES", 1440)
 
+    # Development-header auth opt-in (app.api.deps.get_development_current_user,
+    # P1-2 of the launch-readiness review). Defaults to false ("fail closed")
+    # so a missing/mistaken APP_ENV can never, by itself, expose the
+    # X-Development-User-Email/X-Development-Role bypass - APP_ENV being
+    # development/test/testing is necessary but no longer sufficient; this
+    # flag must also be explicitly enabled. See
+    # app.api.deps.assert_dev_auth_policy_safe for the matching startup guard.
+    ALLOW_DEV_AUTH: bool = getenv("ALLOW_DEV_AUTH", "false").lower() in {"1", "true", "yes"}
+
     # Transactional email provider selection (app.email.dependencies.build_email_provider).
     # Only "dev" and "resend" are recognised today - see the P0-2
     # launch-readiness task for the provider-abstraction rationale (mirrors

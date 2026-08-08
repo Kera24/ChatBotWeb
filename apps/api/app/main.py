@@ -2,6 +2,7 @@
 from fastapi.routing import APIRoute
 
 from app.ai.dependencies import create_ai_core
+from app.api.deps import assert_dev_auth_policy_safe
 from app.api.health import router as health_router
 from app.api.v1.router import API_V1_ROUTER_REGISTRATIONS
 from app.billing.gateway import create_billing_gateway
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
         version=settings.VERSION,
     )
 
+    assert_dev_auth_policy_safe()
     app.state.ai_core = create_ai_core()
     app.state.billing_gateway = create_billing_gateway()
     app.state.email_provider = build_email_provider()
