@@ -38,6 +38,22 @@ class AIProviderHealthCheckError(AIProviderError):
     code = "AI_PROVIDER_HEALTH_CHECK_FAILED"
 
 
+class AIProviderConfigurationError(AIProviderError):
+    code = "AI_PROVIDER_CONFIGURATION_ERROR"
+
+
+class AIProviderAuthenticationError(AIProviderError):
+    code = "AI_PROVIDER_AUTHENTICATION_FAILED"
+
+
+class AIProviderRateLimitedError(AIProviderError):
+    code = "AI_PROVIDER_RATE_LIMITED"
+
+
+class AIProviderInvalidResponseError(AIProviderError):
+    code = "AI_PROVIDER_INVALID_RESPONSE"
+
+
 class InvalidExecutionPolicyError(ValueError):
     code = "INVALID_EXECUTION_POLICY"
 

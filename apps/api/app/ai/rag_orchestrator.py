@@ -40,7 +40,6 @@ def _elapsed_ms(started_at: float) -> int:
 
 
 DEFAULT_RAG_PROMPT_KEY = "grounded_rag_answer"
-DEFAULT_RAG_MODEL_KEY = "mock-grounded-answer"
 FALLBACK_ANSWER = "The available knowledge base does not contain enough information to answer that."
 
 
@@ -194,7 +193,14 @@ class RAGOrchestrator:
             metadata_json=request.metadata,
         )
 
-        model_key = request.model_key or DEFAULT_RAG_MODEL_KEY
+        # Resolved from settings.DEFAULT_AI_MODEL_KEY (env-driven, see
+        # app.ai.dependencies.create_ai_core) rather than a hardcoded mock
+        # literal, so a request that doesn't pin a specific model_key follows
+        # whichever provider AI_PROVIDER actually configured - the mechanism
+        # that makes "no silent mock fallback in production" hold for both
+        # the dashboard test endpoint and the public widget adapter, which
+        # both normally call answer() with model_key=None.
+        model_key = request.model_key or settings.DEFAULT_AI_MODEL_KEY
         prompt_key = request.prompt_key or DEFAULT_RAG_PROMPT_KEY
         model = self.ai_core.model_registry.get(model_key, require_enabled=True)
 

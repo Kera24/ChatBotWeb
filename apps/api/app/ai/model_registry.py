@@ -68,3 +68,31 @@ def register_default_mock_model(registry: ModelRegistry) -> None:
             capabilities=ModelCapabilities(streaming=False, json_mode=False, tools=False, vision=False),
         )
     )
+
+
+def register_openrouter_model(
+    registry: ModelRegistry,
+    *,
+    provider_model_name: str,
+    model_key: str = "openrouter-default",
+    context_window: int = 128_000,
+) -> None:
+    # Per-model pricing on OpenRouter varies by the underlying model chosen
+    # via OPENROUTER_MODEL and isn't known statically here, so cost fields are
+    # left unset rather than guessed. app.ai.accounting._rate_to_decimal
+    # treats an unset rate as $0/token (same as the mock model), so estimated
+    # cost will read as zero until real per-model pricing is configured here -
+    # tracked as a known follow-up, not a launch blocker for provider wiring.
+    registry.register(
+        ModelConfig(
+            model_key=model_key,
+            provider_key="openrouter",
+            provider_model_name=provider_model_name,
+            display_name=f"OpenRouter: {provider_model_name}",
+            enabled=True,
+            context_window=context_window,
+            input_cost_per_million_tokens=None,
+            output_cost_per_million_tokens=None,
+            capabilities=ModelCapabilities(streaming=False, json_mode=False, tools=False, vision=False),
+        )
+    )

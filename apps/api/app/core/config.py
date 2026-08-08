@@ -82,8 +82,23 @@ class Settings:
     # Set this explicitly once one does.
     RETRIEVAL_MIN_SIMILARITY_SCORE: float = _get_float("RETRIEVAL_MIN_SIMILARITY_SCORE", 0.0)
     PROMPT_VERSION: str = getenv("PROMPT_VERSION", "grounded-answer-v1")
-    DEFAULT_AI_PROVIDER_KEY: str = getenv("DEFAULT_AI_PROVIDER_KEY", "mock")
-    DEFAULT_AI_MODEL_KEY: str = getenv("DEFAULT_AI_MODEL_KEY", "mock-grounded-answer")
+
+    # Generation provider selection (app.ai.dependencies.create_ai_core). Only
+    # "mock" and "openrouter" are recognised today - see
+    # docs/engineering/ai-system-design.md for the provider-abstraction
+    # rationale. DEFAULT_AI_PROVIDER_KEY/DEFAULT_AI_MODEL_KEY below default
+    # from AI_PROVIDER so existing readers of those two settings (e.g.
+    # app.api.v1.settings) automatically reflect whichever provider is
+    # actually wired in, without duplicating the selection concept.
+    AI_PROVIDER: str = getenv("AI_PROVIDER", "mock")
+    OPENROUTER_API_KEY: str = getenv("OPENROUTER_API_KEY", "")
+    OPENROUTER_MODEL: str = getenv("OPENROUTER_MODEL", "")
+    OPENROUTER_BASE_URL: str = getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    LLM_TEMPERATURE: float = _get_float("LLM_TEMPERATURE", 0.0)
+    LLM_MAX_TOKENS: int = _get_int("LLM_MAX_TOKENS", 512)
+    LLM_TIMEOUT_SECONDS: float = _get_float("LLM_TIMEOUT_SECONDS", 30.0)
+    DEFAULT_AI_PROVIDER_KEY: str = getenv("DEFAULT_AI_PROVIDER_KEY", AI_PROVIDER)
+    DEFAULT_AI_MODEL_KEY: str = getenv("DEFAULT_AI_MODEL_KEY", "openrouter-default" if AI_PROVIDER == "openrouter" else "mock-grounded-answer")
     AI_REQUEST_TIMEOUT_SECONDS: float = float(getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
     MOCK_PROVIDER_FAILURE_MODE: str = getenv("MOCK_PROVIDER_FAILURE_MODE", "disabled")
     PUBLIC_WIDGETS_ENABLED: str = getenv("PUBLIC_WIDGETS_ENABLED", "true")
