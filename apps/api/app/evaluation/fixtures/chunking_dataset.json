@@ -1,0 +1,1382 @@
+{
+  "assistant": {
+    "display_name": "Meridian Platform Support Assistant"
+  },
+  "dataset": {
+    "name": "Chunking bake-off structured corpus",
+    "description": "Deliberately long, structurally rich synthetic Meridian CI/CD platform knowledge base (policies, technical docs, runbooks, product docs, FAQs) built to genuinely exercise multi-chunk documents for the Knowledge Pipeline V2 chunking strategy bake-off - unlike golden_dataset.json, whose documents are all shorter than one chunk. No real customer data. Includes nested headings, long paragraphs, lists, tables, code fences, repeated terminology across documents, conflicting/superseded facts, and cross-section/cross-document facts.",
+    "version": "1"
+  },
+  "documents": [
+    {
+      "key": "data_retention_privacy_policy",
+      "title": "Data Retention and Privacy Policy",
+      "content": "# Data Retention and Privacy Policy\n\nThis policy explains what data Meridian collects on behalf of customers, where it is stored, how long it is retained, and how customers can request deletion. It applies to all workspaces on every plan tier unless a signed Enterprise order form states otherwise. Every engineer who joins the platform team is required to read this policy before being granted production data access.\n\n## Data We Collect\n\nMeridian collects build logs, deployment artifacts, pipeline configuration files, audit events, and account profile data. Source code is never permanently stored by Meridian; it is checked out into an ephemeral build runner and discarded when the job finishes. Environment variables marked as secrets are encrypted separately from the rest of the pipeline configuration and are never included in build logs, even when a build fails.\n\nAccount profile data includes the workspace owner's name, email address, and billing contact details. Meridian does not collect payment card numbers directly; those are handled entirely by the payment processor and never touch Meridian's own systems.\n\n## Data Storage Locations\n\nCustomer data is stored in one of two regions depending on the workspace's configured region setting. European Union workspaces store data in the Frankfurt region. All other workspaces store data in the Virginia region. Cross-region replication is not offered on any plan tier today, which means a workspace cannot have its primary data simultaneously present in both regions.\n\nA workspace's region is selected once, during creation, and cannot be changed afterward without opening a support ticket and undergoing a full data migration, which typically takes 5 to 10 business days depending on the amount of stored data.\n\n## Retention Periods\n\nRetention periods vary by data category, described in the subsections below. As a general rule, the more operationally sensitive a data category is, the shorter its retention period, while data needed for security investigations is retained the longest.\n\n### Build Logs\n\nBuild logs are retained for 90 days from the completion of the build, after which they are automatically and permanently deleted. Build logs cannot be recovered after this window closes, even by Meridian support staff. Customers who need longer log retention for compliance purposes should export logs to their own storage using the log export API before the 90-day window closes.\n\n### Deployment Artifacts\n\nDeployment artifacts are retained for 180 days by default. Enterprise workspaces may configure an extended retention period of up to 2 years by contacting their account manager. Extending artifact retention does not extend build log retention, which remains fixed at 90 days on every tier regardless of the artifact retention setting.\n\n### Audit Logs\n\nAudit logs recording who performed which administrative action are retained for 400 days on all plan tiers. Audit logs are the one data category not eligible for early deletion, even upon customer request, because they may be required for security investigations. This 400-day retention period applies uniformly and is not configurable by workspace owners or account managers.\n\n### Account Data\n\nWhen a workspace is closed, account profile data is retained for 30 days to allow for accidental-closure recovery, then permanently purged. During this 30-day window, a workspace owner can contact support to reverse the closure. After the 30-day window elapses, reversal is no longer possible under any circumstances, including a written request from the original workspace owner.\n\n## Data Deletion Process\n\nCustomers may request early deletion of build logs and deployment artifacts (but not audit logs) at any time through the workspace settings page or by emailing privacy@meridian.example. Deletion requests are processed within 15 business days of submission. A confirmation email is sent once deletion completes, listing exactly which data categories were removed.\n\n## Data Subject Rights\n\nIndividuals may request access to, correction of, or deletion of their personal data by contacting privacy@meridian.example. Meridian responds to data subject access requests within 30 days, consistent with applicable data protection law. A request for correction is generally processed faster than a full access request, often within 5 business days.\n\n## International Data Transfers\n\nWhere data must be transferred between the Frankfurt and Virginia regions for support purposes, Meridian relies on Standard Contractual Clauses. Customers who require that support staff never access data outside their configured region may request this restriction on Business and Enterprise tiers. This restriction, once enabled, may slow down some support investigations that would otherwise benefit from cross-region tooling."
+    },
+    {
+      "key": "refund_cancellation_policy",
+      "title": "Refund and Cancellation Policy",
+      "content": "# Refund and Cancellation Policy\n\nThis policy describes when a subscription payment is eligible for a refund, how to request one, and how cancellation works for self-serve and Enterprise customers. It is reviewed annually by the billing team and was last updated alongside the introduction of the Business tier.\n\n## Eligibility\n\nMonthly subscription customers are covered by a 7-day money-back guarantee starting from the date of purchase. Annual subscription customers are covered by a longer 30-day money-back guarantee, in recognition of the larger upfront commitment. Outside these windows, payments are non-refundable except where required by law.\n\nThe money-back guarantee applies once per workspace per 12-month period. A workspace that has already received a refund cannot request a second refund within the same 12-month window, even if it re-subscribes and cancels again.\n\n## How to Request a Refund\n\nRefund requests are submitted from the Billing page by selecting the invoice in question and choosing Request Refund, or by emailing billing@meridian.example with the invoice number. Support will confirm eligibility before processing. Most eligibility checks are completed automatically and near-instantly; only edge cases such as a workspace nearing its once-per-year refund limit require manual review.\n\n## Refund Timelines\n\nApproved refunds are processed back to the original payment method within 7 business days. Bank processing times beyond that point are outside Meridian's control and vary by card issuer, and can add an additional 3 to 5 days before the funds appear in the customer's account.\n\n## Cancellation Process\n\nA subscription can be cancelled at any time from the Billing page. Cancellation takes effect at the end of the current billing period; the workspace remains fully functional until that date. Meridian does not offer partial-month refunds for a cancellation made outside the money-back guarantee window described above.\n\nCancelling does not immediately delete workspace data. Data follows the same retention periods described in the Data Retention and Privacy Policy, starting from the date the workspace formally closes at the end of the billing period, not from the date cancellation was requested.\n\n## Enterprise Contract Exceptions\n\nEnterprise customers on a signed annual order form are governed by the terms of that order form rather than this self-serve policy. Enterprise cancellations require 60 days of written notice delivered to the assigned account manager. Enterprise order forms do not include the standard 30-day money-back guarantee unless the order form explicitly states otherwise.\n\nAn Enterprise customer that cancels with less than 60 days notice remains billed for the full 60-day notice period, even if platform access is voluntarily discontinued earlier than that.\n\n## Special Cases\n\nIf Meridian experiences a Severity 1 outage as defined in the Service Level Agreement Policy and a customer wishes to cancel citing that outage, the standard money-back guarantee windows above still apply; the SLA's service credit mechanism, not this refund policy, is the intended remedy for an uptime shortfall."
+    },
+    {
+      "key": "sla_policy",
+      "title": "Service Level Agreement Policy",
+      "content": "# Service Level Agreement Policy\n\nThis Service Level Agreement (SLA) describes Meridian's uptime commitment by plan tier, how service credits are calculated, and support response time targets. It applies automatically to every paid workspace; no separate enrollment is required.\n\n## Uptime Commitment\n\nMeridian commits to the following monthly uptime percentages measured against the build and deployment API: Standard tier 99.5%, Professional tier 99.9%, Enterprise tier 99.95%. Uptime is measured as the percentage of successful health-check requests against total requests over a calendar month.\n\nUptime is calculated per workspace region. A Virginia-region incident does not count against the uptime of a Frankfurt-region workspace, and vice versa, since the two regions run on independent infrastructure.\n\n## Service Credits\n\nWhen actual uptime falls below the committed percentage for a tier, the affected customer is eligible for a service credit applied to the following month's invoice. If uptime falls below the commitment but stays at or above 99.0%, the credit is 10% of that month's invoice. If uptime falls below 99.0% but stays at or above 95.0%, the credit is 25%. If uptime falls below 95.0%, the credit is 50%, the maximum credit available under this SLA.\n\nService credits are not paid out as cash refunds under any circumstances; they can only be applied against a future invoice. A workspace that cancels before the credit is applied forfeits any pending credit.\n\n## Credit Request Process\n\nService credit requests must be submitted within 30 days of the qualifying incident through the support portal. Requests submitted after the 30-day window are not honored. Meridian reviews eligible requests and applies approved credits within one billing cycle. A request should reference the incident's status page entry where possible, which speeds up review.\n\n## Exclusions\n\nScheduled maintenance windows, announced at least 72 hours in advance through the status page, are excluded from uptime calculations. Outages caused by a customer's own misconfiguration, a customer's upstream Git provider outage, or a force majeure event are also excluded.\n\nA degradation limited to a single non-critical subsystem, such as delayed webhook delivery, is generally classified as Severity 2 under the incident response runbook and does not by itself breach the uptime commitment, which is measured against the core build and deployment API specifically.\n\n## Support Response Times by Tier\n\nSupport response time targets differ by plan tier and issue severity.\n\n| Tier | Standard Issue | Critical Issue |\n\n| --- | --- | --- |\n\n| Standard | 24 business hours | 24 business hours |\n\n| Professional | 4 business hours | 4 business hours |\n\n| Enterprise | 4 business hours | 30 minutes |\n\nThese response time targets are distinct from the uptime service credit calculation above and are not themselves subject to service credits. A missed response time target is instead handled as a support escalation, described in the Support Tiers and Response Times page.\n\n## How This SLA Relates to the Incident Response Runbook\n\nThe severity classifications used internally by the incident response runbook (Severity 1, 2, and 3) inform, but are not identical to, the uptime percentage thresholds in this SLA. A single Severity 1 incident lasting only a few minutes may not be enough on its own to drop a tier below its committed monthly uptime percentage."
+    },
+    {
+      "key": "acceptable_use_policy",
+      "title": "Acceptable Use Policy",
+      "content": "# Acceptable Use Policy\n\nThis policy defines activities that are prohibited on Meridian's build infrastructure and the enforcement process that follows a violation. It exists to keep shared build infrastructure available and safe for every customer.\n\n## Prohibited Activities\n\nThe following activities are prohibited on any Meridian build runner or deployment target:\n\n- Running cryptocurrency mining software of any kind\n\n- Using build runners to host production traffic unrelated to building or deploying the connected repository\n\n- Attempting to access another workspace's build runners, secrets, or artifacts\n\n- Circumventing concurrent build runner limits through automated job splitting designed solely to evade the limit\n\n- Using the platform to conduct security scans or penetration tests against systems the workspace owner does not control\n\n## Resource Abuse\n\nIndividual build jobs are automatically terminated after 4 continuous hours of runtime, regardless of plan tier, to prevent runaway resource consumption. This automatic termination is a resource-abuse safeguard and is separate from the concurrent build runner limits described in the FAQ troubleshooting guide, which cap how many jobs can run at once rather than how long any single job may run.\n\nA workspace whose average build duration is unusually high compared to similar projects may be contacted by the platform team proactively, even before the 4-hour automatic cutoff is reached, to help diagnose whether the long runtime reflects a genuine workload or a misconfiguration.\n\n## Enforcement Actions\n\nViolations are enforced progressively. The first confirmed violation results in a warning email to the workspace owner describing the violation. A second violation within any 12-month period results in a 24-hour suspension of all build runners for the workspace. A third violation results in permanent account termination without refund.\n\nEnforcement actions are recorded against the workspace, not against an individual user, so a violation caused by one team member's script still counts toward the workspace's total even if a different administrator handles the resulting appeal.\n\n## Appeals Process\n\nA workspace owner may appeal an enforcement action within 10 days of receiving notice by submitting the trust and safety form linked in the warning or suspension email. Appeals are reviewed by the trust and safety team, who will respond within 5 business days with a final decision. A successful appeal reverses the enforcement action but does not reset the 12-month violation count to zero."
+    },
+    {
+      "key": "security_compliance_policy",
+      "title": "Security and Compliance Policy",
+      "content": "# Security and Compliance Policy\n\nThis policy summarizes Meridian's encryption practices, current compliance certifications, and incident and vulnerability disclosure timelines. It is reviewed by the security team every six months.\n\n## Encryption\n\nAll customer data is encrypted at rest using AES-256. Data in transit between customer systems and Meridian, and between Meridian's own internal services, is encrypted using TLS 1.3. Encryption keys are rotated on a managed schedule and are never accessible to application-layer code directly.\n\n## Certifications\n\nMeridian has been SOC 2 Type I certified since June 2023. In February 2025, Meridian completed SOC 2 Type II certification. The Type II certification supersedes the earlier Type I certification for all customer-facing purposes; customers requesting a compliance report today receive the Type II report, and the Type I report is retained only for historical audit trail purposes and is no longer issued to new requesters.\n\nISO 27001 certification is in progress and is expected to complete in the third quarter of 2026. Until that certification completes, Meridian cannot provide an ISO 27001 certificate to customers who require one, though a readiness assessment summary is available on request.\n\n## Incident Response\n\nConfirmed security incidents affecting customer data are disclosed to affected customers within 72 hours of confirmation. Disclosure includes a description of the incident, the data categories affected, and remediation steps taken. This 72-hour disclosure clock starts at confirmation, not at initial detection, since many suspected incidents are ruled out during initial investigation.\n\n## Vulnerability Disclosure\n\nSecurity researchers may report vulnerabilities to security@meridian.example. Meridian commits to an initial response within 48 hours of a report. The bug bounty program pays rewards of up to $5,000 for critical findings, scaled down for lower-severity findings according to the published rewards table on the security page.\n\nResearchers are asked not to publicly disclose a finding until Meridian confirms a fix has shipped, or 90 days have elapsed since the report, whichever comes first.\n\n## Which Certification Should I Reference in a Vendor Security Questionnaire?\n\nCustomers filling out a vendor security questionnaire should reference the SOC 2 Type II certification, since it is the current and superseding certification. Referencing the older Type I certification in a new questionnaire is discouraged, as Type I no longer reflects Meridian's active compliance posture."
+    },
+    {
+      "key": "api_authentication_guide",
+      "title": "API Authentication Guide",
+      "content": "# API Authentication Guide\n\nThis guide explains how to authenticate requests to the Meridian API, including API keys, OAuth2 client credentials, key rotation, rate limits, and error codes.\n\n## API Keys\n\nAPI keys are prefixed `mk_live_` for production keys and `mk_test_` for sandbox keys. Each key can be scoped to read-only access or read-write access when it is created. A read-only key cannot trigger deployments or modify pipeline configuration, even if the request is otherwise valid.\n\nKeys are shown in full only once, at creation time. If a key is lost, it must be revoked and a new one generated; Meridian cannot redisplay a previously generated key for security reasons.\n\n## OAuth2 Client Credentials\n\nFor server-to-server integrations, Meridian supports the OAuth2 client credentials grant. Access tokens issued through this flow expire after 3600 seconds (one hour). A new token can be requested from the `/oauth/token` endpoint using the client id and client secret at any time before or after expiry.\n\nUnlike an API key, an OAuth2 access token cannot be scoped narrower than the client's own configured permissions; scoping must be done when the OAuth client itself is registered, not per token request.\n\n## Token Rotation\n\nMeridian recommends rotating API keys at least every 90 days. When a new key is generated, the previous key remains valid for a 24-hour grace period to allow deployed services to pick up the new key without a hard cutover. After the 24-hour grace period, the old key stops working immediately with no further warning.\n\n## Rate Limits\n\nRead endpoints are limited to 600 requests per minute per API key. Write endpoints, which include triggering deployments and modifying configuration, are limited to 120 requests per minute per API key. These limits apply per key, not per workspace, so multiple keys can be used to increase overall throughput.\n\nThe rate limit window is a sliding 60-second window, not a fixed calendar-minute window, so requests are evaluated continuously rather than resetting all at once on the minute boundary.\n\n## Error Codes\n\nThe API returns the following error codes for authentication-related failures:\n\n- 401: invalid or missing credentials\n\n- 403: credentials valid but insufficient scope for the requested operation\n\n- 429: rate limit exceeded; the response includes a Retry-After header\n\n- 503: platform maintenance in progress\n\nA 403 response is a strong signal that the API key needs to be regenerated with read-write scope rather than read-only scope, since the credentials themselves were accepted as valid."
+    },
+    {
+      "key": "webhooks_integration_guide",
+      "title": "Webhooks Integration Guide",
+      "content": "# Webhooks Integration Guide\n\nThis guide explains how to receive real-time event notifications from Meridian via webhooks, including event types, payload signing, retry behavior, and endpoint requirements.\n\n## Event Types\n\nMeridian can deliver the following event types to a registered webhook endpoint:\n\n- build.started\n\n- build.completed\n\n- build.failed\n\n- deployment.started\n\n- deployment.completed\n\n- deployment.rolled_back\n\nEach event type can be individually enabled or disabled per webhook endpoint; an endpoint is not required to subscribe to every event type.\n\n## Payload Signing\n\nEvery webhook payload is signed using HMAC-SHA256 with the workspace's webhook secret. The signature is sent in the `X-Meridian-Signature` header, and the receiving endpoint should recompute the signature over the raw request body to verify authenticity before trusting the payload.\n\nThe webhook secret can be rotated independently of API keys from the Webhooks settings page. Rotating the webhook secret does not have the 24-hour grace period that API key rotation has; the old secret stops validating signatures immediately.\n\n## Retry Policy\n\nIf a webhook delivery fails, Meridian retries the delivery up to 5 times using exponential backoff, with the first retry starting 30 seconds after the initial failure. After 5 failed attempts, the delivery is marked as permanently failed and is not retried further.\n\nA delivery log showing every attempt, including timestamps and response codes, is available from the Webhooks settings page for 30 days after the final attempt.\n\n## Endpoint Requirements\n\nA webhook endpoint must respond within 10 seconds with a 2xx status code, or the delivery is considered failed and enters the retry sequence described above. Endpoints must be served over HTTPS; endpoints using plain HTTP are rejected at registration time and cannot be saved.\n\n## Testing a Webhook Endpoint\n\nA test event can be sent on demand from the Webhooks settings page without waiting for a real build or deployment to occur. This is the recommended way to verify signature validation logic before relying on the endpoint in production."
+    },
+    {
+      "key": "cli_reference_guide",
+      "title": "CLI Reference Guide",
+      "content": "# CLI Reference Guide\n\nThis guide documents installation, authentication, common commands, the configuration file, and exit codes for the Meridian command-line interface.\n\n## Installation\n\nThe CLI can be installed with `npm install -g meridian-cli`, or downloaded as a standalone binary from the releases page for environments without Node.js. CLI version 4.2 is the minimum supported version as of this writing; versions below 3.0 no longer receive security patches and should be upgraded immediately.\n\nHomebrew installation is also available via `brew install meridian-cli` on macOS and Linux, and is kept in sync with the npm release within 24 hours of each new version.\n\n## Authentication\n\nRun `meridian login` to authenticate. This opens a browser-based OAuth flow and stores a session token locally. For headless environments such as CI runners, use `meridian login --token <api-key>` instead.\n\nThe locally stored session token from `meridian login` is separate from any API key and cannot be used directly against the REST API; it is only valid for CLI operations.\n\n## Common Commands\n\nThe most frequently used commands are:\n\n1. `meridian deploy` - triggers a deployment of the current branch\n\n2. `meridian logs --follow` - streams live logs for the most recent build\n\n3. `meridian rollback --to <version>` - rolls back a deployment to a previous version\n\n4. `meridian status` - shows the current pipeline and deployment status\n\n5. `meridian secrets set <name>` - stores an encrypted secret for use in pipeline environment variables\n\n## Configuration File\n\nThe CLI reads its configuration from `meridian.yaml` at the repository root. Example:\n\n```yaml\n\nproject: my-service\n\nregion: us-virginia\n\nnotify: slack\n\n```\n\nThe `region` field in this file only affects which region the CLI targets for API calls; it does not change the workspace's storage region, which is fixed at workspace creation as described in the Data Retention and Privacy Policy.\n\n## Exit Codes\n\nThe CLI returns one of the following exit codes: 0 for success, 1 for a general error, 2 for an authentication failure, 3 for an invalid configuration file, and 4 for a deployment rejected by policy (for example, a branch protection rule)."
+    },
+    {
+      "key": "pipeline_configuration_reference",
+      "title": "Pipeline Configuration Reference",
+      "content": "# Pipeline Configuration Reference\n\nThis reference documents the structure of a Meridian pipeline file, including stages, environment variables, caching, and matrix builds.\n\n## Pipeline File Structure\n\nA pipeline is defined in `.meridian/pipeline.yaml` at the repository root. The top-level keys are `stages`, `env`, `cache`, and `matrix`. A minimal example:\n\n```yaml\n\nstages:\n\n  - name: test\n\n    run: npm test\n\n  - name: build\n\n    run: npm run build\n\n```\n\nIf the pipeline file is missing entirely, Meridian falls back to an auto-detected default pipeline based on the project's language, but this fallback is not recommended for production use since it cannot be customized.\n\n## Stages\n\nA pipeline may define up to 20 stages. Stages run in the order declared unless a stage specifies `parallel: true`, in which case it runs alongside the following stage rather than after it. A stage can also declare `continue_on_failure: true` so that a later stage still runs even if this one fails.\n\n## Environment Variables\n\nEnvironment variables prefixed `MERIDIAN_` are reserved for platform use, such as `MERIDIAN_BUILD_ID`, and cannot be overridden by a pipeline's own `env` block. Attempting to override a reserved variable causes the pipeline to fail validation before it runs, returning CLI exit code 3.\n\nSecrets referenced in the `env` block using the `secret:` prefix are pulled from the workspace's encrypted secret store at build time and are automatically masked in build logs, even in the 90 days before those logs are deleted.\n\n## Caching\n\nDeclaring a `cache` key with a path caches that directory between builds, keyed by a hash of the specified lockfile. Cache keys expire after 14 days of inactivity and are evicted automatically; the next build after expiry simply rebuilds the cache from scratch rather than failing.\n\n## Matrix Builds\n\nThe `matrix` key runs the same stages across multiple variable combinations, for example testing against several language runtime versions at once. A single pipeline run supports a maximum of 25 matrix combinations; exceeding this limit causes the pipeline to be rejected at validation time, also returning CLI exit code 3.\n\nMatrix build combinations each count separately against the workspace's concurrent build runner limit described in the FAQ troubleshooting guide, so a 10-combination matrix on the Team tier, which allows 3 concurrent builds, will queue the remaining combinations rather than run them all at once."
+    },
+    {
+      "key": "runbook_production_incident_response",
+      "title": "Runbook: Production Incident Response",
+      "content": "# Runbook: Production Incident Response\n\nThis runbook describes how the on-call team classifies, responds to, and communicates about a production incident. It is the primary reference during any live incident and takes precedence over informal past practice.\n\n## Severity Classification\n\nIncidents are classified into three severities. Severity 1 is a full platform outage affecting all customers. Severity 2 is a partial degradation affecting a subset of customers or a non-critical subsystem. Severity 3 is a minor issue with a workaround available and no significant customer impact.\n\nSeverity is assigned by the first responding on-call engineer and can be revised upward or downward as more information becomes available, though a downward revision from Severity 1 requires sign-off from the incident commander.\n\n## Initial Response Steps\n\nFor a Severity 1 incident, the on-call engineer must be paged within 5 minutes of detection, and an incident commander must be assigned within 10 minutes of the page. For a Severity 2 incident, the on-call engineer must acknowledge the page within 30 minutes. For a Severity 3 incident, acknowledgement within 4 business hours is sufficient.\n\n## Escalation Path\n\nIf the on-call engineer does not respond within 15 minutes of a Severity 1 or Severity 2 page, the incident automatically escalates to the team lead. If the team lead does not respond within a further 30 minutes, the incident escalates to the engineering director.\n\nThis escalation path exists specifically to guarantee that a Severity 1 or Severity 2 incident is never left without an active responder for more than 45 minutes total, combining the initial 15-minute window with the following 30-minute window.\n\n## Communication\n\nThe public status page must be updated within 15 minutes of declaring a Severity 1 or Severity 2 incident. Status page updates should avoid speculating about root cause until it has been confirmed. Updates should be posted at least once every 30 minutes thereafter until the incident is resolved, even if the update is only that investigation is continuing.\n\n## Postmortem Requirements\n\nEvery Severity 1 incident requires a written postmortem submitted within 5 business days of resolution. The postmortem is reviewed by the reliability team before being shared with affected customers. Severity 2 and Severity 3 incidents do not require a formal postmortem unless the reliability team requests one.\n\nA postmortem must include a timeline, root cause, customer impact, and at least one concrete follow-up action with an owner and due date; a postmortem without a follow-up action is considered incomplete and is sent back for revision."
+    },
+    {
+      "key": "runbook_database_failover",
+      "title": "Runbook: Database Failover Procedure",
+      "content": "# Runbook: Database Failover Procedure\n\nThis runbook describes the steps for failing over the primary database to a standby replica during an incident. It should only be executed by an engineer with database administrator access, or under their direct supervision.\n\n## Preconditions\n\nBefore initiating failover, confirm that replica lag is under 5 seconds. Failing over with higher replica lag risks data loss and should only be done as a last resort with explicit incident commander approval.\n\nConfirm also that the standby replica has passed its most recent automated health check within the last 5 minutes; failing over onto an unhealthy replica can turn a partial outage into a full outage.\n\n## Failover Steps\n\n1. Freeze writes on the current primary database\n\n2. Verify the replica has fully caught up to the frozen primary\n\n3. Promote the replica to primary\n\n4. Update connection routing to point at the new primary\n\n5. Resume writes\n\nEach of these five steps should be announced in the incident channel as it begins and as it completes, so the incident commander always knows which step is currently in progress.\n\n## Verification\n\nAfter failover, run the automated health check suite against the new primary and confirm the error rate stays under 0.1% for a sustained 10-minute window before declaring the failover complete. A full failover, from freezing writes to declaring completion, should take no more than 8 minutes under normal conditions.\n\nIf the 10-minute verification window is still in progress when the 8-minute target is reached, the failover is not yet considered complete; the 8-minute target describes the mechanical steps, not the full verification period.\n\n## Rollback\n\nIf the error rate exceeds 1% after failover, revert connection routing back to the original primary within 3 minutes and escalate to the database team immediately rather than attempting a second failover. A second failover attempt without database team involvement is explicitly discouraged by this runbook."
+    },
+    {
+      "key": "runbook_certificate_rotation",
+      "title": "Runbook: Certificate Rotation Procedure",
+      "content": "# Runbook: Certificate Rotation Procedure\n\nThis runbook describes the schedule and steps for rotating TLS certificates on Meridian's public-facing endpoints, both for the routine automated schedule and for emergency revocation.\n\n## Schedule\n\nCertificates are rotated automatically every 60 days. A manual, out-of-schedule rotation is also available for emergency revocation if a certificate or its private key is suspected to be compromised.\n\nAn emergency rotation follows the same rotation steps described below but compresses the 15-minute canary period to 5 minutes, given the urgency of removing a potentially compromised certificate from service.\n\n## Pre-Rotation Checklist\n\nBefore rotating, confirm the new certificate was issued by an approved certificate authority and confirm the corresponding private key has been stored in the secrets vault, not left on a local workstation.\n\nAlso confirm the new certificate's expiry date is at least 90 days out from the rotation date, to avoid a situation where the newly rotated certificate itself needs emergency rotation shortly after going live.\n\n## Rotation Steps\n\nThe new certificate is first staged and validated. Canary traffic is then routed to the new certificate for 15 minutes while error rates are monitored. If the canary period is clean, the remaining traffic is cut over. The old certificate is revoked 24 hours after cutover, giving time to roll back if an unexpected issue surfaces.\n\n## Validation\n\nRotation is not considered complete until a TLS handshake has been confirmed successful against every regional endpoint, not just the region where the canary ran. Both the Frankfurt and Virginia regional endpoints must be individually validated."
+    },
+    {
+      "key": "onboarding_guide_new_workspaces",
+      "title": "Onboarding Guide for New Workspaces",
+      "content": "# Onboarding Guide for New Workspaces\n\nThis guide walks a new administrator through setting up a Meridian workspace for the first time, from account creation through the first successful deployment.\n\n## Account Setup\n\nCreate the workspace, then verify the administrator's email address using the link sent to their inbox. The workspace is not fully active until the email is verified. Verification links expire after 24 hours; an expired link can be resent from the sign-up page.\n\n## Connecting a Repository\n\nMeridian supports connecting repositories hosted on GitHub, GitLab, or Bitbucket. Connecting a repository requires granting Meridian's GitHub App, GitLab integration, or Bitbucket app the requested read and webhook permissions. A single workspace can connect repositories from more than one of these providers at the same time.\n\n## Configuring the First Pipeline\n\nAfter connecting a repository, create a pipeline file as described in the Pipeline Configuration Reference. Meridian can also generate a starter pipeline file automatically by detecting the project's language and framework, which is the recommended path for a first-time setup.\n\n## Inviting Team Members\n\nAt least one additional team member should be invited from the workspace's People page before going to production, so that a single administrator's absence does not block deployments. Invited members receive an email invitation that expires after 7 days if not accepted.\n\n## Enabling Notifications\n\nSlack or email notifications can be configured from the Notifications settings page to alert the team about build and deployment status changes. Notification rules can be scoped to specific pipelines rather than applying to the whole workspace.\n\n## Trial Details\n\nNew workspaces begin on a 14-day free trial that includes up to 500 build minutes. Workspace names must be between 3 and 40 characters, using only lowercase letters, numbers, and hyphens.\n\nIf the 500 trial build minutes are exhausted before the 14-day trial period ends, further builds are queued but not run until the workspace either upgrades to a paid plan or the trial period resets, whichever happens first."
+    },
+    {
+      "key": "billing_plans_overview",
+      "title": "Billing and Plans Overview",
+      "content": "# Billing and Plans Overview\n\nThis page describes Meridian's plan tiers, included build minutes, overage pricing, and available add-ons.\n\n## Plan Tiers\n\n| Plan | Price | Build Minutes Included | Seats |\n\n| --- | --- | --- | --- |\n\n| Starter | $19/month | 1,000 | 5 |\n\n| Team | $79/month | 5,000 | 15 |\n\n| Business | $249/month | 20,000 | Unlimited |\n\n| Enterprise | Custom pricing | Unlimited | Unlimited |\n\nEvery plan tier includes the same core feature set; the differences between tiers are limited to build minutes, seats, concurrent build runners, and support coverage rather than which features are unlocked.\n\n## Build Minutes\n\nBuild minutes are consumed for every pipeline run, measured to the nearest minute, rounded up. Build minutes reset at the start of each billing cycle and do not roll over to the next cycle, so unused minutes are forfeited when the cycle resets.\n\n## Overage Charges\n\nIf a workspace exceeds its included build minutes, additional minutes are billed at $0.006 per minute on the Starter and Team tiers, and $0.004 per minute on the Business tier. Enterprise plans include unlimited build minutes and are never subject to overage charges.\n\nA workspace can set a monthly overage spending cap from the Billing page; once the cap is reached, further builds are queued rather than run, preventing an unexpectedly large invoice.\n\n## Add-ons\n\nAn extra concurrent build runner can be added to any plan for $49/month each. A priority support add-on is available for $99/month on the Starter and Team tiers; priority support is already included at no extra cost on the Business and Enterprise tiers.\n\n## Annual Billing Discount\n\nSwitching from monthly to annual billing on any plan tier saves 15% compared to paying monthly for the same twelve months. This discount is separate from, and not combinable with, any negotiated Enterprise order form discount."
+    },
+    {
+      "key": "faq_billing_payments",
+      "title": "FAQ: Billing and Payments",
+      "content": "# FAQ: Billing and Payments\n\n## What payment methods are accepted?\n\nMeridian accepts all major credit cards for every plan tier. Enterprise customers on an annual contract may also pay by ACH bank transfer. Wire transfer is available for Enterprise contracts above a negotiated minimum annual value.\n\n## Where can I download past invoices?\n\nInvoices are available under Billing > Invoices and remain downloadable for 18 months after being issued. After 18 months, a copy can still be requested from billing@meridian.example, though retrieval may take a few business days since older invoices are moved to archival storage.\n\n## What happens if a payment fails?\n\nMeridian retries a failed payment up to 3 times over 7 days. If all retries fail, the workspace is suspended, meaning new builds cannot start but existing data is preserved. If the balance remains unpaid for a further 15 days after suspension, build history is permanently deleted.\n\nA suspended workspace can be reactivated immediately once a valid payment method clears the outstanding balance, at any point before the 15-day deletion window closes.\n\n## How do I change plans?\n\nUpgrades take effect immediately and are billed on a prorated basis for the remainder of the current cycle. Downgrades take effect at the start of the next billing cycle and are not prorated.\n\n## Are downgrades refunded for unused time?\n\nNo. Because downgrades take effect at the next billing cycle rather than immediately, there is no unused time to refund; the current cycle continues at the original plan's rate until it ends.\n\n## Can I get an itemized breakdown of overage charges?\n\nYes. Each invoice includes a line-item breakdown showing base plan cost, any add-ons, and overage build minutes billed separately, so the two charge types are never combined into a single opaque line."
+    },
+    {
+      "key": "faq_account_security",
+      "title": "FAQ: Account and Security",
+      "content": "# FAQ: Account and Security\n\n## How do I set up two-factor authentication?\n\nTwo-factor authentication can be enabled from Account Settings > Security using any authenticator app that supports the TOTP standard. SMS-based two-factor authentication is not offered, for security reasons related to SIM-swap attacks.\n\n## How long does a login session last?\n\nAn idle session automatically expires after 12 hours of inactivity. Activity resets the timer, so an actively used session can last much longer than 12 hours in total. There is no absolute maximum session length as long as activity continues.\n\n## Does Meridian support single sign-on?\n\nSAML 2.0 single sign-on is available on the Business and Enterprise tiers only. Starter and Team workspaces cannot enable SSO and must use standard email and password or a personal authenticator app instead.\n\n## What are the password requirements?\n\nPasswords must be at least 10 characters long and include at least one number and one symbol. There is no maximum password length enforced beyond typical field limits.\n\n## What if I lose my two-factor device?\n\nContact support and complete identity verification. Manual review of a lost-device recovery request typically takes 24 to 48 hours before access is restored. The 10 recovery codes generated when two-factor authentication was first enabled can also be used to regain access instantly, without waiting for manual review, if they were saved at setup time.\n\n## Can I require SSO for every member of my workspace?\n\nYes, on Business and Enterprise tiers, an administrator can enforce mandatory SSO from the Security settings page, which blocks members from signing in with a password once enabled."
+    },
+    {
+      "key": "faq_troubleshooting_common_errors",
+      "title": "FAQ: Troubleshooting Common Errors",
+      "content": "# FAQ: Troubleshooting Common Errors\n\n## My build failed with exit code 4. What does that mean?\n\nExit code 4 means the deployment was rejected by a policy, most commonly a branch protection rule. Check the repository's branch protection settings to see which rule blocked the deployment. This is the same exit code documented in the CLI Reference Guide's exit codes section.\n\n## I'm getting 429 errors from the API. What should I do?\n\nA 429 response means the per-key rate limit was exceeded. Check the Retry-After header on the response and back off until it elapses. Read and write endpoints have different rate limits, so moving a high-volume operation from a write endpoint to a read endpoint, where possible, can help.\n\n## My webhook endpoint isn't receiving events.\n\nFirst confirm the endpoint responds within 10 seconds with a 2xx status code; slower or non-2xx responses are treated as failed deliveries. Also confirm any firewall in front of the endpoint allows inbound traffic from Meridian's published IP ranges. The delivery log on the Webhooks settings page will show the exact response code and timing of each attempt.\n\n## My pipeline is stuck in a queued state.\n\nThis usually means the workspace has reached its concurrent build runner limit. The limit is 1 concurrent build on Starter, 3 on Team, 10 on Business, and a custom limit on Enterprise. Additional builds queue until a runner frees up rather than failing outright.\n\n## How is the concurrent build runner limit different from included build minutes?\n\nBuild minutes measure total monthly usage and are described in the Billing and Plans Overview. The concurrent build runner limit instead caps how many builds can run at the exact same moment, regardless of how many build minutes remain in the current cycle. A workspace can have plenty of build minutes left and still queue if it is already running its maximum concurrent builds.\n\n## My CLI login keeps failing with exit code 2.\n\nExit code 2 indicates an authentication failure. Confirm the API key used with `meridian login --token` has not expired or been revoked, and that it was generated with at least read scope for CLI operations to succeed."
+    },
+    {
+      "key": "release_notes_version_history",
+      "title": "Release Notes and Version History",
+      "content": "# Release Notes and Version History\n\nThis page summarizes the current and historical status of Meridian's Pipeline API versions and CLI releases, and should be checked before starting any new integration work.\n\n## Pipeline API v3 (Current Beta)\n\nPipeline API v3 entered public beta in January 2026 and adds native matrix build support directly in the API, without requiring the CLI. It is not yet recommended for production integrations while in beta, since its endpoints may still change before general availability.\n\n## Pipeline API v2 (Current Stable)\n\nPipeline API v2 is the current stable, fully supported version and is recommended for all new production integrations today. It has been stable since its release and receives only backward-compatible additions.\n\n## Pipeline API v1 (Deprecated)\n\nPipeline API v1 was deprecated in March 2024. It remains reachable but is scheduled for full shutdown in December 2025, after which any integration still using it will stop working entirely. Customers still on v1 should migrate to v2 well before the shutdown date to avoid a disruption.\n\n## CLI Version Support\n\nCLI version 4.2 is the current minimum supported version. CLI versions below 3.0 no longer receive security patches and should be upgraded as soon as possible. Versions between 3.0 and 4.1 still function but do not receive new feature updates.\n\n## Upcoming Changes\n\nA future CLI release, expected after Pipeline API v3 reaches general availability, will add native matrix build commands so that matrix builds can be triggered without hand-writing the API request."
+    },
+    {
+      "key": "support_tiers_response_times",
+      "title": "Support Tiers and Response Times",
+      "content": "# Support Tiers and Response Times\n\nThis page describes how to reach Meridian support, response time targets by tier, and how after-hours coverage works.\n\n## Support Channels\n\nSupport is available by email and in-app chat on every plan tier. Phone support is available only on the Enterprise tier. The in-app chat widget is available from any page while signed in.\n\n## Response Time by Tier\n\nResponse time targets match the Service Level Agreement Policy: Standard tier 24 business hours for any issue, Professional tier 4 business hours for any issue, and Enterprise tier 4 business hours for standard issues but 30 minutes for critical issues.\n\n## After-Hours Support\n\nEnterprise customers receive full 24/7 after-hours support coverage. Business tier customers receive after-hours coverage only for Severity 1 (critical, full-outage) issues. Starter and Team tier customers do not have after-hours coverage and should expect a response during the next business day.\n\nA Business tier customer contacting support after hours for a non-Severity-1 issue will still have the ticket logged and queued, but should not expect a response until the next business day begins.\n\n## Escalating a Support Ticket\n\nA ticket can be escalated by replying with the word escalate in the ticket thread, or by clicking the Escalate button in the support portal. Escalated tickets receive a callback within 1 business hour, regardless of plan tier.\n\nEscalation does not change the underlying response time target for the tier; it is intended for cases where the original response time target was already missed, and guarantees a fast acknowledgement even though full resolution may still take longer."
+    },
+    {
+      "key": "company_background_irrelevant",
+      "title": "About Meridian - Our Story",
+      "content": "# About Meridian - Our Story\n\nMeridian was founded by a small team of infrastructure engineers who were frustrated with how slow and fragile their previous employer's build pipelines were. The name Meridian was chosen to evoke a line that every team's code passes through on its way to production.\n\n## Our Mission\n\nWe care deeply about security and support for our customers, and we believe developer tools should feel invisible when they work and obvious to fix when they don't. This mission statement guides product decisions but is not itself a source of specific policy commitments.\n\n## Offices\n\nMeridian has offices in Austin, Lisbon, and Singapore, with the majority of the engineering team working remotely across North America and Europe. The Austin office also hosts the company's small hardware lab, used for testing physical network equipment unrelated to the hosted platform.\n\n## Community Involvement\n\nThe team sponsors several open-source continuous integration projects and hosts a quarterly meetup for platform engineers in each of its office cities. Meridian employees are encouraged to spend up to one day a quarter contributing to an open-source project of their choosing."
+    }
+  ],
+  "cases": [
+    {
+      "question": "How long are build logs kept before they are automatically deleted?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "data_retention_privacy_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "retention"
+      ]
+    },
+    {
+      "question": "Can Enterprise customers extend deployment artifact retention beyond the default 180 days?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "data_retention_privacy_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "retention",
+        "paraphrase"
+      ]
+    },
+    {
+      "question": "How many days are audit logs retained on the platform?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "data_retention_privacy_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "retention",
+        "heading-dependent"
+      ],
+      "notes": "Answer is under ### Audit Logs, distinct from the nearby 90-day build-log figure."
+    },
+    {
+      "question": "If I close my workspace, how many days do I have to reverse the closure before account data is purged?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "data_retention_privacy_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "retention",
+        "boundary"
+      ],
+      "notes": "Fact sits at the end of the Retention Periods section."
+    },
+    {
+      "question": "Which region stores data for a workspace based in the European Union?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "data_retention_privacy_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "regions"
+      ]
+    },
+    {
+      "question": "How many days is the money-back guarantee window for a monthly subscription?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "How long do I have to request a refund if I paid for an annual plan?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing",
+        "paraphrase"
+      ]
+    },
+    {
+      "question": "Can a workspace receive two money-back-guarantee refunds within the same 12-month period?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing",
+        "edge-case"
+      ]
+    },
+    {
+      "question": "How many days of written notice does an Enterprise customer need to give before cancelling?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "I want to cancel because of a recent outage - does the refund policy give me my money back, or does something else apply?",
+      "category": "multi_document",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy",
+        "sla_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "cross-section"
+      ],
+      "notes": "Refund policy's Special Cases section points to the SLA's service credit mechanism as the intended remedy."
+    },
+    {
+      "question": "What uptime percentage does Meridian commit to for the Enterprise tier?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "sla_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "sla"
+      ]
+    },
+    {
+      "question": "What service credit percentage applies if monthly uptime falls to 97%?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "sla_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "sla",
+        "boundary"
+      ],
+      "notes": "Requires selecting the correct credit band (95.0%-99.0% -> 25%)."
+    },
+    {
+      "question": "How many days do I have to submit a service credit request after a qualifying incident?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "sla_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "sla"
+      ]
+    },
+    {
+      "question": "Are scheduled maintenance windows counted against Meridian's uptime commitment?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "sla_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "sla"
+      ]
+    },
+    {
+      "question": "If Meridian misses its uptime commitment badly, do I get a cash refund or a service credit?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "sla_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "sla",
+        "boundary"
+      ],
+      "notes": "Doc states credits are never paid out as cash."
+    },
+    {
+      "question": "After how many continuous hours does Meridian automatically terminate a running build job?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "acceptable_use_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "aup"
+      ]
+    },
+    {
+      "question": "What happens to a workspace after its third acceptable-use policy violation?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "acceptable_use_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "aup"
+      ]
+    },
+    {
+      "question": "How many days do I have to appeal an enforcement action under the Acceptable Use Policy?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "acceptable_use_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "aup"
+      ]
+    },
+    {
+      "question": "Does a successful appeal reset a workspace's 12-month violation count back to zero?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "acceptable_use_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "aup",
+        "boundary"
+      ]
+    },
+    {
+      "question": "Which SOC 2 certification should I reference today, Type I or Type II?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "security_compliance_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security",
+        "superseded"
+      ],
+      "notes": "Type II supersedes Type I for all customer-facing purposes."
+    },
+    {
+      "question": "When did Meridian complete its SOC 2 Type II certification?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "security_compliance_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "question": "What encryption standard protects Meridian customer data while in transit?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "security_compliance_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "question": "How quickly does Meridian commit to an initial response for a submitted vulnerability report?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "security_compliance_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "question": "Has Meridian completed its ISO 27001 certification yet?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "security_compliance_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security",
+        "boundary"
+      ],
+      "notes": "Certification is in progress, expected Q3 2026 - not yet complete."
+    },
+    {
+      "question": "What prefix do production Meridian API keys use?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "api_authentication_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api"
+      ]
+    },
+    {
+      "question": "How long does an OAuth2 client-credentials access token stay valid before expiring?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "api_authentication_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api"
+      ]
+    },
+    {
+      "question": "After rotating an API key, how long does the old key continue to work?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "api_authentication_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api",
+        "boundary"
+      ]
+    },
+    {
+      "question": "What is the rate limit for write endpoints, in requests per minute?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "api_authentication_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api",
+        "heading-dependent"
+      ],
+      "notes": "Distinct from the nearby 600/min read-endpoint limit."
+    },
+    {
+      "question": "What does a 403 response from the Meridian API indicate?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "api_authentication_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api"
+      ]
+    },
+    {
+      "question": "How many times does Meridian retry a failed webhook delivery?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "webhooks_integration_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "webhooks"
+      ]
+    },
+    {
+      "question": "Which HTTP header carries the webhook payload signature?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "webhooks_integration_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "webhooks"
+      ]
+    },
+    {
+      "question": "How many seconds does a webhook endpoint have to respond before a delivery is considered failed?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "webhooks_integration_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "webhooks",
+        "paraphrase"
+      ]
+    },
+    {
+      "question": "Can a webhook endpoint be registered using plain HTTP instead of HTTPS?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "webhooks_integration_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "webhooks"
+      ]
+    },
+    {
+      "question": "Which CLI command rolls back a deployment to a previous version?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "cli_reference_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "cli"
+      ]
+    },
+    {
+      "question": "What does CLI exit code 3 mean?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "cli_reference_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "cli",
+        "heading-dependent"
+      ]
+    },
+    {
+      "question": "What is the minimum supported Meridian CLI version right now?",
+      "category": "multi_document",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "cli_reference_guide",
+        "release_notes_version_history"
+      ],
+      "citation_required": true,
+      "tags": [
+        "cross-section"
+      ],
+      "notes": "The same 4.2 figure is restated in both the CLI guide and the release notes page."
+    },
+    {
+      "question": "How do I authenticate the CLI in a headless CI environment without a browser?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "cli_reference_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "cli"
+      ]
+    },
+    {
+      "question": "What is the maximum number of stages allowed in a single pipeline?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "pipeline_configuration_reference"
+      ],
+      "citation_required": true,
+      "tags": [
+        "pipelines"
+      ]
+    },
+    {
+      "question": "How many days of inactivity before a pipeline cache key expires?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "pipeline_configuration_reference"
+      ],
+      "citation_required": true,
+      "tags": [
+        "pipelines"
+      ]
+    },
+    {
+      "question": "What is the maximum number of matrix build combinations allowed in a single pipeline run?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "pipeline_configuration_reference"
+      ],
+      "citation_required": true,
+      "tags": [
+        "pipelines"
+      ]
+    },
+    {
+      "question": "Can a pipeline's env block override a MERIDIAN_-prefixed reserved variable?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "pipeline_configuration_reference"
+      ],
+      "citation_required": true,
+      "tags": [
+        "pipelines"
+      ]
+    },
+    {
+      "question": "Within how many minutes must a Severity 1 incident be paged to the on-call engineer?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_production_incident_response"
+      ],
+      "citation_required": true,
+      "tags": [
+        "incident-response"
+      ]
+    },
+    {
+      "question": "How many business days after resolution is a Severity 1 postmortem due?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_production_incident_response"
+      ],
+      "citation_required": true,
+      "tags": [
+        "incident-response"
+      ]
+    },
+    {
+      "question": "If the on-call engineer does not respond within 15 minutes to a Severity 1 page, who does the incident escalate to?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_production_incident_response"
+      ],
+      "citation_required": true,
+      "tags": [
+        "incident-response",
+        "boundary"
+      ]
+    },
+    {
+      "question": "Do Severity 3 incidents require a formal written postmortem?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_production_incident_response"
+      ],
+      "citation_required": true,
+      "tags": [
+        "incident-response"
+      ]
+    },
+    {
+      "question": "What is the maximum acceptable replica lag before initiating a database failover?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_database_failover"
+      ],
+      "citation_required": true,
+      "tags": [
+        "runbooks"
+      ]
+    },
+    {
+      "question": "How long should a full database failover take under normal conditions?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_database_failover"
+      ],
+      "citation_required": true,
+      "tags": [
+        "runbooks"
+      ]
+    },
+    {
+      "question": "What error rate threshold triggers a rollback after a database failover?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_database_failover"
+      ],
+      "citation_required": true,
+      "tags": [
+        "runbooks",
+        "boundary"
+      ]
+    },
+    {
+      "question": "How often are TLS certificates rotated automatically?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_certificate_rotation"
+      ],
+      "citation_required": true,
+      "tags": [
+        "runbooks"
+      ]
+    },
+    {
+      "question": "How long after cutover is the old TLS certificate revoked?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_certificate_rotation"
+      ],
+      "citation_required": true,
+      "tags": [
+        "runbooks"
+      ]
+    },
+    {
+      "question": "How long is the canary traffic period during an emergency certificate rotation?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "runbook_certificate_rotation"
+      ],
+      "citation_required": true,
+      "tags": [
+        "runbooks",
+        "boundary"
+      ],
+      "notes": "5 minutes for emergency rotation, contrasted with 15 minutes for the routine schedule."
+    },
+    {
+      "question": "How many build minutes are included in the free trial?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "onboarding_guide_new_workspaces"
+      ],
+      "citation_required": true,
+      "tags": [
+        "onboarding",
+        "cross-section"
+      ],
+      "notes": "Distinct from the per-plan build minutes in the Billing and Plans Overview."
+    },
+    {
+      "question": "How many days does the free trial last?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "onboarding_guide_new_workspaces"
+      ],
+      "citation_required": true,
+      "tags": [
+        "onboarding"
+      ]
+    },
+    {
+      "question": "What characters are allowed in a Meridian workspace name?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "onboarding_guide_new_workspaces"
+      ],
+      "citation_required": true,
+      "tags": [
+        "onboarding"
+      ]
+    },
+    {
+      "question": "How long before an unaccepted team invitation expires?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "onboarding_guide_new_workspaces"
+      ],
+      "citation_required": true,
+      "tags": [
+        "onboarding"
+      ]
+    },
+    {
+      "question": "How much does the Team plan cost per month?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "billing_plans_overview"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "How many build minutes are included in the Business plan?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "billing_plans_overview"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "What is the overage rate per extra build minute on the Team plan?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "billing_plans_overview"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing",
+        "heading-dependent"
+      ],
+      "notes": "Distinct from the Business tier's lower overage rate."
+    },
+    {
+      "question": "How much does an extra concurrent build runner cost per month?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "billing_plans_overview"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "How much can I save by switching from monthly to annual billing?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "billing_plans_overview"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing",
+        "boundary"
+      ],
+      "notes": "Fact sits in the final section of the document."
+    },
+    {
+      "question": "How many payment retry attempts does Meridian make before suspending a workspace?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_billing_payments"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "How many days after suspension is a workspace's build history permanently deleted?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_billing_payments"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing",
+        "boundary"
+      ]
+    },
+    {
+      "question": "Are plan downgrades prorated?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_billing_payments"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "Can Enterprise customers pay by ACH bank transfer?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_billing_payments"
+      ],
+      "citation_required": true,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "question": "Does Meridian offer SMS-based two-factor authentication?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_account_security"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "question": "How long can an idle login session last before it automatically expires?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_account_security"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "question": "Is single sign-on available on the Starter plan?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_account_security"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "question": "What is the minimum required password length?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_account_security"
+      ],
+      "citation_required": true,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "question": "What does a build failure with exit code 4 mean?",
+      "category": "multi_document",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_troubleshooting_common_errors",
+        "cli_reference_guide"
+      ],
+      "citation_required": true,
+      "tags": [
+        "cross-section"
+      ],
+      "notes": "Exit code 4 is defined identically in both the troubleshooting FAQ and the CLI reference guide."
+    },
+    {
+      "question": "How many concurrent builds can run at once on the Team plan?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_troubleshooting_common_errors"
+      ],
+      "citation_required": true,
+      "tags": [
+        "troubleshooting",
+        "heading-dependent"
+      ]
+    },
+    {
+      "question": "Why might my webhook endpoint not be receiving any events?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_troubleshooting_common_errors"
+      ],
+      "citation_required": true,
+      "tags": [
+        "troubleshooting"
+      ]
+    },
+    {
+      "question": "How is the concurrent build runner limit different from a workspace's included build minutes?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "faq_troubleshooting_common_errors"
+      ],
+      "citation_required": true,
+      "tags": [
+        "troubleshooting",
+        "cross-section"
+      ]
+    },
+    {
+      "question": "Which Pipeline API version is currently recommended for new production integrations?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "release_notes_version_history"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api",
+        "superseded"
+      ]
+    },
+    {
+      "question": "When is Pipeline API v1 scheduled to fully shut down?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "release_notes_version_history"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api"
+      ]
+    },
+    {
+      "question": "When did Pipeline API v3 enter public beta?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "release_notes_version_history"
+      ],
+      "citation_required": true,
+      "tags": [
+        "api"
+      ]
+    },
+    {
+      "question": "Is phone support available on the Team tier?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "support_tiers_response_times"
+      ],
+      "citation_required": true,
+      "tags": [
+        "support"
+      ]
+    },
+    {
+      "question": "Do Business tier customers get after-hours support for any issue, or only for critical ones?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "support_tiers_response_times"
+      ],
+      "citation_required": true,
+      "tags": [
+        "support",
+        "boundary"
+      ]
+    },
+    {
+      "question": "How do I escalate a support ticket?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "support_tiers_response_times"
+      ],
+      "citation_required": true,
+      "tags": [
+        "support"
+      ]
+    },
+    {
+      "question": "Does the Enterprise critical-issue response time in the support tiers page match the SLA policy's figure?",
+      "category": "multi_document",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "support_tiers_response_times",
+        "sla_policy"
+      ],
+      "citation_required": true,
+      "tags": [
+        "cross-section"
+      ],
+      "notes": "Both documents state the same 30-minute figure; consistency-check style question spanning two docs."
+    },
+    {
+      "question": "Does Meridian sponsor any community events or meetups?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "company_background_irrelevant"
+      ],
+      "citation_required": true,
+      "tags": [
+        "company"
+      ]
+    },
+    {
+      "question": "Where are Meridian's offices located?",
+      "category": "answerable_factual",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "company_background_irrelevant"
+      ],
+      "citation_required": true,
+      "tags": [
+        "company"
+      ]
+    },
+    {
+      "question": "Does Meridian offer SMS-based two-factor authentication as a backup option for Enterprise customers specifically?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "faq_account_security"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "SMS 2FA is stated as not offered at all, with no Enterprise-specific exception described."
+    },
+    {
+      "question": "What refund percentage applies if I cancel an annual plan 45 days after purchase?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "Only a 30-day eligibility cutoff is defined; no partial/scaled refund percentage exists past that window."
+    },
+    {
+      "question": "How many concurrent build runners does the Enterprise tier include by default?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "faq_troubleshooting_common_errors"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "Doc states Enterprise has a 'custom limit', not a specific default number."
+    },
+    {
+      "question": "What uptime percentage does Meridian commit to during the free trial period?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "sla_policy"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "The SLA defines Standard/Professional/Enterprise tiers only; there is no trial-tier uptime commitment."
+    },
+    {
+      "question": "What is the maximum bug bounty reward for a low-severity vulnerability finding?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "security_compliance_policy"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "Only the critical-finding maximum ($5,000) is a concrete number; lower severities are only described as 'scaled down'."
+    },
+    {
+      "question": "How many days of written notice does a Starter plan customer need to give before cancelling?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "The 60-day written notice requirement applies only to Enterprise contracts, not self-serve tiers."
+    },
+    {
+      "question": "Which specific authenticator app does Meridian officially recommend for two-factor authentication?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "faq_account_security"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "Doc says 'any standard authenticator app that supports TOTP' - no specific app is named."
+    },
+    {
+      "question": "How many build minutes does a Team plan workspace get during its free trial?",
+      "category": "similar_but_absent",
+      "expected_answerability": "unanswerable",
+      "expected_document_keys": [
+        "onboarding_guide_new_workspaces"
+      ],
+      "citation_required": false,
+      "tags": [
+        "trap"
+      ],
+      "notes": "Trial minutes (500) are flat and not tied to which plan tier will eventually be chosen."
+    },
+    {
+      "question": "Does Meridian support deployments to on-premises Kubernetes clusters?",
+      "category": "unanswerable",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "fallback"
+      ]
+    },
+    {
+      "question": "What is Meridian's stock ticker symbol?",
+      "category": "unanswerable",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "fallback"
+      ]
+    },
+    {
+      "question": "Can I pay for my Meridian subscription using cryptocurrency?",
+      "category": "unanswerable",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "fallback"
+      ]
+    },
+    {
+      "question": "Does Meridian offer a native mobile app for iOS or Android?",
+      "category": "unanswerable",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "fallback"
+      ]
+    },
+    {
+      "question": "What is the maximum file size allowed for a single build artifact?",
+      "category": "unanswerable",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "fallback"
+      ]
+    },
+    {
+      "question": "Who is Meridian's current chief executive officer?",
+      "category": "unanswerable",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "fallback"
+      ]
+    },
+    {
+      "question": "What's a good recipe for chocolate chip cookies?",
+      "category": "irrelevant_off_topic",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "off-topic"
+      ]
+    },
+    {
+      "question": "Who won the most recent World Cup?",
+      "category": "irrelevant_off_topic",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "off-topic"
+      ]
+    },
+    {
+      "question": "Can you write me a short poem about autumn?",
+      "category": "irrelevant_off_topic",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "off-topic"
+      ]
+    },
+    {
+      "question": "What's the weather like in Austin today?",
+      "category": "irrelevant_off_topic",
+      "expected_answerability": "unanswerable",
+      "citation_required": false,
+      "tags": [
+        "off-topic",
+        "trap"
+      ],
+      "notes": "Austin is named in the corpus only as an office location - retrieval should not be fooled into treating a weather question as answerable."
+    },
+    {
+      "question": "How do I cancel?",
+      "category": "ambiguous",
+      "expected_answerability": "ambiguous",
+      "citation_required": false,
+      "tags": [
+        "clarification-needed"
+      ],
+      "notes": "Self-serve vs Enterprise cancellation differ in notice period and refund eligibility."
+    },
+    {
+      "question": "What's the rate limit?",
+      "category": "ambiguous",
+      "expected_answerability": "ambiguous",
+      "citation_required": false,
+      "tags": [
+        "clarification-needed"
+      ],
+      "notes": "Read and write API endpoints have different rate limits."
+    },
+    {
+      "question": "How long until my data is deleted?",
+      "category": "ambiguous",
+      "expected_answerability": "ambiguous",
+      "citation_required": false,
+      "tags": [
+        "clarification-needed"
+      ],
+      "notes": "Build logs, artifacts, audit logs, and account data all have different retention periods."
+    },
+    {
+      "question": "build minutes?",
+      "category": "benign_edge_case",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "billing_plans_overview"
+      ],
+      "citation_required": false,
+      "tags": [
+        "edge-case",
+        "terse"
+      ]
+    },
+    {
+      "question": "CAN I GET A REFUND???",
+      "category": "benign_edge_case",
+      "expected_answerability": "answerable",
+      "expected_document_keys": [
+        "refund_cancellation_policy"
+      ],
+      "citation_required": false,
+      "tags": [
+        "edge-case",
+        "casing"
+      ]
+    }
+  ]
+}

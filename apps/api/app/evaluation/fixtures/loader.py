@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
 FIXTURE_PATH = Path(__file__).parent / "launch_dataset.json"
 GOLDEN_FIXTURE_PATH = Path(__file__).parent / "golden_dataset.json"
+CHUNKING_FIXTURE_PATH = Path(__file__).parent / "chunking_dataset.json"
 
 _PLACEHOLDER_KEYS = {
     "workspace_id": "__foreign_workspace_id__",
@@ -86,6 +87,16 @@ def load_fixture_definition() -> dict:
 
 def load_golden_fixture_definition() -> dict:
     return json.loads(GOLDEN_FIXTURE_PATH.read_text(encoding="utf-8"))
+
+
+def load_chunking_fixture_definition() -> dict:
+    """`chunking_dataset.json` - a separate, deliberately long/structurally
+    rich corpus (Knowledge Pipeline V2 Phase 7 bake-off) built specifically
+    so chunking strategies can produce genuinely different multi-chunk
+    output, unlike golden_dataset.json's short (one-chunk) documents. Kept
+    as its own fixture file rather than extending golden_dataset.json so the
+    general launch/regression evaluation corpus is unaffected."""
+    return json.loads(CHUNKING_FIXTURE_PATH.read_text(encoding="utf-8"))
 
 
 _CASE_METADATA_PASSTHROUGH_KEYS = ("notes", "expected_clarification", "forbidden_answer_points", "citation_required")

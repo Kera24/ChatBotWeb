@@ -48,8 +48,18 @@ class EvalEmbeddingConfig:
 # never a universal constant. Do not add an entry here for a new model
 # without re-running that same analysis; `recommended_min_similarity_score`
 # deliberately returns None (not a guess) for any unlisted model.
+#
+# nomic-embed-text-v2-moe recalibrated 0.25 -> 0.32 (ADR-0032) after
+# structure_aware chunking (ADR-0031) became the production default: the
+# original 0.25 was derived against golden_dataset.json's one-chunk-per-
+# document (whole ~50-word document) embeddings, not the shorter (~63-word
+# average), topically-narrower chunks structure_aware actually produces. Full
+# re-analysis in docs/04_Engineering/Evaluation_Score_Distribution_Analysis_Chunking_StructureAware.md.
+# 0.32 remains below golden_dataset.json's own relevant-score p10 (0.337), so
+# this change is non-regressive for the original one-chunk-per-document
+# evaluation flow too.
 _VALIDATED_MIN_SIMILARITY_SCORE_BY_MODEL: dict[str, float] = {
-    "nomic-embed-text-v2-moe": 0.25,
+    "nomic-embed-text-v2-moe": 0.32,
 }
 
 

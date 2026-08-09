@@ -24,14 +24,26 @@ enforces this dimension on INSERT, so every vector in this file is padded to
 exactly that width (see `ControlledEmbeddingProvider` below).
 
 Since a fresh database-per-test would make this tier too slow to be useful
-day-to-day, all tests in this module share one long-lived schema (session
--scoped engine) and rely on fresh, randomly-generated UUID tenant rows per
-test (via `_seed_tenant`'s `suffix` argument, which only needs to be unique
-*within this file* - `Organisation.slug` has a real unique constraint) for
-isolation - incidentally a more production-realistic setup than a wiped
-database, since it proves tenant-scoping still holds with OTHER tenants'
-rows already present in the same tables, the way a real multi-tenant
-Postgres database always looks.
+day-to-day, all tests in this module share one long-lived schema (module
+-scoped engine) and rely on distinct `suffix` values per test (via
+`_seed_tenant`'s `suffix` argument, which only needs to be unique *within
+this file* - `Organisation.slug` has a real unique constraint) for isolation
+*within* one run - incidentally a more production-realistic setup than a
+wiped database, since it proves tenant-scoping still holds with OTHER
+tenants' rows already present in the same tables, the way a real
+multi-tenant Postgres database always looks.
+
+Isolation *across* separate runs (this file executed twice back to back, or
+after a previous run crashed mid-test) is a different problem: `suffix`
+values are fixed strings, not randomly generated per run, so without a
+reset, a second run's `INSERT`s collide with the first run's leftover rows
+on `Organisation.slug`'s unique constraint. `pg_engine` below resets the
+schema (`Base.metadata.drop_all` then `create_all`) both before the module's
+tests run and after, so every run starts from a byte-identical empty slate
+regardless of how the previous run ended - this is the "deterministic
+truncate/reset with safe teardown" isolation strategy, scoped to the
+dedicated `chatbotweb_test` database only (see `POSTGRES_TEST_DATABASE_URL`
+above), never the dev/prod database at `DATABASE_URL`.
 """
 
 from __future__ import annotations
@@ -101,8 +113,23 @@ def pg_engine():
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
+    # Reset BEFORE running: makes this run self-healing regardless of
+    # whether the previous run's own teardown got a chance to execute (a
+    # killed process, a Ctrl+C, a Docker restart mid-run all skip Python
+    # teardown code entirely) - the fixed `suffix` values in this file's
+    # `_seed_tenant` calls are only unique within a single run, so starting
+    # from a genuinely empty schema is what actually fixes the duplicate-key
+    # failures on a second/stale run, not just a best-effort cleanup after.
+    # drop_all's default checkfirst=True makes this safe to run against an
+    # already-empty (or brand new) database too.
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield engine
+    # Reset AFTER too, so a normal (non-crashed) run leaves nothing behind
+    # either - belt-and-suspenders with the pre-run reset above. Runs even
+    # if a test inside this module raised, since pytest always resumes a
+    # yield-fixture's teardown code on the way out of the module's tests.
+    Base.metadata.drop_all(engine)
     engine.dispose()
 
 

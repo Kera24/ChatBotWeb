@@ -18,7 +18,7 @@ Orchestrated from `app.api.v1.documents`:
 
 1. **Upload** — `create_uploaded_document_with_version()` via `LocalDocumentStorage`; size/type validated (`UnsupportedUploadType`, `UploadTooLarge`).
 2. **Extraction** — automated via the upload pipeline, or `app.services.manual_extraction.manually_extract_document_version()` for content that needs manual text entry instead (e.g. content that can't be auto-extracted).
-3. **Chunking** — `app.services.chunking.chunk_document_version()`. Size controlled by `CHUNK_SIZE_WORDS`/`CHUNK_OVERLAP_WORDS` in `Settings`. Strategy selectable via `settings.CHUNKING_STRATEGY` (`fixed_word` baseline, or `structure_aware`/`structure_semantic` — see `docs/engineering/chunking.md`); default `fixed_word` is the original, unchanged code path.
+3. **Chunking** — `app.services.chunking.chunk_document_version()`. Size controlled by `CHUNK_SIZE_WORDS`/`CHUNK_OVERLAP_WORDS` in `Settings`. Strategy selectable via `settings.CHUNKING_STRATEGY` (default `structure_aware` per ADR-0031; `fixed_word` — the original, unchanged code path — remains available as a one-line rollback; `structure_semantic` is opt-in — see `docs/engineering/chunking.md`).
 4. **Embedding** — `app.services.embeddings.embed_document_version_chunks()`, via whichever provider `build_embedding_provider()` constructs from `EMBEDDING_PROVIDER`/`EMBEDDING_MODEL`/`EMBEDDING_DIMENSION`. See `vector-storage.md` for provider details and the Postgres-only vector-write behavior.
 5. **Activation** — `Document.active_document_version_id` is updated once a version is `ready`; only the active version's chunks are retrievable.
 

@@ -64,6 +64,8 @@ Each page uses a Current / Future / Out-of-scope structure; pages for subsystems
 | 0028 | Engineering documentation as a first-class deliverable |
 | 0029 | Retain Azure architecture without deploying |
 | 0030 | Developer Operating System |
+| 0031 | Promote structure-aware chunking to the default strategy |
+| 0032 | Recalibrate the nomic-embed-text-v2-moe retrieval threshold for structure-aware chunking |
 
 Full list with pre-existing 0001-0018: see `docs/adr/` directory or `docs/README.md`.
 

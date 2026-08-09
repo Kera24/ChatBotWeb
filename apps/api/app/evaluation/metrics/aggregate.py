@@ -36,6 +36,7 @@ class RunSummary:
     category_breakdown: dict[str, dict[str, int]]
     average_duplicate_context_rate: float | None = None
     average_precision_at_k: float | None = None
+    average_recall_at_k: float | None = None
     unauthorised_source_rate: float | None = None
     invalid_citation_rate: float | None = None
     failed_cases_list: list[CaseSummary] = field(default_factory=list)
@@ -58,6 +59,7 @@ class RunSummary:
             "total_tokens": self.total_tokens,
             "average_duplicate_context_rate": self.average_duplicate_context_rate,
             "average_precision_at_k": self.average_precision_at_k,
+            "average_recall_at_k": self.average_recall_at_k,
             "unauthorised_source_rate": self.unauthorised_source_rate,
             "invalid_citation_rate": self.invalid_citation_rate,
             "category_breakdown": self.category_breakdown,
@@ -129,6 +131,9 @@ def summarise_results(results: list[dict]) -> RunSummary:
     precision_values = [r["retrieval_metrics"].get("precision_at_k") for r in results if r["retrieval_metrics"].get("precision_at_k") is not None]
     average_precision_at_k = (sum(precision_values) / len(precision_values)) if precision_values else None
 
+    recall_values = [r["retrieval_metrics"].get("recall_at_k") for r in results if r["retrieval_metrics"].get("recall_at_k") is not None]
+    average_recall_at_k = (sum(recall_values) / len(recall_values)) if recall_values else None
+
     unauthorised_source_flags = [r for r in results if r["retrieval_metrics"]]
     unauthorised_source_rate = (
         sum(1 for r in unauthorised_source_flags if r["retrieval_metrics"].get("unauthorised_source_failure")) / len(unauthorised_source_flags)
@@ -183,6 +188,7 @@ def summarise_results(results: list[dict]) -> RunSummary:
         category_breakdown=category_breakdown,
         average_duplicate_context_rate=average_duplicate_context_rate,
         average_precision_at_k=average_precision_at_k,
+        average_recall_at_k=average_recall_at_k,
         unauthorised_source_rate=unauthorised_source_rate,
         invalid_citation_rate=invalid_citation_rate,
         failed_cases_list=failed_cases_list,

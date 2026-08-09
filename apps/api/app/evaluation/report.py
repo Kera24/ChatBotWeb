@@ -43,6 +43,7 @@ def render_text_report(run: EvaluationRun, summary: RunSummary, gate: GateVerdic
         f"Fallback rate on answerable cases:       {_fmt_pct(summary.fallback_rate_on_answerable)}",
         f"Correct fallback on unanswerable cases:  {_fmt_pct(summary.correct_fallback_rate_on_unanswerable)}",
         f"Average precision@k:                     {_fmt_pct(summary.average_precision_at_k)}",
+        f"Average recall@k:                        {_fmt_pct(summary.average_recall_at_k)}",
         f"Average duplicate-context rate:           {_fmt_pct(summary.average_duplicate_context_rate)}",
         f"Unauthorised-source rate:                {_fmt_pct(summary.unauthorised_source_rate)}",
         f"Invalid-citation rate:                    {_fmt_pct(summary.invalid_citation_rate)}",

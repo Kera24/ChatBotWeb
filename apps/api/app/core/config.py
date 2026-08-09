@@ -95,7 +95,13 @@ class Settings:
     # "structure_aware" or "structure_semantic" to opt a deployment in;
     # setting it back to "fixed_word" is the entire rollback procedure, no
     # code change required.
-    CHUNKING_STRATEGY: str = getenv("CHUNKING_STRATEGY", "fixed_word")
+    # Promoted from "fixed_word" to "structure_aware" per the Knowledge
+    # Pipeline V2 chunking-corpus bake-off (docs/engineering/chunking.md,
+    # ADR-0031): non-regressive-to-improved on every measured axis (hit
+    # rate, recall@k, pass rate, hard failures, citation coverage, token
+    # cost) across two independent corpora and two embedding-provider
+    # configurations. Still a one-line rollback via this env var.
+    CHUNKING_STRATEGY: str = getenv("CHUNKING_STRATEGY", "structure_aware")
     CHUNKING_MIN_CHUNK_SIZE_WORDS: int = _get_int("CHUNKING_MIN_CHUNK_SIZE_WORDS", 40)
     CHUNKING_MAX_CHUNK_SIZE_WORDS: int = _get_int("CHUNKING_MAX_CHUNK_SIZE_WORDS", 500)
     # None (unset) means "use the per-embedding-model calibrated default" -

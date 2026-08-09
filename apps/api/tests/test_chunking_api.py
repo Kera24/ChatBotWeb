@@ -138,11 +138,19 @@ def chunk_url(workspace_id: str, document_id: str, version_id: str) -> str:
 
 
 def test_client_admin_can_create_chunks(client: TestClient, tmp_path) -> None:
+    # Explicitly pins the fixed_word baseline algorithm regardless of
+    # settings.CHUNKING_STRATEGY's ambient default (structure_aware as of
+    # the Knowledge Pipeline V2 chunking-corpus bake-off promotion - see
+    # docs/engineering/chunking.md) - this test's intent is to verify the
+    # baseline's exact word-boundary/overlap behavior, not "whatever the
+    # current default happens to be".
     original_root = settings.LOCAL_UPLOAD_ROOT
     original_size = settings.CHUNK_SIZE_WORDS
     original_overlap = settings.CHUNK_OVERLAP_WORDS
+    original_strategy = settings.CHUNKING_STRATEGY
     object.__setattr__(settings, "CHUNK_SIZE_WORDS", 5)
     object.__setattr__(settings, "CHUNK_OVERLAP_WORDS", 1)
+    object.__setattr__(settings, "CHUNKING_STRATEGY", "fixed_word")
     try:
         organisation_id, workspace_id, document_id, version_id = prepare_ready_version(client, tmp_path)
 
@@ -176,6 +184,7 @@ def test_client_admin_can_create_chunks(client: TestClient, tmp_path) -> None:
         object.__setattr__(settings, "LOCAL_UPLOAD_ROOT", original_root)
         object.__setattr__(settings, "CHUNK_SIZE_WORDS", original_size)
         object.__setattr__(settings, "CHUNK_OVERLAP_WORDS", original_overlap)
+        object.__setattr__(settings, "CHUNKING_STRATEGY", original_strategy)
 
 
 def test_viewer_cannot_trigger_chunking(client: TestClient) -> None:
