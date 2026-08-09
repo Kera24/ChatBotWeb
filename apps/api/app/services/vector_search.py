@@ -114,6 +114,15 @@ def _search_sqlite(
             Document.organisation_id == organisation_id,
             Document.workspace_id == workspace_id,
             Document.deleted_at.is_(None),
+            # Excludes archived/expired/uploaded/processing/failed documents
+            # from retrieval - "ready" is the only status meaning "fully
+            # processed and currently in active use" (see
+            # app.services.document_lifecycle.DOCUMENT_TRANSITIONS). Without
+            # this, archiving a document (app.services.document_lifecycle.
+            # transition_document_status) only relabels it - its chunks
+            # remain fully retrievable forever, since archiving never touches
+            # active_document_version_id or chunk status.
+            Document.status == "ready",
             Document.active_document_version_id == Chunk.document_version_id,
             DocumentVersion.organisation_id == organisation_id,
             DocumentVersion.workspace_id == workspace_id,
@@ -175,6 +184,7 @@ def _search_postgresql(
           AND d.organisation_id = :organisation_id
           AND d.workspace_id = :workspace_id
           AND d.deleted_at IS NULL
+          AND d.status = 'ready'
           AND d.active_document_version_id = c.document_version_id
           AND dv.organisation_id = :organisation_id
           AND dv.workspace_id = :workspace_id

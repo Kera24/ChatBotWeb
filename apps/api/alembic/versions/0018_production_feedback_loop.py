@@ -164,7 +164,13 @@ def upgrade() -> None:
             ["id"],
         )
         op.create_foreign_key(
-            "fk_evaluation_candidates_dataset_destination_id_evaluation_datasets",
+            # NAMEDATALEN-safe: the fully-spelled-out name
+            # ("...dataset_destination_id_evaluation_datasets") is 67 bytes,
+            # over PostgreSQL/SQLAlchemy's 63-byte identifier limit -
+            # SQLAlchemy's dialect.validate_identifier raises before this
+            # ever reaches the server, so the un-truncated name has never
+            # actually been creatable on Postgres.
+            "fk_evaluation_candidates_dataset_destination_id_eval_datasets",
             "evaluation_candidates",
             "evaluation_datasets",
             ["dataset_destination_id"],
@@ -175,14 +181,18 @@ def upgrade() -> None:
         )
 
         op.create_foreign_key(
-            "fk_evaluation_dataset_version_events_dataset_id_evaluation_datasets",
+            # NAMEDATALEN-safe - see the dataset_destination_id constraint's
+            # comment above (67 bytes, over the 63-byte identifier limit).
+            "fk_eval_dataset_version_events_dataset_id_evaluation_datasets",
             "evaluation_dataset_version_events",
             "evaluation_datasets",
             ["dataset_id"],
             ["id"],
         )
         op.create_foreign_key(
-            "fk_evaluation_dataset_version_events_organisation_id_organisations",
+            # NAMEDATALEN-safe - see the dataset_destination_id constraint's
+            # comment above (66 bytes, over the 63-byte identifier limit).
+            "fk_eval_dataset_version_events_organisation_id_organisations",
             "evaluation_dataset_version_events",
             "organisations",
             ["organisation_id"],
@@ -203,7 +213,10 @@ def upgrade() -> None:
             ["id"],
         )
         op.create_foreign_key(
-            "fk_evaluation_dataset_version_events_candidate_id_evaluation_candidates",
+            # NAMEDATALEN-safe - the fully-spelled-out name is 71 bytes, over
+            # the 63-byte identifier limit (see the comment on the
+            # dataset_destination_id constraint above).
+            "fk_eval_dataset_version_events_candidate_id_eval_candidates",
             "evaluation_dataset_version_events",
             "evaluation_candidates",
             ["candidate_id"],
@@ -235,7 +248,9 @@ def upgrade() -> None:
             "fk_evaluation_regression_reports_run_id_evaluation_runs", "evaluation_regression_reports", "evaluation_runs", ["run_id"], ["id"]
         )
         op.create_foreign_key(
-            "fk_evaluation_regression_reports_baseline_run_id_evaluation_runs",
+            # NAMEDATALEN-safe - see the dataset_destination_id constraint's
+            # comment above (64 bytes, over the 63-byte identifier limit).
+            "fk_evaluation_regression_reports_baseline_run_id_eval_runs",
             "evaluation_regression_reports",
             "evaluation_runs",
             ["baseline_run_id"],
@@ -258,7 +273,7 @@ def downgrade() -> None:
     if dialect != "sqlite":
         op.drop_constraint("fk_evaluation_cases_source_candidate_id_evaluation_candidates", "evaluation_cases", type_="foreignkey")
 
-        op.drop_constraint("fk_evaluation_regression_reports_baseline_run_id_evaluation_runs", "evaluation_regression_reports", type_="foreignkey")
+        op.drop_constraint("fk_evaluation_regression_reports_baseline_run_id_eval_runs", "evaluation_regression_reports", type_="foreignkey")
         op.drop_constraint("fk_evaluation_regression_reports_run_id_evaluation_runs", "evaluation_regression_reports", type_="foreignkey")
         op.drop_constraint("fk_evaluation_regression_reports_dataset_id_evaluation_datasets", "evaluation_regression_reports", type_="foreignkey")
         op.drop_constraint("fk_evaluation_regression_reports_widget_id_widgets", "evaluation_regression_reports", type_="foreignkey")
@@ -267,19 +282,19 @@ def downgrade() -> None:
 
         op.drop_constraint("fk_evaluation_dataset_version_events_created_by_users", "evaluation_dataset_version_events", type_="foreignkey")
         op.drop_constraint(
-            "fk_evaluation_dataset_version_events_candidate_id_evaluation_candidates", "evaluation_dataset_version_events", type_="foreignkey"
+            "fk_eval_dataset_version_events_candidate_id_eval_candidates", "evaluation_dataset_version_events", type_="foreignkey"
         )
         op.drop_constraint("fk_evaluation_dataset_version_events_case_id_evaluation_cases", "evaluation_dataset_version_events", type_="foreignkey")
         op.drop_constraint("fk_evaluation_dataset_version_events_workspace_id_workspaces", "evaluation_dataset_version_events", type_="foreignkey")
         op.drop_constraint(
-            "fk_evaluation_dataset_version_events_organisation_id_organisations", "evaluation_dataset_version_events", type_="foreignkey"
+            "fk_eval_dataset_version_events_organisation_id_organisations", "evaluation_dataset_version_events", type_="foreignkey"
         )
         op.drop_constraint(
-            "fk_evaluation_dataset_version_events_dataset_id_evaluation_datasets", "evaluation_dataset_version_events", type_="foreignkey"
+            "fk_eval_dataset_version_events_dataset_id_evaluation_datasets", "evaluation_dataset_version_events", type_="foreignkey"
         )
 
         op.drop_constraint("fk_evaluation_candidates_promoted_case_id_evaluation_cases", "evaluation_candidates", type_="foreignkey")
-        op.drop_constraint("fk_evaluation_candidates_dataset_destination_id_evaluation_datasets", "evaluation_candidates", type_="foreignkey")
+        op.drop_constraint("fk_evaluation_candidates_dataset_destination_id_eval_datasets", "evaluation_candidates", type_="foreignkey")
         op.drop_constraint("fk_evaluation_candidates_duplicate_of_id_evaluation_candidates", "evaluation_candidates", type_="foreignkey")
         op.drop_constraint("fk_evaluation_candidates_reviewer_id_users", "evaluation_candidates", type_="foreignkey")
         op.drop_constraint("fk_evaluation_candidates_source_message_id_chat_messages", "evaluation_candidates", type_="foreignkey")
