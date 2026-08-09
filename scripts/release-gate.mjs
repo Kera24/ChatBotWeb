@@ -3,26 +3,51 @@
 //
 // Chains software tests, the deterministic evaluation suite, the guardrail /
 // isolation / citation tests, a real-embedding evaluation run when Ollama is
-// reachable, and a required-environment-variable check; writes a gate report
-// and exits non-zero if anything hard-blocking failed.
+// reachable, a required-environment-variable check, Docker Compose
+// config validation (prod + observability), and a real migration-apply
+// check; writes a gate report and exits non-zero if anything hard-blocking
+// failed.
 //
 // Usage:
 //   node scripts/release-gate.mjs                         # local dev checks only
-//   node scripts/release-gate.mjs --env-file .env.production   # also checks required vars
+//   node scripts/release-gate.mjs --env-file .env.production   # also checks required vars + migrations against that real file
 //   node scripts/release-gate.mjs --smoke-base-url https://api.example.com  # + live smoke
+//   node scripts/release-gate.mjs --skip-verified-suites --migration-check-env-file .env.production.example
+//     # CI mode: skip suites `npm run verify` already ran in the same job; still
+//     # validate Compose config + a real migration apply, using only the
+//     # checked-in example file's safe/placeholder values (never a real secret).
 //
 // This intentionally does not know about Azure - it is the generic
 // counterpart to scripts/validate-production-pilot-readiness.mjs, meant to
 // gate a docker-compose.prod.yml deployment to a single VPS.
 
-import { existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, unlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolveRepoPath, writeJson, parseArgs } from "./azure-release-lib.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const envFilePath = args["env-file"] ? resolveRepoPath(String(args["env-file"])) : null;
+// Deliberately separate from envFilePath/--env-file above: that flag also
+// gates required_env_vars_not_placeholder, which is SUPPOSED to fail against
+// .env.production.example (it exists to catch a real deployment still
+// carrying leftover placeholders). CI wants "does a real migration apply
+// cleanly against this env file's shape" without also asserting the values
+// aren't placeholders - .env.production.example's placeholders are exactly
+// the safe, credential-free fixture values this task calls for. Defaults to
+// envFilePath so existing `--env-file .env.production` local/manual usage
+// keeps validating migrations against that same real file, unchanged.
+const migrationCheckEnvFilePath = args["migration-check-env-file"]
+  ? resolveRepoPath(String(args["migration-check-env-file"]))
+  : envFilePath;
 const smokeBaseUrl = args["smoke-base-url"] ? String(args["smoke-base-url"]) : null;
 const skipBuild = Boolean(args["skip-build"]);
+// CI opts into this after `npm run verify` has already run in the same job -
+// api_tests/web_tests/web_lint/web_build/eval_framework_tests below are
+// exactly the suites `verify` already covers (see package.json's `verify`
+// script); re-running them here would just burn CI minutes on the same
+// result. Local/manual use (this flag omitted) is unaffected - every suite
+// still runs, matching this script's existing behaviour.
+const skipVerifiedSuites = Boolean(args["skip-verified-suites"]);
 // Production feedback loop gate (app.evaluation.production_gate) needs an
 // explicit assistant/dataset scope this generic script cannot infer on its
 // own - same reasoning as smokeBaseUrl above. Advisory/skipped unless all
@@ -80,6 +105,35 @@ function run(id, command, cmdArgs, { blocking = true, cwd } = {}) {
   return passed;
 }
 
+// docker-compose.prod.yml's api/web services declare `env_file: [.env.production]`
+// - a literal path baked into the compose file, independent of the
+// --env-file flag below (which only affects ${VAR} interpolation within the
+// compose file itself). ANY `docker compose` invocation against this file -
+// even `config` or a targeted `up <service>` that only starts postgres/
+// migrate - fails outright if that literal file is missing, because Compose
+// resolves every service definition upfront. If no real .env.production
+// exists (true for a fresh checkout / CI), fall back to the checked-in,
+// git-tracked example file's shape by copying it to that exact throwaway
+// path for the duration of this script, then remove it - safe because every
+// value in .env.production.example is already documented as a non-secret
+// placeholder (see that file's own header comment). Never touches a
+// pre-existing real .env.production.
+let createdEnvProductionFile = false;
+function ensureLiteralEnvProductionFile() {
+  const target = resolveRepoPath(".env.production");
+  if (existsSync(target)) return target;
+  const example = resolveRepoPath(".env.production.example");
+  copyFileSync(example, target);
+  createdEnvProductionFile = true;
+  return target;
+}
+function cleanupEnvProductionFileIfCreated() {
+  if (createdEnvProductionFile) {
+    unlinkSync(resolveRepoPath(".env.production"));
+    createdEnvProductionFile = false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 1. Required environment variables (only checked when --env-file is given -
 //    e.g. against .env.production before a real deployment; local dev runs
@@ -112,6 +166,54 @@ if (envFilePath) {
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Production env template shape - always runs, no --env-file needed and
+//     no real secret required: verifies .env.production.example still
+//     defines every variable app.core.config/docker-compose.prod.yml
+//     actually require, so the template can't silently drift out of sync
+//     with what a real deployment needs. Deliberately does NOT check against
+//     PLACEHOLDER_MARKERS here - the example file is *supposed* to contain
+//     placeholders; that's a property of a real .env.production (checked
+//     above), not of this template.
+// ---------------------------------------------------------------------------
+{
+  const examplePath = resolveRepoPath(".env.production.example");
+  if (!existsSync(examplePath)) {
+    gate("production_env_example_shape", { passed: false, detail: { reason: ".env.production.example not found" } });
+  } else {
+    const exampleText = readFileSync(examplePath, "utf8");
+    const exampleKeys = new Set(
+      exampleText
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#") && line.includes("="))
+        .map((line) => line.slice(0, line.indexOf("=")).trim()),
+    );
+    const missing = MANDATORY_ENV_VARS.filter((name) => !exampleKeys.has(name));
+    gate("production_env_example_shape", { passed: missing.length === 0, detail: { missing } });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 1c. Production/observability Docker Compose configuration is syntactically
+//     valid and every referenced variable resolves - credential-free (a
+//     `config` render never talks to Postgres/Redis/etc., and the throwaway
+//     env-file fallback below never contains a real secret). Always runs.
+// ---------------------------------------------------------------------------
+const configCheckEnvFile = ensureLiteralEnvProductionFile();
+run("docker_compose_prod_config", "docker", ["compose", "-f", "docker-compose.prod.yml", "--env-file", configCheckEnvFile, "config", "--quiet"]);
+run("docker_compose_observability_config", "docker", [
+  "compose",
+  "-f",
+  "docker-compose.prod.yml",
+  "-f",
+  "docker-compose.observability.yml",
+  "--env-file",
+  configCheckEnvFile,
+  "config",
+  "--quiet",
+]);
+
+// ---------------------------------------------------------------------------
 // 2. Migration safety. When --env-file points at a real deployment env (e.g.
 //    .env.production), this runs the actual `migrate` Compose service against
 //    Postgres - the real deployment path - rather than whatever DATABASE_URL
@@ -122,13 +224,13 @@ if (envFilePath) {
 //    migration file renamed after that database was created), which is a
 //    dev-environment hygiene issue, not a "can this deploy" signal.
 // ---------------------------------------------------------------------------
-if (envFilePath) {
+if (migrationCheckEnvFilePath) {
   run("migrations_apply_cleanly", "docker", [
     "compose",
     "-f",
     "docker-compose.prod.yml",
     "--env-file",
-    envFilePath,
+    migrationCheckEnvFilePath,
     "up",
     "--build",
     "--exit-code-from",
@@ -139,7 +241,7 @@ if (envFilePath) {
   gate("migrations_apply_cleanly", {
     passed: true,
     blocking: false,
-    detail: { reason: "no --env-file given; migration check against Postgres skipped (see script comment)" },
+    detail: { reason: "no --env-file/--migration-check-env-file given; migration check against Postgres skipped (see script comment)" },
   });
 }
 
@@ -147,17 +249,32 @@ if (envFilePath) {
 // 3. Software test suites (includes tenant/assistant isolation tests -
 //    test_tenant_isolation_patterns.py, test_tenant_api.py - and citation /
 //    guardrail tests - test_guardrails.py - as part of the full API suite).
+//    Skipped when --skip-verified-suites is set - CI's Verify job already
+//    ran `npm run verify` (which includes api:test/web:test/web:lint/
+//    web:build) in the same job immediately before invoking this script.
 // ---------------------------------------------------------------------------
-run("api_tests", "npm", ["run", "api:test"]);
-run("web_tests", "npm", ["run", "web:test"]);
-run("web_lint", "npm", ["run", "web:lint"]);
-if (!skipBuild) run("web_build", "npm", ["run", "web:build"]);
+if (!skipVerifiedSuites) {
+  run("api_tests", "npm", ["run", "api:test"]);
+  run("web_tests", "npm", ["run", "web:test"]);
+  run("web_lint", "npm", ["run", "web:lint"]);
+  if (!skipBuild) run("web_build", "npm", ["run", "web:build"]);
+} else {
+  for (const id of ["api_tests", "web_tests", "web_lint", "web_build"]) {
+    gate(id, { passed: true, blocking: false, detail: { reason: "--skip-verified-suites given; already covered by npm run verify in this CI job" } });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 4. Deterministic evaluation suite (pure code-correctness tests of the
 //    evaluation framework itself) - always blocking, matches `verify`.
+//    Skipped when --skip-verified-suites is set - see the note above (`npm
+//    run verify` already runs `eval:test`).
 // ---------------------------------------------------------------------------
-run("eval_framework_tests", "npm", ["run", "eval:test"]);
+if (!skipVerifiedSuites) {
+  run("eval_framework_tests", "npm", ["run", "eval:test"]);
+} else {
+  gate("eval_framework_tests", { passed: true, blocking: false, detail: { reason: "--skip-verified-suites given; already covered by npm run verify in this CI job" } });
+}
 
 // ---------------------------------------------------------------------------
 // eval:launch runs the launch-critical dataset with the deterministic MOCK
@@ -234,6 +351,8 @@ if (smokeBaseUrl) {
 } else {
   gate("deployed_smoke_test", { passed: true, blocking: false, detail: { reason: "no --smoke-base-url given; skipped" } });
 }
+
+cleanupEnvProductionFileIfCreated();
 
 // ---------------------------------------------------------------------------
 // Report

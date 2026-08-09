@@ -1,4 +1,19 @@
 name: Verify
+#
+# The primary, always-on gate for this repo: runs on every PR and every push
+# to main, validating the CURRENT launch target - a single-VPS Docker
+# Compose deployment (docker-compose.prod.yml). It intentionally does NOT
+# run Azure infrastructure/observability/release-tooling validation
+# unconditionally - Azure is a retained-for-the-future, not-yet-active
+# deployment target (see docs/architecture/deployment.md, ADR-0027/0029),
+# and gating every single PR on it (regardless of whether it touched
+# anything Azure-related) is exactly the "Azure validated more strongly than
+# the active VPS path" problem this workflow used to have. Azure validation
+# still exists and still blocks merges - just scoped to when it's actually
+# relevant, in azure-validate.yml (path-filtered on infrastructure/azure/**,
+# scripts/azure-*.mjs, etc.), plus workflow_dispatch-only deploy/rollback/
+# promote workflows for real Azure environments. Nothing about Azure's own
+# validation was weakened - it just no longer runs redundantly here too.
 
 on:
   pull_request:
@@ -31,15 +46,6 @@ jobs:
             packages/widget-sdk/package-lock.json
             tests/widget-browser/package-lock.json
 
-      - name: Validate Azure infrastructure foundation
-        run: npm run infra:azure:validate
-
-      - name: Validate Azure observability
-        run: npm run azure:observability:validate
-
-      - name: Run Azure release tooling tests
-        run: npm run azure:release:test
-
       - name: Install API dependencies
         run: npm run api:install
 
@@ -61,6 +67,18 @@ jobs:
       - name: Run verification
         run: npm run verify
 
+      - name: Run VPS release gate (Compose config + migrations)
+        # --skip-verified-suites: api_tests/web_tests/web_lint/web_build/
+        # eval_framework_tests already ran via `npm run verify` above - this
+        # step adds the checks verify does NOT cover: docker-compose.prod.yml
+        # + docker-compose.observability.yml config validation, and a real
+        # `alembic upgrade head` against ephemeral Postgres via the actual
+        # `migrate` Compose service. --migration-check-env-file points at the
+        # checked-in, git-tracked example file (safe placeholder values only,
+        # never a real secret) - see scripts/release-gate.mjs's own comments
+        # for why this is a separate flag from --env-file.
+        run: npm run vps:release:gate -- --skip-verified-suites --migration-check-env-file .env.production.example
+
       - name: Run widget pilot verification
         run: npm run widget:pilot:verify
 
@@ -72,6 +90,15 @@ jobs:
 
       - name: Run widget admin release gate
         run: npm run widget:admin:release:verify
+
+      - name: Upload VPS release gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-release-gate
+          path: artifacts/release-gate
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload widget admin readiness report
         if: always()
