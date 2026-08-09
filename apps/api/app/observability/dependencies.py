@@ -3,7 +3,12 @@ from __future__ import annotations
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
-from app.observability.ai_trace_recorder import AITraceRecorder, NoOpAITraceRecorder, SqlAlchemyAITraceRecorder
+from app.observability.ai_trace_recorder import (
+    AITraceRecorder,
+    MetricsEmittingAITraceRecorder,
+    NoOpAITraceRecorder,
+    SqlAlchemyAITraceRecorder,
+)
 
 
 def _truthy(value: str) -> bool:
@@ -27,10 +32,14 @@ def build_ai_trace_recorder(db: Session) -> AITraceRecorder:
     app.evaluation.engine.build_evaluation_trace_recorder, which guards that
     specific scenario separately.
     """
+    # Wrapped in MetricsEmittingAITraceRecorder regardless of AI_TRACE_ENABLED
+    # - Prometheus metric export (app.observability.otel_metrics) is a
+    # separate observability path from Postgres trace persistence and stays
+    # on even when the latter is disabled.
     if not _truthy(settings.AI_TRACE_ENABLED):
-        return NoOpAITraceRecorder()
+        return MetricsEmittingAITraceRecorder(NoOpAITraceRecorder())
     session_factory = sessionmaker(bind=db.get_bind())
-    return SqlAlchemyAITraceRecorder(session_factory=session_factory)
+    return MetricsEmittingAITraceRecorder(SqlAlchemyAITraceRecorder(session_factory=session_factory))
 
 
 def get_ai_trace_recorder(db: Session) -> AITraceRecorder:

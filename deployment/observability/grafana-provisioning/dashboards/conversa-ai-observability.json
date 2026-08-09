@@ -1,0 +1,139 @@
+{
+  "title": "Conversa AI Observability",
+  "uid": "conversa-ai-observability",
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "AI request outcomes (per status)",
+      "type": "timeseries",
+      "description": "app.observability.ai_trace_recorder.finish_trace's status/answer_state, emitted via app.observability.otel_metrics.record_ai_request_completed. For per-request detail (question/answer/citations), use the in-app Observability dashboard - this panel is the aggregate operator view only.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(ai_requests_total[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "AI provider call failure rate (per provider)",
+      "type": "timeseries",
+      "description": "ai_model_call_total's outcome label - a sustained non-zero failure rate here is the same signal app.observability.alerts's provider_error_rate_high threshold and app.alerting's proactive delivery already evaluate; this panel is the always-on trend view of the same underlying condition.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (provider) (rate(ai_model_call_total{outcome!=\"success\"}[5m])) / sum by (provider) (rate(ai_model_call_total[5m]))",
+          "legendFormat": "{{provider}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "AI pipeline stage latency p95 (embedding / retrieval / generation / ...)",
+      "type": "timeseries",
+      "description": "ai_stage_latency_ms by stage - app.observability.context's fixed STAGE_* vocabulary (query_embedding, retrieval, provider_generation, etc.). This is the closest Prometheus-native equivalent to 'embedding latency' / 'retrieval latency' / 'generation latency' the platform can currently measure without a customer/tenant-identifying label.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(ai_stage_latency_ms_bucket[5m])))",
+          "legendFormat": "{{stage}} p95"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "AI model call latency p50 / p95 (per provider/model)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, provider, model) (rate(ai_model_call_latency_ms_bucket[5m])))",
+          "legendFormat": "{{provider}}/{{model}} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, provider, model) (rate(ai_model_call_latency_ms_bucket[5m])))",
+          "legendFormat": "{{provider}}/{{model}} p95"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Token usage rate (per provider/model)",
+      "type": "timeseries",
+      "description": "ai_tokens_total - recorded once per completed request from finish_trace's already-aggregated total_tokens, not per model-call attempt.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (provider, model) (rate(ai_tokens_total[5m]))",
+          "legendFormat": "{{provider}}/{{model}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Estimated AI spend rate (USD/s, per provider/model)",
+      "type": "timeseries",
+      "description": "Only populated for requests where pricing is known (ModelConfig.input_cost_per_million_tokens/output_cost_per_million_tokens are both set) - see app.observability.ai_trace_recorder.record_model_call's pricing_known flag.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (provider, model) (rate(ai_estimated_cost_usd_total[5m]))",
+          "legendFormat": "{{provider}}/{{model}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Fallback rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(ai_requests_total{fallback=\"true\"}[5m])) / sum(rate(ai_requests_total[5m]))",
+          "legendFormat": "fallback rate"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Guardrail outcomes (per layer)",
+      "type": "timeseries",
+      "description": "ai_guardrail_outcomes_total - see docs/architecture/guardrails.md for layers A-H. A rising blocked share on one layer is worth investigating via the in-app Observability trace detail view (guardrail reason codes), not actionable from this aggregate alone.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (layer, blocked) (rate(ai_guardrail_outcomes_total[5m]))",
+          "legendFormat": "{{layer}} blocked={{blocked}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Evaluation / release gate outcomes",
+      "type": "timeseries",
+      "description": "evaluation_gate_outcomes_total - emitted by app.operations.eval_release_gate_check (gate=release_gate) and eval_regression_report (gate=regression) alongside app.alerting's existing evaluation-gate-failure notification (app.alerting.hooks.notify_gate_failure). Same underlying verdict, two delivery paths (immediate proactive alert vs. this trend view) - see docs/architecture/observability.md's 'alert responsibility split'.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (gate, result) (increase(evaluation_gate_outcomes_total[1h]))",
+          "legendFormat": "{{gate}} {{result}}"
+        }
+      ]
+    }
+  ]
+}

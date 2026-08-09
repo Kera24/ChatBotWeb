@@ -165,5 +165,24 @@ class Settings:
     AI_ALERT_ZERO_TRAFFIC_MINUTES: int = _get_int("AI_ALERT_ZERO_TRAFFIC_MINUTES", 60)
     AI_ALERT_MIN_SAMPLE_SIZE: int = _get_int("AI_ALERT_MIN_SAMPLE_SIZE", 5)
 
+    # Proactive alert delivery (app.alerting.*). Only "dev", "email", and
+    # "slack" are recognised today - see app.alerting.dependencies.build_alert_provider
+    # for the provider-abstraction rationale (mirrors AI_PROVIDER/
+    # TRANSACTIONAL_EMAIL_PROVIDER's shape). "dev" (the default) never makes
+    # an external call, matching the "no external notifications from
+    # dev/test unless explicitly enabled" requirement.
+    ALERT_PROVIDER: str = getenv("ALERT_PROVIDER", "dev")
+    ALERT_EMAIL_TO: str = getenv("ALERT_EMAIL_TO", "")
+    SLACK_WEBHOOK_URL: str = getenv("SLACK_WEBHOOK_URL", "")
+    # Alerts below this severity are evaluated but never delivered. One of
+    # "info"/"warning"/"critical" (app.alerting.contracts.AlertSeverity).
+    ALERT_MIN_SEVERITY: str = getenv("ALERT_MIN_SEVERITY", "warning")
+    # Minimum seconds between two deliveries of the same alert for the same
+    # tenant/assistant scope (app.alerting.cooldown.AlertCooldownStore) -
+    # prevents a still-triggering condition from re-notifying on every CLI
+    # run within the cooldown window.
+    ALERT_COOLDOWN_SECONDS: int = _get_int("ALERT_COOLDOWN_SECONDS", 1800)
+    ALERT_COOLDOWN_STATE_PATH: str = getenv("ALERT_COOLDOWN_STATE_PATH", "./local_alert_cooldown_state.json")
+
 
 settings = Settings()

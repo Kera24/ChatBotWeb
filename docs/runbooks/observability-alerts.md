@@ -8,7 +8,8 @@ A structured alert event fires (`docs/architecture/observability.md`'s alert typ
 
 1. Identify which specific alert fired and pull the `GET /observability/alerts` detail.
 2. Cross-reference against `GET /observability/anomalies` (deterministic 24h-vs-7-day-baseline comparison) for corroborating signal.
-3. Route to the specific matching runbook: `docs/runbooks/high-latency.md`, `docs/runbooks/high-token-cost.md`, `docs/runbooks/llm-provider-outage.md`, `docs/runbooks/prompt-regressions.md`, etc.
+3. If the optional Grafana stack is deployed, check whether the same condition also fired there (deployment-wide, not per-tenant) - `docs/architecture/observability.md`'s "Investigation workflow" walks through cross-referencing Grafana dashboards, Tempo traces, and Loki logs to narrow an aggregate signal down to a specific request/tenant.
+4. Route to the specific matching runbook: `docs/runbooks/high-latency.md`, `docs/runbooks/high-token-cost.md`, `docs/runbooks/llm-provider-outage.md`, `docs/runbooks/prompt-regressions.md`, etc.
 
 ## Recovery
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from app.evaluation.engine import _build_evaluation_trace_recorder
-from app.observability.ai_trace_recorder import NoOpAITraceRecorder, SqlAlchemyAITraceRecorder
+from app.observability.ai_trace_recorder import MetricsEmittingAITraceRecorder, NoOpAITraceRecorder, SqlAlchemyAITraceRecorder
 
 
 def _fake_session(dialect_name: str) -> MagicMock:
@@ -21,9 +21,15 @@ def test_evaluation_trace_recorder_is_noop_on_sqlite() -> None:
     engine must fall back to a no-op recorder on SQLite specifically, so
     evaluation runs are never destabilised by AI trace recording. See
     app.evaluation.engine._build_evaluation_trace_recorder's docstring and
-    docs/03_AI/AI_Observability_Architecture.md's limitations section."""
+    docs/03_AI/AI_Observability_Architecture.md's limitations section.
+
+    Every recorder is wrapped in MetricsEmittingAITraceRecorder (Prometheus
+    metric export is independent of AI_TRACE_ENABLED/DB-write safety - see
+    that class's docstring) - unwrap `.inner` to assert on the underlying
+    DB-writing behaviour this test actually protects."""
     recorder = _build_evaluation_trace_recorder(_fake_session("sqlite"))
-    assert isinstance(recorder, NoOpAITraceRecorder)
+    assert isinstance(recorder, MetricsEmittingAITraceRecorder)
+    assert isinstance(recorder.inner, NoOpAITraceRecorder)
 
 
 def test_evaluation_trace_recorder_is_real_on_postgres() -> None:
@@ -31,4 +37,5 @@ def test_evaluation_trace_recorder_is_real_on_postgres() -> None:
     single-writer file lock) evaluation-triggered RAG calls ARE traced and
     tagged with eval_run_id/eval_case_id."""
     recorder = _build_evaluation_trace_recorder(_fake_session("postgresql"))
-    assert isinstance(recorder, SqlAlchemyAITraceRecorder)
+    assert isinstance(recorder, MetricsEmittingAITraceRecorder)
+    assert isinstance(recorder.inner, SqlAlchemyAITraceRecorder)

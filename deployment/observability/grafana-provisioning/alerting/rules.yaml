@@ -1,0 +1,244 @@
+# Grafana-managed alert rules (Grafana's own "unified alerting", not
+# Alertmanager/Prometheus rule files) - the aggregate, scalable incident
+# layer described in docs/architecture/observability.md's "alert
+# responsibility split". Every rule here fires on a WINDOWED AGGREGATE
+# (a rate/ratio/quantile over several minutes) crossing a threshold, never
+# on one individual failed request - see each rule's `for:` duration, which
+# is the sustained-condition requirement, and the underlying PromQL, which
+# is always a `sum`/`rate`/`histogram_quantile` over a window.
+#
+# These rules fire into Grafana's alerting engine and are visible in the
+# Grafana UI/API regardless of contact-point configuration. To actually
+# receive a notification (email/Slack/PagerDuty/etc.), provision a contact
+# point and notification policy - see
+# docs/06_Operations/Grafana_Prometheus_Loki_Tempo_VPS_Guide.md for how (not
+# included here: no real destination - email server, Slack workspace,
+# PagerDuty account - exists to provision safely without inventing a fake
+# one; wire this up via Grafana's Alerting UI or by adding
+# deployment/observability/grafana-provisioning/alerting/contact-points.yaml
+# following Grafana's provisioning schema).
+#
+# Thresholds mirror app.observability.alerts's existing AI_ALERT_* defaults
+# where the same underlying condition applies (see
+# docs/06_Operations/AI_Alert_Threshold_Guide.md) - this is a second,
+# independent evaluation of a related signal for aggregate/trend alerting,
+# not a duplication of that module's per-tenant evaluation logic (Grafana
+# has no tenant dimension here at all - see the cardinality policy).
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: conversa-platform-alerts
+    folder: Conversa
+    interval: 1m
+    rules:
+      - uid: conversa-elevated-5xx-rate
+        title: Elevated 5xx rate
+        condition: threshold
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          category: high_error_rate
+        annotations:
+          summary: "5xx responses exceeded 5% of requests for 5+ minutes"
+          description: "See the Conversa API Overview dashboard's '5xx rate' panel and Loki logs (severity_text=ERROR) for the affected route(s)."
+        data:
+          - refId: query
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              refId: query
+              instant: true
+              expr: >-
+                sum(rate(http_server_duration_milliseconds_count{http_status_code=~"5.."}[5m]))
+                /
+                sum(rate(http_server_duration_milliseconds_count[5m]))
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              refId: threshold
+              type: threshold
+              expression: query
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+
+      - uid: conversa-ai-provider-failure-rate
+        title: AI provider failure rate high
+        condition: threshold
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          category: ai_provider_failure
+        annotations:
+          summary: "AI provider call failure rate exceeded 10% for 5+ minutes"
+          description: "Cross-check the Conversa AI Observability dashboard's 'AI provider call failure rate' panel per provider/model, and app.alerting's own provider_error_rate_high notification (same underlying condition, per-tenant, delivered immediately)."
+        data:
+          - refId: query
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              refId: query
+              instant: true
+              expr: >-
+                sum(rate(ai_model_call_total{outcome!="success"}[10m]))
+                /
+                sum(rate(ai_model_call_total[10m]))
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              refId: threshold
+              type: threshold
+              expression: query
+              conditions:
+                - evaluator: { type: gt, params: [0.10] }
+
+      - uid: conversa-sustained-latency-degradation
+        title: Sustained HTTP p95 latency degradation
+        condition: threshold
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          category: high_latency
+        annotations:
+          summary: "HTTP p95 latency exceeded 8s for 10+ minutes"
+          description: "Mirrors app.observability.alerts's AI_ALERT_P95_LATENCY_MS default (8000ms) at the HTTP layer instead of the AI-request layer - see the Conversa API Overview dashboard's 'HTTP p95 latency' panel per route."
+        data:
+          - refId: query
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              refId: query
+              instant: true
+              expr: >-
+                histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket[10m])))
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              refId: threshold
+              type: threshold
+              expression: query
+              conditions:
+                - evaluator: { type: gt, params: [8000] }
+
+      - uid: conversa-ai-cost-spike
+        title: AI estimated cost burn-rate spike
+        condition: threshold
+        for: 15m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          category: high_cost
+        annotations:
+          summary: "Estimated AI spend burn rate exceeded the configured threshold for 15+ minutes"
+          description: "The $5/hour default is a starting point, not a measured baseline - tune it to your real traffic volume (see the 'Estimated AI spend rate' panel on the Conversa AI Observability dashboard for current levels before adjusting)."
+        data:
+          - refId: query
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              refId: query
+              instant: true
+              expr: "sum(rate(ai_estimated_cost_usd_total[15m])) * 3600"
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              refId: threshold
+              type: threshold
+              expression: query
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+
+      - uid: conversa-evaluation-regression
+        title: Evaluation regression or release-gate failure
+        condition: threshold
+        for: 0m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          category: evaluation_regression
+        annotations:
+          summary: "An evaluation/release gate check failed in the last hour"
+          description: "Same underlying verdict as app.alerting's immediate notify_gate_failure hook (app.operations.eval_release_gate_check / eval_regression_report) - this is the aggregate/trend view, already deduplicated per gate run, not per customer request."
+        data:
+          - refId: query
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              refId: query
+              instant: true
+              expr: "sum(increase(evaluation_gate_outcomes_total{result=\"failed\"}[1h]))"
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              refId: threshold
+              type: threshold
+              expression: query
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: conversa-otel-collector-unavailable
+        title: OTel Collector unavailable
+        condition: threshold
+        for: 2m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: critical
+          category: service_unavailable
+        annotations:
+          summary: "Prometheus cannot scrape the OTel Collector's metrics endpoint"
+          description: "Every downstream signal on these dashboards depends on the collector being reachable - check `docker compose -f docker-compose.observability.yml ps otel-collector` and its logs first."
+        data:
+          - refId: query
+            relativeTimeRange: { from: 120, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              refId: query
+              instant: true
+              expr: "up{job=\"otel-collector\"}"
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              refId: threshold
+              type: threshold
+              expression: query
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      - uid: conversa-no-api-telemetry
+        title: No API telemetry (traffic stopped or pipeline broken)
+        condition: threshold
+        for: 5m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: warning
+          category: no_traffic_or_telemetry_missing
+        annotations:
+          summary: "No http_server_duration_milliseconds samples in the last 10 minutes"
+          description: "Ambiguous by design: this can mean genuinely zero traffic (plausible off-hours for a low-traffic pilot) OR that OTEL_ENABLED telemetry export itself broke while the API kept serving requests fine. Cross-check deployment/monitoring/check.sh's api_ready result (queries the API directly, independent of this telemetry pipeline) before treating this as a production outage."
+        data:
+          - refId: query
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              refId: query
+              instant: true
+              expr: "absent_over_time(http_server_duration_milliseconds_count[10m])"
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              refId: threshold
+              type: threshold
+              expression: query
+              conditions:
+                - evaluator: { type: gt, params: [0] }

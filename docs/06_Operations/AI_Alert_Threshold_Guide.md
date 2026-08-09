@@ -1,15 +1,45 @@
 # AI Alert Threshold Guide
 
-Status: implemented (structured events only - no paging/webhook delivery)
+Status: implemented (structured events, read API, and proactive delivery via `app.alerting.*`)
 
 ## Delivery model
 
 `app.observability.alerts.evaluate_alerts` is a deterministic threshold evaluator, not a running background service. It computes metrics over a trailing window (default 1 hour) and, for each breached threshold, emits a structured JSON log line (via `app.operations.logging.log_operational_event`) and returns the event to the caller. It is invoked:
 
 - On demand via `GET .../observability/alerts` (requires `org_owner`/`client_admin`).
-- Optionally on a schedule, by wiring a cron/systemd timer to call it (there is no bundled scheduler in this pass - see Limitations).
+- On a schedule, via `python -m app.operations.alert_dispatch_run --organisation <id> --workspace <id> [--assistant <id>] [--window-hours <float>] [--dry-run]` (cron/systemd timer, same pattern as `observability_retention_cleanup.py`), which additionally *delivers* any triggered alert through the proactive delivery layer below.
 
-This intentionally does not include a webhook/email/PagerDuty integration. The spec this feature was built against explicitly allows "emit structured alert events... no expensive alerting service required" as the initial implementation - structured logs plus the read API are the two delivery mechanisms available today. Forward the structured log lines into your own alerting pipeline (e.g. a Loki alerting rule reading `event_type: "ai_observability.alert"`) if you need paging.
+`evaluate_alerts` itself is unchanged by the delivery layer - it still only computes and logs. Delivery is a separate, additive consumer.
+
+## Proactive delivery (`app.alerting.*`)
+
+A provider-independent delivery layer sits on top of `evaluate_alerts`'s output - it never re-evaluates a threshold, only converts an already-triggered `AlertEvent` into an `AlertNotification` (`app.alerting.dispatcher.alert_event_to_notification`) and dispatches it.
+
+- **Provider abstraction** - `app.alerting.providers.base.AlertProvider`, selected via `ALERT_PROVIDER` (`app.alerting.dependencies.build_alert_provider`, fail-fast on an explicitly-selected-but-misconfigured provider, mirrors `app.email.dependencies.build_email_provider`):
+  - `dev` (default) - logs safe metadata only, never makes an external call. Safe for development/test by default.
+  - `email` - reuses the existing transactional email provider abstraction (`app.email.providers.base.TransactionalEmailProvider`), never calls Resend directly. Requires `ALERT_EMAIL_TO` (comma-separated).
+  - `slack` - a minimal incoming-webhook client (no Slack SDK). Requires `SLACK_WEBHOOK_URL`.
+  - Not yet implemented, but the `AlertProvider` interface is designed for them: Microsoft Teams, Discord, PagerDuty, Opsgenie - each is a new `app/alerting/providers/*.py` file plus a `build_alert_provider` branch, no change to the abstraction.
+- **Severity** - `info` / `warning` / `critical` (`app.alerting.contracts.AlertSeverity`), taken directly from `AlertEvent.severity`. `ALERT_MIN_SEVERITY` (default `warning`) filters what actually gets delivered; `evaluate_alerts` still evaluates and logs everything regardless.
+- **Deduplication/cooldown** - `app.alerting.cooldown.AlertCooldownStore`, a small JSON state file (`ALERT_COOLDOWN_STATE_PATH`) keyed by organisation/workspace/assistant/alert_key, so a still-triggering condition doesn't re-notify on every cron run within `ALERT_COOLDOWN_SECONDS` (default 1800).
+- **Safe payload only** - `AlertNotification` carries alert type, severity, source subsystem, timestamp, tenant/correlation ids, and safe numeric metrics; its `message`/`metrics` fields are redacted on construction via the existing `app.observability.redaction`/`app.operations.logging.redact` paths as a defense-in-depth backstop. Never carries prompts, documents, conversation text, full email addresses, tokens, or API keys.
+- **Fail-safe** - a provider failure (raised as a classified `app.alerting.errors.AlertProviderError`, or any unexpected exception) is caught by `app.alerting.dispatcher.dispatch_alerts`, logged as `alert.delivery_failed`, and never propagates - it cannot crash the CLI or any call site.
+
+### Alert categories currently wired
+
+| Category | Source signal | Alert key(s) |
+|---|---|---|
+| AI provider failure / high error rate | `evaluate_alerts` | `provider_error_rate_high` |
+| High latency | `evaluate_alerts` | `p95_latency_high` |
+| Guardrail failure | `evaluate_alerts` | `guardrail_block_rate_high` |
+| High token/cost usage | `evaluate_alerts` | `cost_per_request_high` |
+| Evidence-insufficient / fallback / zero-traffic | `evaluate_alerts` | `evidence_insufficient_rate_high`, `fallback_rate_high`, `zero_traffic` |
+| Evaluation gate failure / deployment release-gate failure | `app.evaluation.production_gate.evaluate_production_readiness`'s already-computed verdict, via a fail-safe hook (`app.alerting.hooks.notify_gate_failure`) in `app.operations.eval_release_gate_check` | `evaluation_release_gate_failed` |
+| Prompt regression | `app.evaluation.gate.evaluate_gate`'s already-computed verdict, via the same hook in `app.operations.eval_regression_report` | `evaluation_regression_detected` |
+
+**Deliberately not wired** (no existing aggregate signal to reuse without either a schema change or a synchronous call in a customer-facing hot path, both out of scope for this pass): embedding failure, vector DB failure (not separately tracked from provider failures yet, same limitation `evaluate_alerts` already documents below), email provider failure (would require a network call inside the password-reset/verification request path), billing/webhook failure (billing logic is out of bounds without explicit instruction - see `CLAUDE.md`), unhandled exception spike (would require either a new persisted signal or a synchronous call inside the global exception handler, both rejected as risking customer-facing latency/behaviour change).
+
+This intentionally still does not include a Teams/Discord/PagerDuty/Opsgenie integration - see "Provider abstraction" above for how to add one.
 
 ## Thresholds
 

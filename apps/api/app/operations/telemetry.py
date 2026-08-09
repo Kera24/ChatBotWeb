@@ -166,11 +166,45 @@ def configure_observability(app: FastAPI) -> None:
         _configure_generic_otel(app)
 
 
+_installed_otel_log_handler: Any = None
+
+
 def _configure_generic_otel(app: FastAPI) -> None:
+    """Wires the trace, metrics, and logs pipelines into the same OTLP
+    endpoint - the full Conversa -> OTel Collector -> Prometheus/Loki/Tempo
+    leg of the architecture in docs/architecture/observability.md.
+
+    Metrics: FastAPIInstrumentor emits the `http.server.duration`/
+    `http.server.active_requests` metrics the existing "Conversa API
+    Overview" Grafana dashboard already queries
+    (`http_server_duration_milliseconds_*`, via the collector's Prometheus
+    exporter's dot-to-underscore/unit-suffix translation) once a real
+    MeterProvider exists - previously none was ever registered, so those
+    panels had no data even when OTEL_ENABLED=true. Application-level
+    metrics (AI/guardrail/evaluation/email/error counters) are emitted
+    separately via app.observability.otel_metrics, through this same
+    process-global MeterProvider.
+
+    Logs: attaches an OTel LoggingHandler to the root Python logger, so
+    every EXISTING structured log line (app.operations.logging.log_operational_event,
+    which already redacts before formatting - this handler forwards the
+    already-redacted message body, applying no new redaction of its own and
+    introducing no new call sites anywhere else in the app) also reaches
+    Loki via the collector, closing the gap
+    docs/06_Operations/Grafana_Prometheus_Loki_Tempo_VPS_Guide.md previously
+    documented as "not included". Idempotent: a second call (e.g. across
+    tests re-invoking configure_observability with different settings)
+    replaces rather than stacks the previous handler.
+    """
     try:
-        from opentelemetry import trace
+        from opentelemetry import metrics, trace
+        from opentelemetry._logs import set_logger_provider
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+        from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogRecordExporter
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
@@ -186,24 +220,70 @@ def _configure_generic_otel(app: FastAPI) -> None:
             "service.version": config.release_version,
             **_parse_otel_resource_attributes(settings.OTEL_RESOURCE_ATTRIBUTES),
         }
-        provider = TracerProvider(resource=Resource.create(resource_attributes))
+        resource = Resource.create(resource_attributes)
+        tracer_provider = TracerProvider(resource=resource)
+        logger_provider = LoggerProvider(resource=resource)
+        metric_readers: list[Any] = []
 
         endpoint = settings.OTEL_EXPORTER_OTLP_ENDPOINT.strip()
         if endpoint:
+            from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+            from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-            provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+            # Unlike the OTEL_EXPORTER_OTLP_ENDPOINT env var (which the SDK
+            # auto-appends a per-signal path to when read directly from the
+            # environment), the exporter's `endpoint=` CONSTRUCTOR argument
+            # is used verbatim with no path appended. OTEL_EXPORTER_OTLP_ENDPOINT
+            # here is documented and used as a single collector base URL
+            # (see docker-compose.observability.yml's usage note), so the
+            # per-signal path must be appended explicitly here or every
+            # export silently 404s against the collector's OTLP HTTP
+            # receiver, which only listens on /v1/traces, /v1/metrics, and
+            # /v1/logs.
+            tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=_otlp_signal_endpoint(endpoint, "v1/traces"))))
+            metric_readers.append(
+                PeriodicExportingMetricReader(
+                    OTLPMetricExporter(endpoint=_otlp_signal_endpoint(endpoint, "v1/metrics")), export_interval_millis=15000
+                )
+            )
+            logger_provider.add_log_record_processor(
+                BatchLogRecordProcessor(OTLPLogExporter(endpoint=_otlp_signal_endpoint(endpoint, "v1/logs")))
+            )
         elif _truthy(settings.OTEL_CONSOLE_EXPORT):
-            provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-        # else: no span processor registered - spans are created but
-        # discarded in-process ("local/no-export mode" from the spec).
+            tracer_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+            metric_readers.append(PeriodicExportingMetricReader(ConsoleMetricExporter(), export_interval_millis=15000))
+            logger_provider.add_log_record_processor(BatchLogRecordProcessor(ConsoleLogRecordExporter()))
+        # else: no span processor / metric reader / log record processor
+        # registered - spans, metrics, and logs are created but discarded
+        # in-process ("local/no-export mode" from the spec).
 
-        trace.set_tracer_provider(provider)
-        FastAPIInstrumentor.instrument_app(app, excluded_urls="/health/live,/health/ready")
+        meter_provider = MeterProvider(resource=resource, metric_readers=metric_readers)
+
+        trace.set_tracer_provider(tracer_provider)
+        metrics.set_meter_provider(meter_provider)
+        set_logger_provider(logger_provider)
+        FastAPIInstrumentor.instrument_app(
+            app, tracer_provider=tracer_provider, meter_provider=meter_provider, excluded_urls="/health/live,/health/ready"
+        )
         SQLAlchemyInstrumentor().instrument(enable_commenter=False)
+        _install_otel_log_handler(LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider))
         app.state.telemetry_enabled = bool(endpoint or _truthy(settings.OTEL_CONSOLE_EXPORT))
     except Exception as exc:
         logger.warning("Generic OpenTelemetry initialization failed; continuing without export: %s", exc)
+
+
+def _install_otel_log_handler(handler: Any) -> None:
+    global _installed_otel_log_handler
+    root_logger = logging.getLogger()
+    if _installed_otel_log_handler is not None:
+        root_logger.removeHandler(_installed_otel_log_handler)
+    root_logger.addHandler(handler)
+    _installed_otel_log_handler = handler
+
+
+def _otlp_signal_endpoint(base_endpoint: str, signal_path: str) -> str:
+    return f"{base_endpoint.rstrip('/')}/{signal_path}"
 
 
 def _parse_otel_resource_attributes(raw: str) -> dict[str, str]:

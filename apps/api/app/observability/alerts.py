@@ -13,11 +13,14 @@ from app.repositories.observability_repository import TraceFilters, count_guardr
 
 logger = logging.getLogger("chatbotweb.observability.alerts")
 
-# Initial implementation, per the observability spec's own scope: emit
-# structured JSON alert events (logged + returned to callers) and expose the
-# underlying metrics for external monitoring (Prometheus/Grafana via the VPS
-# stack, or Azure Monitor). No webhook/email/paging integration in this pass
-# - see docs/06_Operations/AI_Alert_Threshold_Guide.md's deferred-scope note.
+# Deterministic threshold evaluation only: emits structured JSON alert
+# events (logged + returned to callers) and exposes the underlying metrics
+# for external monitoring (Prometheus/Grafana via the VPS stack, or Azure
+# Monitor). Proactive delivery (email/Slack/dev, severity filtering,
+# dedup/cooldown) is a separate, additive consumer of this module's output -
+# see app.alerting.dispatcher.alert_event_to_notification and
+# docs/06_Operations/AI_Alert_Threshold_Guide.md. This module itself must
+# stay a pure evaluator - never call a delivery provider from here.
 
 
 @dataclass(frozen=True)

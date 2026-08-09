@@ -17,6 +17,7 @@ env/
 *.db
 *.sqlite
 *.sqlite3
+local_alert_cooldown_state.json
 
 # Node and Next.js
 node_modules/

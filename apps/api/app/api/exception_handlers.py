@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.observability import otel_metrics
 from app.observability.redaction import redact_free_text
 from app.operations.correlation import safe_request_id
 from app.operations.logging import log_operational_event
@@ -79,5 +80,6 @@ def _log_unexpected_exception(exc: Exception, *, request_id: str, trace_id: str,
             },
             level=logging.ERROR,
         )
+        otel_metrics.record_unhandled_exception(route=route, exception_type=type(exc).__name__)
     except Exception:
         logger.error("Failed to log unhandled exception metadata for request_id=%s", request_id)

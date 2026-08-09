@@ -31,7 +31,7 @@ from app.ai.rag_orchestrator import (
 from app.core.config import settings
 from app.db.models import EvaluationCase, EvaluationDataset, EvaluationRun
 from app.evaluation.categories import ISOLATION_CATEGORIES
-from app.observability.ai_trace_recorder import AITraceRecorder, NoOpAITraceRecorder
+from app.observability.ai_trace_recorder import AITraceRecorder, MetricsEmittingAITraceRecorder, NoOpAITraceRecorder
 from app.observability.context import AITraceContext, new_trace_id
 from app.observability.dependencies import build_ai_trace_recorder
 from app.evaluation.metrics.answer import compute_answer_metrics
@@ -73,7 +73,11 @@ def _build_evaluation_trace_recorder(db: Session) -> AITraceRecorder:
     """
     dialect_name = db.get_bind().dialect.name
     if dialect_name == "sqlite":
-        return NoOpAITraceRecorder()
+        # Still wrapped for metrics: MetricsEmittingAITraceRecorder never
+        # touches the database itself (see its docstring), so it carries
+        # none of the SQLite cross-thread locking risk documented above -
+        # only Postgres-writing SqlAlchemyAITraceRecorder does.
+        return MetricsEmittingAITraceRecorder(NoOpAITraceRecorder())
     return build_ai_trace_recorder(db)
 
 

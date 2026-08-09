@@ -13,6 +13,7 @@ from app.ai.contracts import TokenUsage
 from app.ai.model_registry import ModelConfig
 from app.core.config import settings
 from app.db.models.ai_trace import AIGuardrailTrace, AIModelCallTrace, AIRetrievalTrace, AITrace, AITraceStage
+from app.observability import otel_metrics
 from app.observability.context import AITraceContext
 from app.observability.redaction import apply_retention_policy
 
@@ -450,3 +451,166 @@ def _current_otel_span_ids() -> tuple[str | None, str | None]:
         return format(span_context.trace_id, "032x"), format(span_context.span_id, "016x")
     except Exception:
         return None, None
+
+
+class MetricsEmittingAITraceRecorder:
+    """Wraps any AITraceRecorder (NoOp or SqlAlchemy) to additionally emit
+    cardinality-safe OpenTelemetry metrics (app.observability.otel_metrics)
+    alongside whatever the wrapped recorder itself does. Deliberately
+    independent of AI_TRACE_ENABLED: Postgres trace persistence (this
+    module's other classes) and Prometheus metric export are two separate
+    observability paths with different purposes (per-request investigation
+    vs. aggregate operational monitoring - see
+    docs/architecture/observability.md) and should not be coupled to the
+    same on/off switch. See app.observability.dependencies.build_ai_trace_recorder,
+    which wraps every recorder it constructs in this class.
+
+    Every otel_metrics.record_* call is fail-safe by construction (catches
+    every exception internally), so wrapping never changes the inner
+    recorder's own behaviour, return values, or failure modes - this class
+    adds a metrics side effect, nothing else.
+
+    `inner` is a public attribute (not name-mangled) so callers that need to
+    know which concrete recorder is doing the actual persistence - e.g.
+    tests asserting NoOp-vs-SqlAlchemy dialect selection - can unwrap it
+    rather than asserting on this decorator's own type."""
+
+    def __init__(self, inner: AITraceRecorder) -> None:
+        self.inner = inner
+
+    def start_trace(
+        self, ctx: AITraceContext, *, organisation_id: str, workspace_id: str, assistant_id: str | None, channel: str
+    ) -> None:
+        self.inner.start_trace(ctx, organisation_id=organisation_id, workspace_id=workspace_id, assistant_id=assistant_id, channel=channel)
+
+    def record_stage(
+        self,
+        ctx: AITraceContext,
+        stage_name: str,
+        *,
+        status: str,
+        latency_ms: int | None = None,
+        reason_code: str | None = None,
+        safe_counts: dict[str, Any] | None = None,
+        error_class: str | None = None,
+        provider_model_config_version: str | None = None,
+    ) -> None:
+        self.inner.record_stage(
+            ctx,
+            stage_name,
+            status=status,
+            latency_ms=latency_ms,
+            reason_code=reason_code,
+            safe_counts=safe_counts,
+            error_class=error_class,
+            provider_model_config_version=provider_model_config_version,
+        )
+        if latency_ms is not None:
+            otel_metrics.record_ai_stage_latency(stage=stage_name, status=status, latency_ms=latency_ms)
+
+    def record_retrieval(self, ctx: AITraceContext, *, entries: list[RetrievalTraceEntry]) -> None:
+        self.inner.record_retrieval(ctx, entries=entries)
+
+    def record_model_call(
+        self,
+        ctx: AITraceContext,
+        *,
+        model: ModelConfig,
+        provider_model_name: str,
+        prompt_key: str,
+        prompt_version: str | None,
+        prompt_hash: str | None,
+        token_usage: TokenUsage,
+        latency_ms: int,
+        finish_reason: str | None,
+        outcome: str,
+        error_code: str | None = None,
+        raw_prompt: str | None = None,
+        raw_response: str | None = None,
+        attempt_number: int = 1,
+        prompt_version_id: str | None = None,
+        experiment_id: str | None = None,
+        experiment_arm: str | None = None,
+        resolved_layer_version_ids: dict[str, str] | None = None,
+    ) -> None:
+        self.inner.record_model_call(
+            ctx,
+            model=model,
+            provider_model_name=provider_model_name,
+            prompt_key=prompt_key,
+            prompt_version=prompt_version,
+            prompt_hash=prompt_hash,
+            token_usage=token_usage,
+            latency_ms=latency_ms,
+            finish_reason=finish_reason,
+            outcome=outcome,
+            error_code=error_code,
+            raw_prompt=raw_prompt,
+            raw_response=raw_response,
+            attempt_number=attempt_number,
+            prompt_version_id=prompt_version_id,
+            experiment_id=experiment_id,
+            experiment_arm=experiment_arm,
+            resolved_layer_version_ids=resolved_layer_version_ids,
+        )
+        otel_metrics.record_ai_model_call(provider=model.provider_key, model=model.model_key, outcome=outcome, latency_ms=latency_ms)
+
+    def record_guardrail(
+        self,
+        ctx: AITraceContext,
+        *,
+        layer: str,
+        guardrail_name: str,
+        verdict: str,
+        blocked: bool,
+        reason_code: str | None = None,
+        safe_detail: dict[str, Any] | None = None,
+    ) -> None:
+        self.inner.record_guardrail(
+            ctx, layer=layer, guardrail_name=guardrail_name, verdict=verdict, blocked=blocked, reason_code=reason_code, safe_detail=safe_detail
+        )
+        otel_metrics.record_guardrail_outcome(layer=layer, guardrail=guardrail_name, verdict=verdict, blocked=blocked)
+
+    def finish_trace(
+        self,
+        ctx: AITraceContext,
+        *,
+        status: str,
+        answer_state: str | None,
+        fallback_used: bool,
+        total_latency_ms: int | None,
+        provider_key: str | None = None,
+        model_key: str | None = None,
+        provider_model_name: str | None = None,
+        embedding_provider: str | None = None,
+        embedding_model: str | None = None,
+        total_tokens: int | None = None,
+        estimated_cost: Decimal | None = None,
+        error_class: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        self.inner.finish_trace(
+            ctx,
+            status=status,
+            answer_state=answer_state,
+            fallback_used=fallback_used,
+            total_latency_ms=total_latency_ms,
+            provider_key=provider_key,
+            model_key=model_key,
+            provider_model_name=provider_model_name,
+            embedding_provider=embedding_provider,
+            embedding_model=embedding_model,
+            total_tokens=total_tokens,
+            estimated_cost=estimated_cost,
+            error_class=error_class,
+            metadata=metadata,
+        )
+        otel_metrics.record_ai_request_completed(
+            status=status,
+            answer_state=answer_state,
+            fallback_used=fallback_used,
+            provider=provider_key,
+            model=model_key,
+            total_tokens=total_tokens,
+            estimated_cost_usd=float(estimated_cost) if estimated_cost is not None else None,
+        )

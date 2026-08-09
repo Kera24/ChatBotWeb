@@ -22,11 +22,11 @@ Per `docs/sops/deploying.md`. Release identity (git SHA, image digests, and — 
 
 ## Dashboards
 
-`/observability` (dashboard + trace detail + retrieval debugger) surfaces request volume, latency percentiles, token/cost, fallback rate, blocked rate, evidence-insufficient rate, citation coverage — the human-facing view of the telemetry above.
+`/observability` (dashboard + trace detail + retrieval debugger) surfaces request volume, latency percentiles, token/cost, fallback rate, blocked rate, evidence-insufficient rate, citation coverage — the human-facing view of the telemetry above, scoped per-tenant. The optional Grafana stack (`docs/06_Operations/Grafana_Prometheus_Loki_Tempo_VPS_Guide.md`) adds the deployment-wide aggregate view on top - see `docs/architecture/observability.md`'s "Full telemetry architecture" for how the two relate.
 
 ## Alerts
 
-Structured alert events fire on threshold breach (p95 latency, provider/embedding error rate, fallback rate, evidence-insufficient rate, invalid citation attempts, guardrail spikes, cost spikes, zero traffic) — see `docs/runbooks/observability-alerts.md` for the response process.
+Structured alert events fire on threshold breach (p95 latency, provider/embedding error rate, fallback rate, evidence-insufficient rate, invalid citation attempts, guardrail spikes, cost spikes, zero traffic) — see `docs/runbooks/observability-alerts.md` for the response process. `app.alerting` can deliver these proactively (email/Slack); Grafana's own alert rules independently evaluate the same class of condition in aggregate across all tenants - see `docs/architecture/observability.md`'s "Alert responsibility split" for which system owns what.
 
 ## Incident Detection
 

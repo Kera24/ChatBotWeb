@@ -35,7 +35,16 @@ exporters:
   loki:
     endpoint: http://loki:3100/loki/api/v1/push
 
+# Standard OTel Collector readiness/liveness endpoint - internal network
+# only (no host port published, matching every other service in
+# docker-compose.observability.yml except Grafana). Returns 200 once the
+# collector's pipelines are up. See deployment/observability/check.sh.
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
 service:
+  extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]

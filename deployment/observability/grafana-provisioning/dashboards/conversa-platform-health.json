@@ -1,0 +1,89 @@
+{
+  "title": "Conversa Platform Health",
+  "uid": "conversa-platform-health",
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Email delivery outcomes (per provider)",
+      "type": "timeseries",
+      "description": "email_delivery_total - app.email.service's dev/resend provider, emitted alongside the existing email.send/email.send_failed structured log events (searchable in Loki). A sustained failure share here means the transactional email provider itself is degraded, not an individual send.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (provider, status) (rate(email_delivery_total[15m]))",
+          "legendFormat": "{{provider}} {{status}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Email delivery failure rate",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(email_delivery_total{status=\"failure\"}[15m])) / sum(rate(email_delivery_total[15m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 0.3 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Unhandled exceptions (total rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(api_unhandled_exceptions_total[5m]))",
+          "legendFormat": "unhandled exceptions/s"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Unhandled exceptions (by exception type)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (exception_type) (rate(api_unhandled_exceptions_total[15m]))",
+          "legendFormat": "{{exception_type}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Recent error/warning logs",
+      "type": "logs",
+      "description": "Structured JSON log lines forwarded to Loki via the OTel log bridge (app.operations.telemetry's LoggingHandler) - the same events already visible via `docker compose logs`, now centrally searchable. Content is whatever app.operations.logging.redact already redacted before the line was ever logged; this panel adds no additional exposure.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "expr": "{service_name=\"chatbotweb-api\"} | json | severity_text =~ \"ERROR|WARN\""
+        }
+      ]
+    }
+  ]
+}

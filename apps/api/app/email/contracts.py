@@ -17,6 +17,9 @@ class EmailType(StrEnum):
     BILLING_NOTIFICATION = "billing_notification"
     SECURITY_ALERT = "security_alert"
     WORKSPACE_INVITATION = "workspace_invitation"
+    # Internal operational alert delivery (app.alerting.providers.email) -
+    # distinct from SECURITY_ALERT, which is customer-facing.
+    OPERATIONAL_ALERT = "operational_alert"
 
 
 class EmailMessage(BaseModel):

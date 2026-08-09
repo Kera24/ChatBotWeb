@@ -26,8 +26,10 @@ import argparse
 import json
 import sys
 
+from app.alerting.hooks import notify_gate_failure
 from app.db.session import SessionLocal
 from app.evaluation.gate import evaluate_gate
+from app.observability import otel_metrics
 from app.evaluation.policy import load_policy_from_env
 from app.evaluation.summary_builder import build_run_summary
 from app.repositories import evaluation_candidate_repository, evaluation_repository
@@ -121,6 +123,24 @@ def main(argv: list[str] | None = None) -> int:
             verdict_reasons=verdict.reasons,
             created_by=args.created_by,
         )
+
+        otel_metrics.record_evaluation_gate_outcome(gate="regression", passed=verdict.passed)
+
+        if not verdict.passed:
+            notify_gate_failure(
+                alert_key="evaluation_regression_detected",
+                category="prompt_regression",
+                message=f"Regression detected comparing run {candidate_run.id} to baseline {baseline_run.id}: {'; '.join(verdict.reasons) or 'no reasons reported'}",
+                source_subsystem="evaluation_regression",
+                organisation_id=args.organisation,
+                workspace_id=args.workspace,
+                assistant_id=candidate_run.widget_id,
+                correlation_id=candidate_run.id,
+                metrics={
+                    "newly_failing_case_count": len(newly_failing_cases),
+                    "hard_safety_failure_count": len(hard_safety_failures),
+                },
+            )
 
         print(json.dumps({"verdict": verdict.as_dict(), "report": report}, indent=2, default=str))
 

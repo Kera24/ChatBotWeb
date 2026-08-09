@@ -3,7 +3,7 @@
   "uid": "conversa-api-overview",
   "timezone": "utc",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
   "panels": [
@@ -53,6 +53,44 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "datasource": { "type": "tempo", "uid": "Tempo" },
       "targets": [{ "queryType": "search", "limit": 20 }]
+    },
+    {
+      "id": 5,
+      "title": "Unhandled exceptions (by route)",
+      "type": "timeseries",
+      "description": "app.api.exception_handlers's global handler - a route with a nonzero, sustained rate here means something is crashing outside the normal HTTPException/guardrail error paths.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (route) (rate(api_unhandled_exceptions_total[5m]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "No traffic (5m request count)",
+      "type": "stat",
+      "description": "0 for 5+ minutes with the service otherwise healthy can mean telemetry stopped flowing, not that traffic actually stopped - cross-check against deployment/monitoring/check.sh's api_ready result before treating this as a real outage.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_duration_milliseconds_count[5m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      }
     }
   ]
 }

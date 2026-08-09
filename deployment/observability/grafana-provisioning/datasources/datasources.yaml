@@ -1,18 +1,32 @@
+# Explicit `uid:` on every datasource - dashboard/alert-rule JSON in this
+# same provisioning tree (conversa-*.json, alerting/rules.yaml) references
+# these UIDs literally ("Prometheus"/"Tempo"/"Loki"). Without an explicit
+# uid here, Grafana auto-generates a random one on first provisioning and
+# every panel/rule referencing the literal name would resolve to "datasource
+# not found" instead.
 apiVersion: 1
 
 datasources:
   - name: Prometheus
+    uid: Prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
     isDefault: true
 
   - name: Tempo
+    uid: Tempo
     type: tempo
     access: proxy
     url: http://tempo:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: Loki
+      tracesToMetrics:
+        datasourceUid: Prometheus
 
   - name: Loki
+    uid: Loki
     type: loki
     access: proxy
     url: http://loki:3100

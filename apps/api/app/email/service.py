@@ -12,6 +12,7 @@ from app.email.contracts import EmailMessage, EmailSendResult, EmailType
 from app.email.errors import EmailProviderError
 from app.email.providers.base import TransactionalEmailProvider
 from app.email.templates import render_password_reset_email, render_verification_email
+from app.observability import otel_metrics
 from app.operations.logging import log_operational_event, pseudonymous_identifier
 
 logger = logging.getLogger("app.email.service")
@@ -71,6 +72,7 @@ def _send(provider: TransactionalEmailProvider, message: EmailMessage) -> EmailS
                 "to": pseudonymous_identifier(message.to_email, prefix="email"),
             },
         )
+        otel_metrics.record_email_delivery(provider=provider.provider_key, email_type=message.email_type.value, success=False, error_code=exc.code)
         return None
 
     log_operational_event(
@@ -85,4 +87,5 @@ def _send(provider: TransactionalEmailProvider, message: EmailMessage) -> EmailS
             "to": pseudonymous_identifier(message.to_email, prefix="email"),
         },
     )
+    otel_metrics.record_email_delivery(provider=result.provider_key, email_type=result.email_type.value, success=result.success, error_code=result.error_code)
     return result

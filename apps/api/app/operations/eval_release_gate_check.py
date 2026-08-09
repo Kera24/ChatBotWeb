@@ -19,8 +19,10 @@ import argparse
 import json
 import sys
 
+from app.alerting.hooks import notify_gate_failure
 from app.db.session import SessionLocal
 from app.evaluation.production_gate import DEFAULT_MAX_BASELINE_AGE_DAYS, evaluate_production_readiness
+from app.observability import otel_metrics
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -45,6 +47,20 @@ def main(argv: list[str] | None = None) -> int:
             widget_id=args.assistant,
             dataset_id=args.dataset,
             max_baseline_age_days=args.max_baseline_age_days,
+        )
+
+    otel_metrics.record_evaluation_gate_outcome(gate="release_gate", passed=verdict.passed)
+
+    if not verdict.passed:
+        notify_gate_failure(
+            alert_key="evaluation_release_gate_failed",
+            category="evaluation_gate_failure",
+            message=f"Production release gate failed for dataset {args.dataset}: {'; '.join(verdict.reasons) or 'no reasons reported'}",
+            source_subsystem="evaluation_release_gate",
+            organisation_id=args.organisation,
+            workspace_id=args.workspace,
+            assistant_id=args.assistant,
+            correlation_id=args.dataset,
         )
 
     if args.format == "json":
