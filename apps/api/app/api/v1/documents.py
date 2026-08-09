@@ -31,6 +31,7 @@ from app.services.chunking import (
     InvalidChunkingStatus,
     chunk_document_version,
 )
+from app.services.chunking_strategies import UnknownChunkingStrategy, build_chunking_strategy
 from app.services.embeddings import (
     EmbeddingProviderError,
     EmbeddingTargetNotFound,
@@ -387,6 +388,25 @@ def chunk_document_version_endpoint(
         root_path=settings.LOCAL_UPLOAD_ROOT,
         max_upload_bytes=settings.MAX_UPLOAD_BYTES,
     )
+    # settings.CHUNKING_STRATEGY defaults to "fixed_word" - the current
+    # production baseline - so this resolves to `strategy=None` and
+    # chunk_document_version() takes its original, unchanged code path
+    # unless a deployment has explicitly opted into a Knowledge Pipeline V2
+    # candidate. See docs/engineering/chunking.md.
+    strategy_key = settings.CHUNKING_STRATEGY.strip().lower()
+    strategy = None
+    if strategy_key != "fixed_word":
+        embedding_provider = None
+        if strategy_key == "structure_semantic":
+            embedding_provider = build_embedding_provider(
+                provider_name=settings.EMBEDDING_PROVIDER,
+                model_name=settings.EMBEDDING_MODEL,
+                dimension=settings.EMBEDDING_DIMENSION,
+            )
+        try:
+            strategy = build_chunking_strategy(strategy_key, embedding_provider=embedding_provider)
+        except UnknownChunkingStrategy as exc:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
     try:
         result = chunk_document_version(
             db,
@@ -398,6 +418,7 @@ def chunk_document_version_endpoint(
             chunk_size_words=settings.CHUNK_SIZE_WORDS,
             chunk_overlap_words=settings.CHUNK_OVERLAP_WORDS,
             actor_user_id=current_user.user_id,
+            strategy=strategy,
         )
     except ChunkingTargetNotFound as exc:
         raise HTTPException(

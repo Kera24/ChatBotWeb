@@ -88,6 +88,23 @@ class Settings:
     MAX_UPLOAD_BYTES: int = _get_int("MAX_UPLOAD_BYTES", 10 * 1024 * 1024)
     CHUNK_SIZE_WORDS: int = _get_int("CHUNK_SIZE_WORDS", 300)
     CHUNK_OVERLAP_WORDS: int = _get_int("CHUNK_OVERLAP_WORDS", 50)
+    # Knowledge Pipeline V2 (app.services.chunking_strategies). "fixed_word"
+    # (the current production baseline) is the default and stays the default
+    # until a bake-off (app.operations.eval_chunking_bakeoff) shows a
+    # candidate is non-regressive - see docs/engineering/chunking.md. Set to
+    # "structure_aware" or "structure_semantic" to opt a deployment in;
+    # setting it back to "fixed_word" is the entire rollback procedure, no
+    # code change required.
+    CHUNKING_STRATEGY: str = getenv("CHUNKING_STRATEGY", "fixed_word")
+    CHUNKING_MIN_CHUNK_SIZE_WORDS: int = _get_int("CHUNKING_MIN_CHUNK_SIZE_WORDS", 40)
+    CHUNKING_MAX_CHUNK_SIZE_WORDS: int = _get_int("CHUNKING_MAX_CHUNK_SIZE_WORDS", 500)
+    # None (unset) means "use the per-embedding-model calibrated default" -
+    # see app.services.chunking_strategies.semantic.recommended_semantic_similarity_threshold
+    # for how that default was measured (never hardcoded without evidence).
+    CHUNKING_SEMANTIC_SIMILARITY_THRESHOLD: float | None = (
+        _get_float("CHUNKING_SEMANTIC_SIMILARITY_THRESHOLD", -1.0) if getenv("CHUNKING_SEMANTIC_SIMILARITY_THRESHOLD") else None
+    )
+    CHUNKING_SEMANTIC_MIN_UNIT_WORDS: int = _get_int("CHUNKING_SEMANTIC_MIN_UNIT_WORDS", 12)
     EMBEDDING_PROVIDER: str = getenv("EMBEDDING_PROVIDER", "local-mock")
     EMBEDDING_MODEL: str = getenv("EMBEDDING_MODEL", "local-mock-v1")
     EMBEDDING_DIMENSION: int = _get_int("EMBEDDING_DIMENSION", 1536)

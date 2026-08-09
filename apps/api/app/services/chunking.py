@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from hashlib import sha256
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,9 @@ from app.repositories.document_repository import (
     list_chunks_for_document_version,
 )
 from app.services.local_storage import LocalDocumentStorage
+
+if TYPE_CHECKING:
+    from app.services.chunking_strategies import ChunkingConfig, ChunkingStrategy
 
 CHUNKING_STRATEGY_VERSION = "mvp-word-v1"
 
@@ -50,7 +54,19 @@ def chunk_document_version(
     chunk_size_words: int,
     chunk_overlap_words: int,
     actor_user_id: str | None = None,
+    strategy: "ChunkingStrategy | None" = None,
+    strategy_config: "ChunkingConfig | None" = None,
 ) -> ChunkingResult:
+    """`strategy`/`strategy_config` are optional and additive (Knowledge
+    Pipeline V2, see app.services.chunking_strategies) - every existing
+    caller that omits them gets EXACTLY today's behaviour: plain
+    `split_text_into_chunks`, `chunking_strategy_version` recorded as the
+    unchanged `CHUNKING_STRATEGY_VERSION` constant, no heading/section/page
+    metadata. Passing a strategy (e.g. from
+    app.services.chunking_strategies.build_chunking_strategy, keyed by
+    `settings.CHUNKING_STRATEGY`) is how a structure-aware/semantic
+    candidate - or the bake-off harness - opts into the new pipeline without
+    changing this function's default, rollback-safe behaviour."""
     version = get_document_version_for_workspace(
         db,
         organisation_id=organisation_id,
@@ -103,13 +119,13 @@ def chunk_document_version(
             error_message="Extracted text artifact could not be read safely.",
         )
 
-    chunks = split_text_into_chunks(
-        text,
-        chunk_size_words=chunk_size_words,
-        chunk_overlap_words=chunk_overlap_words,
-    )
-    for chunk_index, chunk_text in enumerate(chunks):
-        db.add(
+    if strategy is None:
+        chunk_texts = split_text_into_chunks(
+            text,
+            chunk_size_words=chunk_size_words,
+            chunk_overlap_words=chunk_overlap_words,
+        )
+        chunk_rows = [
             Chunk(
                 organisation_id=organisation_id,
                 workspace_id=workspace_id,
@@ -128,14 +144,62 @@ def chunk_document_version(
                     "chunk_overlap_words": chunk_overlap_words,
                 },
             )
+            for chunk_index, chunk_text in enumerate(chunk_texts)
+        ]
+        recorded_strategy_version = CHUNKING_STRATEGY_VERSION
+        recorded_config: dict[str, object] = {"chunk_size_words": chunk_size_words, "chunk_overlap_words": chunk_overlap_words}
+    else:
+        from app.core.config import settings
+        from app.services.chunking_strategies import ChunkingConfig
+
+        config = strategy_config or ChunkingConfig(
+            chunk_size_words=chunk_size_words,
+            chunk_overlap_words=chunk_overlap_words,
+            source_type=version.document.source_type,
+            min_chunk_size_words=settings.CHUNKING_MIN_CHUNK_SIZE_WORDS,
+            max_chunk_size_words=settings.CHUNKING_MAX_CHUNK_SIZE_WORDS,
+            semantic_similarity_threshold=settings.CHUNKING_SEMANTIC_SIMILARITY_THRESHOLD,
+            semantic_min_unit_words=settings.CHUNKING_SEMANTIC_MIN_UNIT_WORDS,
         )
+        spans = strategy.chunk(text, config=config)
+        recorded_strategy_version = f"{strategy.strategy_key}:{strategy.strategy_version}"
+        recorded_config = {
+            "chunk_size_words": config.chunk_size_words,
+            "chunk_overlap_words": config.chunk_overlap_words,
+            "min_chunk_size_words": config.min_chunk_size_words,
+            "max_chunk_size_words": config.max_chunk_size_words,
+            "semantic_similarity_threshold": config.semantic_similarity_threshold,
+        }
+        chunk_rows = [
+            Chunk(
+                organisation_id=organisation_id,
+                workspace_id=workspace_id,
+                document_id=document_id,
+                document_version_id=document_version_id,
+                chunk_index=chunk_index,
+                content=span.content,
+                content_hash=sha256(span.content.encode("utf-8")).hexdigest(),
+                token_count=len(span.content.split()),
+                source_type=version.document.source_type,
+                source_title=version.document.title,
+                chunking_strategy_version=recorded_strategy_version,
+                heading_path=span.heading_path,
+                section_title=span.section_title,
+                page_number=span.page_number,
+                status="ready",
+                metadata_json={**recorded_config, **span.metadata},
+            )
+            for chunk_index, span in enumerate(spans)
+        ]
+
+    for row in chunk_rows:
+        db.add(row)
 
     metadata_json = dict(version.metadata_json or {})
     metadata_json["chunking"] = {
-        "strategy": CHUNKING_STRATEGY_VERSION,
-        "chunk_count": len(chunks),
-        "chunk_size_words": chunk_size_words,
-        "chunk_overlap_words": chunk_overlap_words,
+        "strategy": recorded_strategy_version,
+        "chunk_count": len(chunk_rows),
+        **recorded_config,
     }
     version.metadata_json = metadata_json
     db.add(version)
@@ -151,11 +215,11 @@ def chunk_document_version(
         document_version_id=version.id,
         previous_status=version.processing_status,
         new_status=version.processing_status,
-        metadata_json={"chunk_count": len(chunks), "strategy": CHUNKING_STRATEGY_VERSION},
+        metadata_json={"chunk_count": len(chunk_rows), "strategy": recorded_strategy_version},
     )
     db.commit()
     db.refresh(version)
-    return ChunkingResult(document_version=version, success=True, chunk_count=len(chunks))
+    return ChunkingResult(document_version=version, success=True, chunk_count=len(chunk_rows))
 
 
 def split_text_into_chunks(

@@ -19,13 +19,18 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
 from app.access.widget_admin.service import create_widget
 from app.db.models import Chunk, Document, DocumentVersion, EvaluationCase, EvaluationDataset, Membership, Organisation, User, Workspace
 from app.services.embeddings import EmbeddingProvider
+
+if TYPE_CHECKING:
+    from app.services.chunking_strategies import ChunkingConfig, ChunkingStrategy
 
 FIXTURE_PATH = Path(__file__).parent / "launch_dataset.json"
 GOLDEN_FIXTURE_PATH = Path(__file__).parent / "golden_dataset.json"
@@ -112,7 +117,26 @@ def seed_launch_dataset(
     embedding_provider: EmbeddingProvider,
     actor_user_id: str | None = None,
     fixture: dict | None = None,
+    chunking_strategy: "ChunkingStrategy | None" = None,
+    chunking_config: "ChunkingConfig | None" = None,
 ) -> LoadedLaunchDataset:
+    """`chunking_strategy`/`chunking_config` are optional and additive
+    (Knowledge Pipeline V2 bake-off support -
+    app.operations.eval_chunking_bakeoff). Omitted (the default, and every
+    pre-existing caller's behaviour, unchanged): each document becomes
+    exactly one hand-inserted chunk, as this loader has always done - fast,
+    and correct for datasets whose documents are short enough that the real
+    chunker would produce exactly one chunk anyway (see
+    docs/engineering/chunking.md's bake-off notes on golden_dataset.json's
+    document sizes). Given a strategy: each document's content is run
+    through `strategy.chunk()` - the same abstraction
+    `app.services.chunking.chunk_document_version` uses for a real upload -
+    so the bake-off exercises the actual chunking algorithm, not a
+    reimplementation of it, and can produce more than one chunk per
+    document when a candidate's structural/semantic boundaries call for
+    it."""
+    from app.services.chunking_strategies import ChunkingConfig as _ChunkingConfig
+
     fixture = fixture or load_fixture_definition()
     can_store_vector = db.bind is not None and db.bind.dialect.name == "postgresql"
     now = datetime.now(timezone.utc)
@@ -141,26 +165,43 @@ def seed_launch_dataset(
         db.flush()
         document.active_document_version_id = version.id
 
-        chunk = Chunk(
-            organisation_id=organisation.id,
-            workspace_id=workspace.id,
-            document_id=document.id,
-            document_version_id=version.id,
-            chunk_index=0,
-            content=doc["content"],
-            content_hash=f"hash-{doc['key']}",
-            token_count=len(doc["content"].split()),
-            source_type="txt",
-            source_title=doc["title"],
-            status="ready",
-            embedding_provider=embedding_provider.provider_name,
-            embedding_model=embedding_provider.model_name,
-            embedding_dimension=embedding_provider.dimension,
-            embedding_created_at=now,
-        )
-        if can_store_vector:
-            chunk.embedding_vector = embedding_provider.embed(doc["content"])
-        db.add(chunk)
+        if chunking_strategy is None:
+            spans_content = [doc["content"]]
+            heading_paths: list[str | None] = [None]
+            section_titles: list[str | None] = [None]
+            strategy_version_label = None
+        else:
+            config = chunking_config or _ChunkingConfig(chunk_size_words=300, chunk_overlap_words=50, source_type="txt")
+            spans = chunking_strategy.chunk(doc["content"], config=config)
+            spans_content = [span.content for span in spans]
+            heading_paths = [span.heading_path for span in spans]
+            section_titles = [span.section_title for span in spans]
+            strategy_version_label = f"{chunking_strategy.strategy_key}:{chunking_strategy.strategy_version}"
+
+        for chunk_index, chunk_content in enumerate(spans_content):
+            chunk = Chunk(
+                organisation_id=organisation.id,
+                workspace_id=workspace.id,
+                document_id=document.id,
+                document_version_id=version.id,
+                chunk_index=chunk_index,
+                content=chunk_content,
+                content_hash=sha256(chunk_content.encode("utf-8")).hexdigest() if chunking_strategy is not None else f"hash-{doc['key']}",
+                token_count=len(chunk_content.split()),
+                source_type="txt",
+                source_title=doc["title"],
+                heading_path=heading_paths[chunk_index],
+                section_title=section_titles[chunk_index],
+                chunking_strategy_version=strategy_version_label,
+                status="ready",
+                embedding_provider=embedding_provider.provider_name,
+                embedding_model=embedding_provider.model_name,
+                embedding_dimension=embedding_provider.dimension,
+                embedding_created_at=now,
+            )
+            if can_store_vector:
+                chunk.embedding_vector = embedding_provider.embed(chunk_content)
+            db.add(chunk)
         document_ids[doc["key"]] = document.id
 
     db.commit()
@@ -231,6 +272,8 @@ def seed_golden_dataset(
     embedding_provider: EmbeddingProvider,
     actor_user_id: str | None = None,
     fixture: dict | None = None,
+    chunking_strategy: "ChunkingStrategy | None" = None,
+    chunking_config: "ChunkingConfig | None" = None,
 ) -> LoadedLaunchDataset:
     """Seed the larger, deliberately-constructed golden dataset
     (golden_dataset.json) used for the full evaluation cycle. Shares every
@@ -244,4 +287,6 @@ def seed_golden_dataset(
         embedding_provider=embedding_provider,
         actor_user_id=actor_user_id,
         fixture=fixture or load_golden_fixture_definition(),
+        chunking_strategy=chunking_strategy,
+        chunking_config=chunking_config,
     )

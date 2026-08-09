@@ -291,6 +291,94 @@ def test_chunking_fails_without_extracted_text_path(client: TestClient, tmp_path
         object.__setattr__(settings, "LOCAL_UPLOAD_ROOT", original_root)
 
 
+def test_structure_aware_strategy_endpoint_persists_metadata_and_respects_tenant_isolation(client: TestClient, tmp_path) -> None:
+    # Knowledge Pipeline V2 Phase 9: the strategy-selection wiring in
+    # chunk_document_version_endpoint (settings.CHUNKING_STRATEGY) must
+    # still go through the same ensure_workspace_in_organisation/tenant
+    # filters as the fixed_word baseline - selecting a candidate strategy
+    # must never become a second, unchecked code path.
+    original_root = settings.LOCAL_UPLOAD_ROOT
+    original_strategy = settings.CHUNKING_STRATEGY
+    object.__setattr__(settings, "CHUNKING_STRATEGY", "structure_aware")
+    try:
+        org_a_id, workspace_a_id, document_id, version_id = prepare_ready_version(
+            client,
+            tmp_path,
+            email="alpha-admin@example.test",
+        )
+        org_b_id, _workspace_b_id, _user_b_id = seed_tenant(
+            client,
+            organisation_name="Beta Clinic",
+            organisation_slug="beta",
+            user_email="beta-admin@example.test",
+            role="client_admin",
+        )
+
+        cross_tenant_response = client.post(
+            chunk_url(workspace_a_id, document_id, version_id),
+            params={"organisation_id": org_b_id},
+            headers=dev_headers("beta-admin@example.test", "client_admin"),
+        )
+        assert cross_tenant_response.status_code == 404
+
+        response = client.post(
+            chunk_url(workspace_a_id, document_id, version_id),
+            params={"organisation_id": org_a_id},
+            headers=dev_headers("alpha-admin@example.test", "client_admin"),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["meta"]["success"] is True
+        with client.app.state.testing_session() as db:
+            chunks = db.query(Chunk).order_by(Chunk.chunk_index).all()
+            assert len(chunks) >= 1
+            assert all(chunk.organisation_id == org_a_id for chunk in chunks)
+            assert all(chunk.workspace_id == workspace_a_id for chunk in chunks)
+            assert all(chunk.chunking_strategy_version == "structure_aware:structure-aware-v1" for chunk in chunks)
+    finally:
+        object.__setattr__(settings, "LOCAL_UPLOAD_ROOT", original_root)
+        object.__setattr__(settings, "CHUNKING_STRATEGY", original_strategy)
+
+
+def test_chunking_strategy_rollback_to_fixed_word(client: TestClient, tmp_path) -> None:
+    # Phase 8/9: rollback to the production baseline must be a pure config
+    # flip - no code change, no data migration - and must reproduce the
+    # exact original chunk_document_version() code path (strategy=None).
+    original_root = settings.LOCAL_UPLOAD_ROOT
+    original_strategy = settings.CHUNKING_STRATEGY
+    original_size = settings.CHUNK_SIZE_WORDS
+    original_overlap = settings.CHUNK_OVERLAP_WORDS
+    object.__setattr__(settings, "CHUNKING_STRATEGY", "structure_aware")
+    object.__setattr__(settings, "CHUNK_SIZE_WORDS", 5)
+    object.__setattr__(settings, "CHUNK_OVERLAP_WORDS", 1)
+    try:
+        organisation_id, workspace_id, document_id, version_id = prepare_ready_version(client, tmp_path)
+
+        object.__setattr__(settings, "CHUNKING_STRATEGY", "fixed_word")
+        response = client.post(
+            chunk_url(workspace_id, document_id, version_id),
+            params={"organisation_id": organisation_id},
+            headers=dev_headers("admin@example.test", "client_admin"),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["meta"]["chunk_count"] == 3
+        with client.app.state.testing_session() as db:
+            chunks = db.query(Chunk).order_by(Chunk.chunk_index).all()
+            assert [chunk.content for chunk in chunks] == [
+                "one two three four five",
+                "five six seven eight nine",
+                "nine ten eleven twelve",
+            ]
+            assert all(chunk.chunking_strategy_version == "mvp-word-v1" for chunk in chunks)
+            assert all(chunk.heading_path is None for chunk in chunks)
+    finally:
+        object.__setattr__(settings, "LOCAL_UPLOAD_ROOT", original_root)
+        object.__setattr__(settings, "CHUNKING_STRATEGY", original_strategy)
+        object.__setattr__(settings, "CHUNK_SIZE_WORDS", original_size)
+        object.__setattr__(settings, "CHUNK_OVERLAP_WORDS", original_overlap)
+
+
 def test_repeated_chunking_is_safely_rejected(client: TestClient, tmp_path) -> None:
     original_root = settings.LOCAL_UPLOAD_ROOT
     original_size = settings.CHUNK_SIZE_WORDS
