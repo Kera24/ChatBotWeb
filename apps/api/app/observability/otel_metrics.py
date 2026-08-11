@@ -119,6 +119,32 @@ def record_ai_request_completed(
         logger.debug("record_ai_request_completed failed", exc_info=True)
 
 
+def record_retrieval_fusion(
+    *, strategy: str, dense_candidate_count: int, lexical_candidate_count: int, fused_candidate_count: int, selected_top_k: int
+) -> None:
+    """One retrieval call's candidate-generation shape (Retrieval V2 Phase 1,
+    docs/future/HybridRetrieval.md) - `strategy` is the closed
+    "dense_only"/"hybrid_rrf" vocabulary from settings.RETRIEVAL_STRATEGY,
+    never a tenant/request id, per this module's CARDINALITY POLICY."""
+    try:
+        labels = {"strategy": _label(strategy)}
+        _counter("retrieval_requests_total", unit="1", description="Completed retrieval calls by strategy.").add(1, labels)
+        _histogram("retrieval_dense_candidate_count", unit="1", description="Dense channel candidate pool size before fusion.").record(
+            dense_candidate_count, labels
+        )
+        _histogram("retrieval_lexical_candidate_count", unit="1", description="Lexical channel candidate pool size before fusion.").record(
+            lexical_candidate_count, labels
+        )
+        _histogram("retrieval_fused_candidate_count", unit="1", description="Candidate count after fusion/dedup.").record(
+            fused_candidate_count, labels
+        )
+        _histogram("retrieval_selected_top_k", unit="1", description="Chunks actually selected into the context window.").record(
+            selected_top_k, labels
+        )
+    except Exception:
+        logger.debug("record_retrieval_fusion failed", exc_info=True)
+
+
 def record_guardrail_outcome(*, layer: str, guardrail: str, verdict: str, blocked: bool) -> None:
     """One guardrail layer verdict (app.observability.ai_trace_recorder.record_guardrail) -
     layer/guardrail_name/verdict are already a fixed vocabulary (see

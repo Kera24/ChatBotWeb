@@ -18,6 +18,12 @@ unavailable.
 this run, without touching the global environment - used for controlled
 threshold experiments (one run per candidate threshold).
 
+`--retrieval-strategy` overrides RETRIEVAL_STRATEGY ("dense_only" or
+"hybrid_rrf", see docs/future/HybridRetrieval.md) for just this run, without
+touching the global environment - run once per strategy against the same
+dataset/assistant and diff the two run ids with eval_compare.py for a
+controlled Retrieval V2 Phase 1 bake-off.
+
 Exits 0 once the run completes (regardless of pass/fail - use `eval_report.py
 --gate` or `eval_launch.py` to enforce a release gate), 2 on an operational
 error (dataset not found, empty dataset, empty category, real provider not configured/unavailable).
@@ -52,6 +58,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--real", action="store_true", help="Use the real embedding provider (EVAL_EMBEDDING_*) instead of the deterministic mock.")
     parser.add_argument("--min-similarity-score", type=float, default=None, help="Override RETRIEVAL_MIN_SIMILARITY_SCORE for just this run (for threshold experiments).")
     parser.add_argument("--case-timeout", type=float, default=30.0, help="Per-case timeout in seconds (default 30; real-embedding runs recompute every chunk's embedding live per query and may need more, e.g. 90-120).")
+    parser.add_argument(
+        "--retrieval-strategy",
+        default=None,
+        choices=["dense_only", "hybrid_rrf"],
+        help="Override RETRIEVAL_STRATEGY for just this run (for the Retrieval V2 Phase 1 dense_only vs hybrid_rrf bake-off).",
+    )
     return parser.parse_args(argv)
 
 
@@ -104,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
                     embedding_provider=real_embedding_provider,
                     min_similarity_score=min_similarity_score,
                     case_timeout_seconds=args.case_timeout,
+                    retrieval_strategy_override=args.retrieval_strategy,
                 ),
             )
         except EmptyDatasetError as exc:

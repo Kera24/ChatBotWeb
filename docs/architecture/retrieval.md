@@ -33,6 +33,14 @@ Each assistant (`Widget`) has a `knowledge_scope_json` (list of document IDs) on
 
 Any guardrail block or empty retrieval routes through `RAGOrchestrator._persist_fallback()`, which always persists a real assistant message with `answer_state="fallback"` and a `guardrail_reason_code` in metadata — never silently drops the turn. A provider execution failure persists `answer_state="failed"` and raises `RAGProviderExecutionError` (caught and mapped to an HTTP error by the caller).
 
+## Hybrid retrieval (Retrieval V2 Phase 1)
+
+`assemble_retrieval_context()` supports two strategies via `settings.RETRIEVAL_STRATEGY` (or a per-request `RAGOrchestrationRequest.retrieval_strategy` override, used by the evaluation engine): `dense_only` (default, unchanged behavior) and `hybrid_rrf` (dense + `app.services.lexical_search` PostgreSQL full-text candidates, fused via `app.services.retrieval_fusion.reciprocal_rank_fusion()`). **`dense_only` remains the production default** — see ADR-0033: a real-embedding controlled bake-off (`nomic-embed-text-v2-moe`, threshold 0.32, both `golden_dataset.json` and the 104-case `chunking_dataset.json`) showed `hybrid_rrf` does not materially improve recall on the corpus purpose-built to test the retrieval-recall gap, so it was not promoted. `hybrid_rrf` is fully implemented, tested (unit, real PostgreSQL integration tier, orchestrator end-to-end), and available as a one-line config change for future reconsideration.
+
+Fused candidates keep `RetrievalCitationData.score` = the dense cosine-similarity score when a dense channel match exists (else `0.0` for a lexical-only match) — the RRF score itself is never substituted in, since `evidence_sufficiency`'s off-topic detector is calibrated for the cosine scale. RRF score/channel provenance is exposed separately via `RetrievalContextResult.retrieval_debug` (`RetrievalDebugInfo`) and `RAGOrchestrationResult.metadata`, never fed into any guardrail.
+
+`app.evaluation.embedding_cache.CachingEmbeddingProvider` (default-on via `EvaluationRunOptions.embedding_cache_enabled`) memoises `embed()` by exact `(provider, model, dimension, content-hash)` inside `run_evaluation()` only — SQLite's no-vector-index retrieval path otherwise re-embeds every candidate chunk on every case. Evaluation-only; never touches production retrieval.
+
 ## Adding a new stage or changing pipeline behavior
 
 - Add stages/checks as additive steps in `answer()`, after the value they need is already computed — never restructure the existing control flow of a passing stage.

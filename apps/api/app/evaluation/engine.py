@@ -31,6 +31,7 @@ from app.ai.rag_orchestrator import (
 from app.core.config import settings
 from app.db.models import EvaluationCase, EvaluationDataset, EvaluationRun
 from app.evaluation.categories import ISOLATION_CATEGORIES
+from app.evaluation.embedding_cache import CachingEmbeddingProvider
 from app.observability.ai_trace_recorder import AITraceRecorder, MetricsEmittingAITraceRecorder, NoOpAITraceRecorder
 from app.observability.context import AITraceContext, new_trace_id
 from app.observability.dependencies import build_ai_trace_recorder
@@ -123,6 +124,23 @@ class EvaluationRunOptions:
     # this exact version, rather than silently falling back, since the whole
     # point of a gate run is to test this specific candidate.
     prompt_version_override_id: str | None = None
+    # Retrieval V2 Phase 1 (docs/future/HybridRetrieval.md) - forces every
+    # case's RAGOrchestrationRequest.retrieval_strategy to one specific value
+    # ("dense_only"/"hybrid_rrf") instead of the deployment's global
+    # settings.RETRIEVAL_STRATEGY, mirroring prompt_version_override_id's
+    # exact pattern. Set by the bake-off CLI (app.operations.eval_run
+    # --retrieval-strategy) to run the same dataset under both strategies for
+    # a controlled comparison; None means "use the global default" for
+    # organic runs.
+    retrieval_strategy_override: str | None = None
+    # Evaluation-performance fix (Retrieval V2 Phase 1 follow-up,
+    # app.evaluation.embedding_cache) - memoises embed() by exact
+    # (provider, model, dimension, content) so a real-embedding run against
+    # SQLite's no-index retrieval path doesn't re-embed every chunk on every
+    # case. Defaults on since it is a pure, result-preserving optimisation;
+    # exposed as a flag so a test can assert cache-enabled and
+    # cache-disabled runs produce byte-identical retrieval results.
+    embedding_cache_enabled: bool = True
 
 
 def run_evaluation(
@@ -158,6 +176,14 @@ def run_evaluation(
         model_name=settings.EMBEDDING_MODEL,
         dimension=settings.EMBEDDING_DIMENSION,
     )
+    # Evaluation-only perf fix (app.evaluation.embedding_cache) - see
+    # EvaluationRunOptions.embedding_cache_enabled's docstring. Wraps
+    # whatever provider was resolved above (mock or real) transparently;
+    # provider_name/model_name/dimension pass through unchanged, so every
+    # downstream consumer (retrieval WHERE filters, retrieval_settings below)
+    # sees the exact same identity as an unwrapped provider would.
+    if options.embedding_cache_enabled:
+        embedding_provider = CachingEmbeddingProvider(embedding_provider)
     min_similarity_score = options.min_similarity_score if options.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE
 
     allowed_document_ids = _resolve_allowed_document_ids(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
@@ -178,6 +204,7 @@ def run_evaluation(
             "embedding_model": embedding_provider.model_name,
             "embedding_dimension": embedding_provider.dimension,
             "category_filter": options.category_filter,
+            "retrieval_strategy_override": options.retrieval_strategy_override,
         },
         created_by=options.created_by,
         trigger_source=options.trigger_source,
@@ -213,6 +240,10 @@ def run_evaluation(
             if outcome.provider_key:
                 provider_key, model_key, provider_model_name = outcome.provider_key, outcome.model_key, outcome.provider_model_name
                 prompt_key, prompt_version, prompt_hash = outcome.prompt_key, outcome.prompt_version, outcome.prompt_hash
+
+    if isinstance(embedding_provider, CachingEmbeddingProvider):
+        run.retrieval_settings_json = {**(run.retrieval_settings_json or {}), **embedding_provider.stats()}
+        db.add(run)
 
     return evaluation_repository.mark_run_completed(
         db,
@@ -279,6 +310,7 @@ def _run_single_case(
         min_similarity_score=min_similarity_score,
         trace_context=AITraceContext(trace_id=new_trace_id(), eval_run_id=eval_run_id, eval_case_id=case.id),
         prompt_version_override_id=options.prompt_version_override_id,
+        retrieval_strategy=options.retrieval_strategy_override,
     )
 
     def call() -> object:
@@ -337,6 +369,13 @@ def _score_result(case: EvaluationCase, result, *, allowed_document_ids, cross_t
         retrieved_chunk_ids=retrieved_chunk_ids,
         retrieved_source_labels=retrieved_source_labels,
         allowed_document_ids=allowed_document_ids if not cross_tenant_leak_detected else None,
+        retrieval_strategy=(result.metadata or {}).get("retrieval_strategy"),
+        dense_candidate_count=(result.metadata or {}).get("dense_candidate_count"),
+        lexical_candidate_count=(result.metadata or {}).get("lexical_candidate_count"),
+        fused_candidate_count=(result.metadata or {}).get("fused_candidate_count"),
+        dense_latency_ms=(result.metadata or {}).get("dense_latency_ms"),
+        lexical_latency_ms=(result.metadata or {}).get("lexical_latency_ms"),
+        fusion_latency_ms=(result.metadata or {}).get("fusion_latency_ms"),
     )
     answer_metrics = compute_answer_metrics(
         answer=result.answer,

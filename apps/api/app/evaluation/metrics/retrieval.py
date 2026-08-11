@@ -22,6 +22,21 @@ class RetrievalMetrics:
     duplicate_context_rate: float
     cross_assistant_retrieval_failure: bool
     unauthorised_source_failure: bool
+    # Retrieval V2 Phase 1 (docs/future/HybridRetrieval.md) additions - how
+    # much of the *multi-item* expected evidence set was covered, not simply
+    # whether one relevant chunk/document was found (that's hit_at_k above).
+    # Reuses the same expected_document_ids ground truth recall_at_k already
+    # uses (fixtures define no chunk-level evidence, so nothing finer is
+    # fabricated) - populated only when a case actually declares more than
+    # one expected document, otherwise None (no signal to measure).
+    evidence_coverage: float | None = None
+    retrieval_strategy: str | None = None
+    dense_candidate_count: int | None = None
+    lexical_candidate_count: int | None = None
+    fused_candidate_count: int | None = None
+    dense_latency_ms: int | None = None
+    lexical_latency_ms: int | None = None
+    fusion_latency_ms: int | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -35,6 +50,14 @@ class RetrievalMetrics:
             "duplicate_context_rate": self.duplicate_context_rate,
             "cross_assistant_retrieval_failure": self.cross_assistant_retrieval_failure,
             "unauthorised_source_failure": self.unauthorised_source_failure,
+            "evidence_coverage": self.evidence_coverage,
+            "retrieval_strategy": self.retrieval_strategy,
+            "dense_candidate_count": self.dense_candidate_count,
+            "lexical_candidate_count": self.lexical_candidate_count,
+            "fused_candidate_count": self.fused_candidate_count,
+            "dense_latency_ms": self.dense_latency_ms,
+            "lexical_latency_ms": self.lexical_latency_ms,
+            "fusion_latency_ms": self.fusion_latency_ms,
         }
 
 
@@ -46,6 +69,13 @@ def compute_retrieval_metrics(
     retrieved_chunk_ids: list[str],
     retrieved_source_labels: list[str],
     allowed_document_ids: list[str] | None,
+    retrieval_strategy: str | None = None,
+    dense_candidate_count: int | None = None,
+    lexical_candidate_count: int | None = None,
+    fused_candidate_count: int | None = None,
+    dense_latency_ms: int | None = None,
+    lexical_latency_ms: int | None = None,
+    fusion_latency_ms: int | None = None,
 ) -> RetrievalMetrics:
     retrieved_chunk_count = len(retrieved_chunk_ids)
     duplicate_context_rate = _duplicate_rate(retrieved_chunk_ids)
@@ -68,6 +98,10 @@ def compute_retrieval_metrics(
             if document_id in expected:
                 reciprocal_rank = 1.0 / rank
                 break
+
+    evidence_coverage: float | None = None
+    if expected_document_ids and len(expected_document_ids) > 1:
+        evidence_coverage = recall_at_k
 
     expected_source_retrieved: bool | None = None
     if expected_source_labels:
@@ -93,6 +127,14 @@ def compute_retrieval_metrics(
         duplicate_context_rate=duplicate_context_rate,
         cross_assistant_retrieval_failure=cross_assistant_retrieval_failure,
         unauthorised_source_failure=unauthorised_source_failure,
+        evidence_coverage=evidence_coverage,
+        retrieval_strategy=retrieval_strategy,
+        dense_candidate_count=dense_candidate_count,
+        lexical_candidate_count=lexical_candidate_count,
+        fused_candidate_count=fused_candidate_count,
+        dense_latency_ms=dense_latency_ms,
+        lexical_latency_ms=lexical_latency_ms,
+        fusion_latency_ms=fusion_latency_ms,
     )
 
 

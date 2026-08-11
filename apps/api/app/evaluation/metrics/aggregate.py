@@ -39,6 +39,15 @@ class RunSummary:
     average_recall_at_k: float | None = None
     unauthorised_source_rate: float | None = None
     invalid_citation_rate: float | None = None
+    # Retrieval V2 Phase 1 (docs/future/HybridRetrieval.md) bake-off fields.
+    average_evidence_coverage: float | None = None
+    retrieval_strategy: str | None = None
+    average_dense_candidate_count: float | None = None
+    average_lexical_candidate_count: float | None = None
+    average_fused_candidate_count: float | None = None
+    average_dense_latency_ms: float | None = None
+    average_lexical_latency_ms: float | None = None
+    average_fusion_latency_ms: float | None = None
     failed_cases_list: list[CaseSummary] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, object]:
@@ -62,6 +71,14 @@ class RunSummary:
             "average_recall_at_k": self.average_recall_at_k,
             "unauthorised_source_rate": self.unauthorised_source_rate,
             "invalid_citation_rate": self.invalid_citation_rate,
+            "average_evidence_coverage": self.average_evidence_coverage,
+            "retrieval_strategy": self.retrieval_strategy,
+            "average_dense_candidate_count": self.average_dense_candidate_count,
+            "average_lexical_candidate_count": self.average_lexical_candidate_count,
+            "average_fused_candidate_count": self.average_fused_candidate_count,
+            "average_dense_latency_ms": self.average_dense_latency_ms,
+            "average_lexical_latency_ms": self.average_lexical_latency_ms,
+            "average_fusion_latency_ms": self.average_fusion_latency_ms,
             "category_breakdown": self.category_breakdown,
             "failed_case_details": [
                 {
@@ -134,6 +151,25 @@ def summarise_results(results: list[dict]) -> RunSummary:
     recall_values = [r["retrieval_metrics"].get("recall_at_k") for r in results if r["retrieval_metrics"].get("recall_at_k") is not None]
     average_recall_at_k = (sum(recall_values) / len(recall_values)) if recall_values else None
 
+    evidence_coverage_values = [
+        r["retrieval_metrics"].get("evidence_coverage") for r in results if r["retrieval_metrics"].get("evidence_coverage") is not None
+    ]
+    average_evidence_coverage = (sum(evidence_coverage_values) / len(evidence_coverage_values)) if evidence_coverage_values else None
+
+    strategies = [r["retrieval_metrics"].get("retrieval_strategy") for r in results if r["retrieval_metrics"].get("retrieval_strategy")]
+    retrieval_strategy = strategies[0] if strategies else None
+
+    def _average(field_name: str) -> float | None:
+        values = [r["retrieval_metrics"].get(field_name) for r in results if r["retrieval_metrics"].get(field_name) is not None]
+        return (sum(values) / len(values)) if values else None
+
+    average_dense_candidate_count = _average("dense_candidate_count")
+    average_lexical_candidate_count = _average("lexical_candidate_count")
+    average_fused_candidate_count = _average("fused_candidate_count")
+    average_dense_latency_ms = _average("dense_latency_ms")
+    average_lexical_latency_ms = _average("lexical_latency_ms")
+    average_fusion_latency_ms = _average("fusion_latency_ms")
+
     unauthorised_source_flags = [r for r in results if r["retrieval_metrics"]]
     unauthorised_source_rate = (
         sum(1 for r in unauthorised_source_flags if r["retrieval_metrics"].get("unauthorised_source_failure")) / len(unauthorised_source_flags)
@@ -191,6 +227,14 @@ def summarise_results(results: list[dict]) -> RunSummary:
         average_recall_at_k=average_recall_at_k,
         unauthorised_source_rate=unauthorised_source_rate,
         invalid_citation_rate=invalid_citation_rate,
+        average_evidence_coverage=average_evidence_coverage,
+        retrieval_strategy=retrieval_strategy,
+        average_dense_candidate_count=average_dense_candidate_count,
+        average_lexical_candidate_count=average_lexical_candidate_count,
+        average_fused_candidate_count=average_fused_candidate_count,
+        average_dense_latency_ms=average_dense_latency_ms,
+        average_lexical_latency_ms=average_lexical_latency_ms,
+        average_fusion_latency_ms=average_fusion_latency_ms,
         failed_cases_list=failed_cases_list,
     )
 

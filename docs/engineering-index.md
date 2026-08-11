@@ -66,6 +66,7 @@ Each page uses a Current / Future / Out-of-scope structure; pages for subsystems
 | 0030 | Developer Operating System |
 | 0031 | Promote structure-aware chunking to the default strategy |
 | 0032 | Recalibrate the nomic-embed-text-v2-moe retrieval threshold for structure-aware chunking |
+| 0033 | Retain dense_only retrieval — hybrid_rrf not promoted (real-embedding bake-off evidence) |
 
 Full list with pre-existing 0001-0018: see `docs/adr/` directory or `docs/README.md`.
 

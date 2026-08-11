@@ -124,6 +124,34 @@ class Settings:
     # essentially at random until a real/semantic embedding provider exists.
     # Set this explicitly once one does.
     RETRIEVAL_MIN_SIMILARITY_SCORE: float = _get_float("RETRIEVAL_MIN_SIMILARITY_SCORE", 0.0)
+
+    # Retrieval V2 Phase 1 - Hybrid Retrieval (docs/future/HybridRetrieval.md,
+    # docs/sops/adding-hybrid-retrieval.md). "dense_only" is the production
+    # baseline and rollback target - switching this back is the entire
+    # rollback procedure, no code change required. "hybrid_rrf" fuses dense
+    # vector search with Postgres full-text lexical search
+    # (app.services.lexical_search) via Reciprocal Rank Fusion
+    # (app.services.retrieval_fusion) inside assemble_retrieval_context().
+    RETRIEVAL_STRATEGY: str = getenv("RETRIEVAL_STRATEGY", "dense_only")
+    # Candidate pool sizes fetched from each channel BEFORE fusion - larger
+    # than RETRIEVAL_MAX_CONTEXT_CHUNKS on purpose, so a chunk that only ranks
+    # well in one channel still has a chance to be pulled into the final
+    # fused top-k (see RETRIEVAL_HYBRID_FINAL_TOP_K below).
+    RETRIEVAL_DENSE_CANDIDATE_POOL_SIZE: int = _get_int("RETRIEVAL_DENSE_CANDIDATE_POOL_SIZE", 25)
+    RETRIEVAL_LEXICAL_CANDIDATE_POOL_SIZE: int = _get_int("RETRIEVAL_LEXICAL_CANDIDATE_POOL_SIZE", 25)
+    # Canonical Reciprocal Rank Fusion constant (score(d) = sum(1/(k+rank))) -
+    # 60 is the value from Cormack, Clarke & Buettcher 2009, used here as the
+    # documented initial value pending the Phase 9 bake-off experiment that
+    # varies it. Never hardcode a different value without re-running that
+    # experiment.
+    RETRIEVAL_RRF_K: int = _get_int("RETRIEVAL_RRF_K", 60)
+    # How many fused candidates advance out of the RRF stage before the
+    # existing max_context_chunks truncation in assemble_context_from_matches
+    # applies. Defaults to RETRIEVAL_MAX_CONTEXT_CHUNKS (i.e. no extra
+    # truncation beyond what dense_only already does) but is kept as an
+    # independently tunable knob for the Phase 9 bake-off experiments.
+    RETRIEVAL_HYBRID_FINAL_TOP_K: int = _get_int("RETRIEVAL_HYBRID_FINAL_TOP_K", 0) or RETRIEVAL_MAX_CONTEXT_CHUNKS
+
     PROMPT_VERSION: str = getenv("PROMPT_VERSION", "grounded-answer-v1")
 
     # Generation provider selection (app.ai.dependencies.create_ai_core). Only

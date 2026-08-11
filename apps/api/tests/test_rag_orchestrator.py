@@ -508,3 +508,99 @@ def messages_conversation_id(db: Session, organisation_id: str, workspace_id: st
 
     conversations = list_conversations(db, organisation_id=organisation_id, workspace_id=workspace_id, limit=10)
     return conversations[-1].id
+
+
+@pytest.fixture()
+def hybrid_retrieval_strategy():
+    """Retrieval V2 Phase 1 (docs/future/HybridRetrieval.md) - temporarily
+    switches settings.RETRIEVAL_STRATEGY to hybrid_rrf for a single test, the
+    same object.__setattr__ override pattern the `client` fixture already
+    uses for other RETRIEVAL_* settings."""
+    original = settings.RETRIEVAL_STRATEGY
+    object.__setattr__(settings, "RETRIEVAL_STRATEGY", "hybrid_rrf")
+    yield
+    object.__setattr__(settings, "RETRIEVAL_STRATEGY", original)
+
+
+def test_hybrid_strategy_still_produces_grounded_cited_answer(client: TestClient, hybrid_retrieval_strategy) -> None:
+    """Guardrails/citation policy/evidence sufficiency must run identically
+    regardless of retrieval strategy - this exercises the full real HTTP path
+    (the same one production traffic uses) with hybrid_rrf active instead of
+    dense_only, and expects the same grounded, cited outcome as the dense_only
+    equivalent above (test_new_conversation_created_and_grounded_answer_persisted)."""
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client,
+        organisation_name="Hybrid College",
+        organisation_slug="hybrid",
+        user_email="viewer@example.test",
+        role="viewer",
+    )
+    _document_id, _version_id, chunk_id = add_embedded_chunk(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        content="applications close in december",
+        title="Admissions Handbook",
+    )
+
+    response = rag_answer(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        email="viewer@example.test",
+        role="viewer",
+        query="applications close in december",
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["answer_state"] == "answered"
+    assert data["fallback_used"] is False
+    assert data["retrieved_chunk_count"] == 1
+    assert data["citations"][0]["chunk_id"] == chunk_id
+
+
+def test_hybrid_strategy_still_respects_empty_knowledge_scope(client: TestClient, hybrid_retrieval_strategy) -> None:
+    """Same regression this file already guards for dense_only
+    (test_widget_with_empty_knowledge_scope_does_not_leak_workspace_documents)
+    - must hold identically under hybrid_rrf."""
+    organisation_id, workspace_id, user_id = seed_tenant(
+        client,
+        organisation_name="Hybrid Empty Scope College",
+        organisation_slug="hybrid-empty-scope",
+        user_email="owner@example.test",
+        role="org_owner",
+    )
+    add_embedded_chunk(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        content="Applications close on March 1st for the fall semester.",
+        title="Admissions Deadlines",
+    )
+    with client.app.state.testing_session() as db:
+        widget = create_widget(
+            db,
+            organisation_id=organisation_id,
+            workspace_id=workspace_id,
+            display_name="Freshly Created Assistant",
+            environment="development",
+            actor_user_id=user_id,
+        )
+
+    response = rag_answer(
+        client,
+        organisation_id=organisation_id,
+        workspace_id=workspace_id,
+        email="owner@example.test",
+        role="org_owner",
+        query="When do applications close?",
+        assistant_id=widget.id,
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["answer_state"] == "fallback"
+    assert data["fallback_used"] is True
+    assert data["citations"] == []
+    assert data["retrieved_chunk_count"] == 0

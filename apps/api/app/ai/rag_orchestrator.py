@@ -21,6 +21,7 @@ from app.db.models.prompt import LAYER_PLATFORM_CORE
 from app.observability import context as trace_stages
 from app.observability.ai_trace_recorder import AITraceRecorder, NoOpAITraceRecorder, RetrievalTraceEntry
 from app.observability.context import AITraceContext, new_trace_id
+from app.observability.otel_metrics import record_retrieval_fusion
 from app.prompts.resolution import ResolvedComposite, resolve_composite_prompt
 from app.repositories import conversation_repository
 from app.access.widget_admin.service import WidgetAdminNotFound, get_current_draft, get_widget
@@ -32,11 +33,36 @@ from app.services.conversation import (
     start_conversation,
 )
 from app.services.embeddings import EmbeddingProvider
-from app.services.retrieval_context import RetrievalCitationData, RetrievalContextBlockData, assemble_retrieval_context
+from app.services.retrieval_context import (
+    RetrievalCitationData,
+    RetrievalContextBlockData,
+    RetrievalDebugInfo,
+    assemble_retrieval_context,
+)
 
 
 def _elapsed_ms(started_at: float) -> int:
     return int((perf_counter() - started_at) * 1000)
+
+
+def _retrieval_debug_metadata(debug: RetrievalDebugInfo | None) -> dict:
+    """Retrieval V2 Phase 1 (docs/future/HybridRetrieval.md) - non-guardrail
+    provenance stashed in RAGOrchestrationResult.metadata (an existing
+    free-form field) so app.evaluation.engine._score_result can surface it in
+    EvaluationResult.retrieval_metrics_json for the bake-off, without a new
+    column/migration. Empty dict when retrieval never ran (e.g. an
+    input-policy block before retrieval)."""
+    if debug is None:
+        return {}
+    return {
+        "retrieval_strategy": debug.strategy,
+        "dense_candidate_count": debug.dense_candidate_count,
+        "lexical_candidate_count": debug.lexical_candidate_count,
+        "fused_candidate_count": debug.fused_candidate_count,
+        "dense_latency_ms": debug.dense_latency_ms,
+        "lexical_latency_ms": debug.lexical_latency_ms,
+        "fusion_latency_ms": debug.fusion_latency_ms,
+    }
 
 
 DEFAULT_RAG_PROMPT_KEY = "grounded_rag_answer"
@@ -92,6 +118,13 @@ class RAGOrchestrationRequest:
     # app.evaluation.prompt_promotion_gate / app.evaluation.engine when
     # gating a candidate version - never set for organic production traffic.
     prompt_version_override_id: str | None = None
+    # Retrieval V2 Phase 1 (docs/future/HybridRetrieval.md) - overrides
+    # settings.RETRIEVAL_STRATEGY for this one request. None (the default)
+    # means "use whatever the deployment is globally configured for" - set
+    # explicitly by app.evaluation.engine for a bake-off run, and available
+    # for a future per-workspace flag; never set for organic production
+    # traffic today.
+    retrieval_strategy: str | None = None
 
 
 @dataclass(frozen=True)
@@ -243,6 +276,7 @@ class RAGOrchestrator:
             provider=self.embedding_provider,
             document_ids=allowed_document_ids,
             min_similarity_score=request.min_similarity_score if request.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
+            retrieval_strategy=request.retrieval_strategy,
         )
         retrieval_latency_ms = _elapsed_ms(retrieval_started_at)
         # Embedding happens inside assemble_retrieval_context and isn't
@@ -250,10 +284,28 @@ class RAGOrchestrator:
         # into retrieval_latency_ms) stage so the pipeline stays explainable
         # even without deeper instrumentation of app.services.vector_search.
         self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_QUERY_EMBEDDING, status="ok")
+        debug = retrieval.retrieval_debug
+        retrieval_safe_counts = {"chunks_returned": len(retrieval.context_blocks), "total_context_chars": retrieval.total_context_chars}
+        if debug is not None:
+            retrieval_safe_counts.update(
+                {
+                    "retrieval_strategy": debug.strategy,
+                    "dense_candidate_count": debug.dense_candidate_count,
+                    "lexical_candidate_count": debug.lexical_candidate_count,
+                    "fused_candidate_count": debug.fused_candidate_count,
+                }
+            )
+            record_retrieval_fusion(
+                strategy=debug.strategy,
+                dense_candidate_count=debug.dense_candidate_count,
+                lexical_candidate_count=debug.lexical_candidate_count,
+                fused_candidate_count=debug.fused_candidate_count,
+                selected_top_k=len(retrieval.context_blocks),
+            )
         self.trace_recorder.record_stage(
             trace_context, trace_stages.STAGE_RETRIEVAL, status="ok" if retrieval.context_blocks else "empty",
             latency_ms=retrieval_latency_ms,
-            safe_counts={"chunks_returned": len(retrieval.context_blocks), "total_context_chars": retrieval.total_context_chars},
+            safe_counts=retrieval_safe_counts,
         )
         # Only chunks actually selected into the context window are visible
         # here - app.services.retrieval_context does not currently return
@@ -275,6 +327,7 @@ class RAGOrchestrator:
             return self._persist_fallback(
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
                 model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
+                retrieval_debug=retrieval.retrieval_debug,
             )
 
         # Layer F: citation enforcement (defence-in-depth assertion - see
@@ -296,6 +349,7 @@ class RAGOrchestrator:
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
                 model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
                 content=citation_verdict.safe_message or FALLBACK_ANSWER, reason_code=citation_verdict.reason_code.value,
+                retrieval_debug=retrieval.retrieval_debug,
             )
 
         # Layer E: strip injected-instruction-style text from retrieved
@@ -343,6 +397,7 @@ class RAGOrchestrator:
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
                 model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
                 content=evidence_verdict.safe_message or FALLBACK_ANSWER, reason_code=evidence_verdict.reason_code.value,
+                retrieval_debug=retrieval.retrieval_debug,
             )
 
         # Composite prompt resolution (app.prompts.resolution) is fully
@@ -573,7 +628,11 @@ class RAGOrchestrator:
             latency_ms=ai_response.latency_ms,
             finish_reason=ai_response.finish_reason,
             fallback_used=not output_verdict.safe,
-            metadata={"total_context_chars": retrieval.total_context_chars, "guardrail_reason_code": output_verdict.reason_code.value},
+            metadata={
+                "total_context_chars": retrieval.total_context_chars,
+                "guardrail_reason_code": output_verdict.reason_code.value,
+                **_retrieval_debug_metadata(retrieval.retrieval_debug),
+            },
             trace_id=trace_context.trace_id,
         )
 
@@ -637,6 +696,7 @@ class RAGOrchestrator:
         content: str = FALLBACK_ANSWER,
         reason_code: str = GuardrailReasonCode.RETRIEVAL_EMPTY.value,
         answer_state: str = "fallback",
+        retrieval_debug: RetrievalDebugInfo | None = None,
     ) -> RAGOrchestrationResult:
         prompt_version = self.ai_core.prompt_registry.resolve_active(prompt_key)
         execution_id = self.ai_core.accounting_service.create_execution_id()
@@ -695,7 +755,7 @@ class RAGOrchestrator:
             latency_ms=0,
             finish_reason=FinishReason.STOP,
             fallback_used=True,
-            metadata={"guardrail_reason_code": reason_code},
+            metadata={"guardrail_reason_code": reason_code, **_retrieval_debug_metadata(retrieval_debug)},
             trace_id=trace_context.trace_id,
         )
 

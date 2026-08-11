@@ -1,3 +1,5 @@
+import pytest
+
 from app.evaluation.metrics.aggregate import compare_to_baseline, summarise_results
 from app.evaluation.metrics.answer import compute_answer_metrics
 from app.evaluation.metrics.retrieval import compute_retrieval_metrics
@@ -36,6 +38,55 @@ def test_retrieval_metrics_miss_when_expected_document_absent() -> None:
     assert metrics.hit_at_k is False
     assert metrics.expected_document_retrieved is False
     assert metrics.reciprocal_rank == 0.0
+
+
+def test_retrieval_metrics_evidence_coverage_when_multiple_documents_expected() -> None:
+    # Retrieval V2 Phase 1 (docs/future/HybridRetrieval.md) - Evidence
+    # Coverage reuses expected_document_ids (the only ground truth the
+    # fixtures actually define) and is only populated for multi-document
+    # cases, distinguishing it from single-item hit_at_k.
+    metrics = compute_retrieval_metrics(
+        expected_document_ids=["doc-1", "doc-2", "doc-3"],
+        expected_source_labels=None,
+        retrieved_document_ids=["doc-1", "doc-2"],
+        retrieved_chunk_ids=["chunk-1", "chunk-2"],
+        retrieved_source_labels=["Doc One", "Doc Two"],
+        allowed_document_ids=None,
+    )
+    assert metrics.evidence_coverage == metrics.recall_at_k
+    assert metrics.evidence_coverage == pytest.approx(2 / 3)
+
+
+def test_retrieval_metrics_evidence_coverage_none_for_single_expected_document() -> None:
+    metrics = compute_retrieval_metrics(
+        expected_document_ids=["doc-1"],
+        expected_source_labels=None,
+        retrieved_document_ids=["doc-1"],
+        retrieved_chunk_ids=["chunk-1"],
+        retrieved_source_labels=["Doc One"],
+        allowed_document_ids=None,
+    )
+    assert metrics.evidence_coverage is None
+
+
+def test_retrieval_metrics_carries_strategy_and_candidate_counts() -> None:
+    metrics = compute_retrieval_metrics(
+        expected_document_ids=None,
+        expected_source_labels=None,
+        retrieved_document_ids=["doc-1"],
+        retrieved_chunk_ids=["chunk-1"],
+        retrieved_source_labels=["Doc One"],
+        allowed_document_ids=None,
+        retrieval_strategy="hybrid_rrf",
+        dense_candidate_count=25,
+        lexical_candidate_count=10,
+        fused_candidate_count=8,
+    )
+    assert metrics.retrieval_strategy == "hybrid_rrf"
+    assert metrics.dense_candidate_count == 25
+    assert metrics.lexical_candidate_count == 10
+    assert metrics.fused_candidate_count == 8
+    assert metrics.as_dict()["fused_candidate_count"] == 8
 
 
 def test_retrieval_metrics_none_when_no_expectations_declared() -> None:
@@ -356,6 +407,26 @@ def test_summarise_results_lists_only_failed_cases() -> None:
     summary = summarise_results(rows)
     assert len(summary.failed_cases_list) == 1
     assert summary.failed_cases_list[0].case_id == "case-2"
+
+
+def test_summarise_results_averages_evidence_coverage_and_candidate_counts() -> None:
+    rows = [
+        _row(retrieval_metrics={
+            "expected_document_retrieved": True, "evidence_coverage": 1.0, "retrieval_strategy": "hybrid_rrf",
+            "dense_candidate_count": 20, "lexical_candidate_count": 10, "fused_candidate_count": 8,
+        }),
+        _row(case_id="case-2", retrieval_metrics={
+            "expected_document_retrieved": True, "evidence_coverage": 0.5, "retrieval_strategy": "hybrid_rrf",
+            "dense_candidate_count": 30, "lexical_candidate_count": 20, "fused_candidate_count": 12,
+        }),
+    ]
+    summary = summarise_results(rows)
+    assert summary.average_evidence_coverage == 0.75
+    assert summary.retrieval_strategy == "hybrid_rrf"
+    assert summary.average_dense_candidate_count == 25
+    assert summary.average_lexical_candidate_count == 15
+    assert summary.average_fused_candidate_count == 10
+    assert summary.as_dict()["average_evidence_coverage"] == 0.75
 
 
 def test_compare_to_baseline_detects_regression() -> None:
