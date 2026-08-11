@@ -21,7 +21,7 @@ from app.db.models.prompt import LAYER_PLATFORM_CORE
 from app.observability import context as trace_stages
 from app.observability.ai_trace_recorder import AITraceRecorder, NoOpAITraceRecorder, RetrievalTraceEntry
 from app.observability.context import AITraceContext, new_trace_id
-from app.observability.otel_metrics import record_retrieval_fusion
+from app.observability.otel_metrics import record_reranker_outcome, record_retrieval_fusion
 from app.prompts.resolution import ResolvedComposite, resolve_composite_prompt
 from app.repositories import conversation_repository
 from app.access.widget_admin.service import WidgetAdminNotFound, get_current_draft, get_widget
@@ -33,6 +33,7 @@ from app.services.conversation import (
     start_conversation,
 )
 from app.services.embeddings import EmbeddingProvider
+from app.services.reranking import NoOpReranker, Reranker
 from app.services.retrieval_context import (
     RetrievalCitationData,
     RetrievalContextBlockData,
@@ -62,6 +63,13 @@ def _retrieval_debug_metadata(debug: RetrievalDebugInfo | None) -> dict:
         "dense_latency_ms": debug.dense_latency_ms,
         "lexical_latency_ms": debug.lexical_latency_ms,
         "fusion_latency_ms": debug.fusion_latency_ms,
+        "reranker_enabled": debug.reranker_enabled,
+        "reranker_provider": debug.reranker_provider,
+        "reranker_model": debug.reranker_model,
+        "reranker_candidate_count": debug.reranker_candidate_count,
+        "reranker_selected_count": debug.reranker_selected_count,
+        "reranker_latency_ms": debug.reranker_latency_ms,
+        "reranker_status": debug.reranker_status,
     }
 
 
@@ -125,6 +133,14 @@ class RAGOrchestrationRequest:
     # for a future per-workspace flag; never set for organic production
     # traffic today.
     retrieval_strategy: str | None = None
+    # Retrieval V2 Phase 2 (docs/future/Reranking.md) - overrides
+    # settings.RERANKER_DENSE_CANDIDATE_POOL_SIZE/RERANKER_FINAL_TOP_K for
+    # this one request. None (the default) means "use the deployment's
+    # global configuration" - set explicitly by app.evaluation.engine for a
+    # controlled candidate-pool/top-k experiment (Part 9); never set for
+    # organic production traffic today.
+    reranker_candidate_pool_size: int | None = None
+    reranker_final_top_k: int | None = None
 
 
 @dataclass(frozen=True)
@@ -172,6 +188,17 @@ class RAGOrchestratorDependencies:
     ai_core: AICoreContainer
     embedding_provider: EmbeddingProvider
     trace_recorder: AITraceRecorder | None = None
+    # Retrieval V2 Phase 2 (docs/future/Reranking.md). Defaults to
+    # NoOpReranker (reranking disabled) in RAGOrchestrator.__init__ for every
+    # existing call site that doesn't construct one explicitly - same
+    # pattern as trace_recorder above.
+    reranker: Reranker | None = None
+    # Production traffic (default False) falls back safely to unmodified
+    # dense ordering on any reranker failure; evaluation runs
+    # (app.evaluation.engine) set this True so a reranker defect surfaces as
+    # a hard case failure instead of silently "succeeding" via that same
+    # fallback - see app.services.reranking.rerank_candidates.
+    reranker_fail_loud: bool = False
 
 
 class RAGOrchestrator:
@@ -182,6 +209,10 @@ class RAGOrchestrator:
         # Every existing call site that doesn't construct a trace_recorder
         # keeps working unchanged - see app.observability.ai_trace_recorder.
         self.trace_recorder = dependencies.trace_recorder or NoOpAITraceRecorder()
+        # Every existing call site that doesn't construct a reranker keeps
+        # working unchanged - see app.services.reranking.
+        self.reranker = dependencies.reranker or NoOpReranker()
+        self.reranker_fail_loud = dependencies.reranker_fail_loud
 
     def answer(self, request: RAGOrchestrationRequest) -> RAGOrchestrationResult:
         trace_context = request.trace_context or AITraceContext(trace_id=new_trace_id())
@@ -277,6 +308,10 @@ class RAGOrchestrator:
             document_ids=allowed_document_ids,
             min_similarity_score=request.min_similarity_score if request.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
             retrieval_strategy=request.retrieval_strategy,
+            reranker=self.reranker,
+            reranker_candidate_pool_size=request.reranker_candidate_pool_size,
+            reranker_final_top_k=request.reranker_final_top_k,
+            reranker_fail_loud=self.reranker_fail_loud,
         )
         retrieval_latency_ms = _elapsed_ms(retrieval_started_at)
         # Embedding happens inside assemble_retrieval_context and isn't
@@ -301,6 +336,15 @@ class RAGOrchestrator:
                 lexical_candidate_count=debug.lexical_candidate_count,
                 fused_candidate_count=debug.fused_candidate_count,
                 selected_top_k=len(retrieval.context_blocks),
+            )
+            record_reranker_outcome(
+                enabled=debug.reranker_enabled,
+                provider=debug.reranker_provider,
+                model=debug.reranker_model,
+                candidate_count=debug.reranker_candidate_count,
+                selected_count=debug.reranker_selected_count,
+                latency_ms=debug.reranker_latency_ms,
+                status=debug.reranker_status,
             )
         self.trace_recorder.record_stage(
             trace_context, trace_stages.STAGE_RETRIEVAL, status="ok" if retrieval.context_blocks else "empty",

@@ -42,6 +42,7 @@ from app.schemas.retrieval import (
 from app.schemas.search import VectorSearchRequest, VectorSearchResult
 from app.schemas.workspace import WorkspaceRead
 from app.services.embeddings import EmbeddingProviderError, build_embedding_provider
+from app.services.reranking import build_reranker
 from app.services.prompt_assembly import assemble_grounded_prompt
 from app.services.retrieval_context import assemble_retrieval_context
 from app.services.vector_search import search_embedded_chunks
@@ -86,6 +87,11 @@ def answer_workspace_rag_question(
             model_name=settings.EMBEDDING_MODEL,
             dimension=settings.EMBEDDING_DIMENSION,
         )
+        reranker = build_reranker(
+            provider_name=settings.RERANKER_PROVIDER,
+            model_name=settings.RERANKER_MODEL,
+            timeout_seconds=settings.RERANKER_TIMEOUT_SECONDS,
+        )
         trace_context = AITraceContext(
             trace_id=getattr(http_request.state, "trace_id", None) or new_trace_id(),
             request_id=getattr(http_request.state, "request_id", None),
@@ -96,6 +102,7 @@ def answer_workspace_rag_question(
                 ai_core=ai_core,
                 embedding_provider=provider,
                 trace_recorder=build_ai_trace_recorder(db),
+                reranker=reranker,
             )
         ).answer(
             RAGOrchestrationRequest(

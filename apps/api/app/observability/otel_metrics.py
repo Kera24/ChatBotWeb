@@ -145,6 +145,29 @@ def record_retrieval_fusion(
         logger.debug("record_retrieval_fusion failed", exc_info=True)
 
 
+def record_reranker_outcome(
+    *, enabled: bool, provider: str | None, model: str | None, candidate_count: int, selected_count: int, latency_ms: int, status: str | None
+) -> None:
+    """One retrieval call's reranking shape (Retrieval V2 Phase 2,
+    docs/future/Reranking.md) - `provider`/`model`/`status` are the closed
+    "none"/"cross_encoder" and "ok"/"no_reranker"/"empty_candidates"/"failed"
+    vocabularies from app.services.reranking, never a tenant/request id, per
+    this module's CARDINALITY POLICY. Recorded even when reranking is
+    disabled (enabled=False) so the "disabled" state is itself visible in the
+    same dashboards, not just inferred from absence."""
+    try:
+        labels = {"provider": _label(provider), "model": _label(model), "status": _label(status), "enabled": str(bool(enabled)).lower()}
+        _counter("reranker_requests_total", unit="1", description="Completed reranker calls by provider/status.").add(1, labels)
+        if enabled:
+            _histogram("reranker_candidate_count", unit="1", description="Candidate pool size handed to the reranker.").record(
+                candidate_count, labels
+            )
+            _histogram("reranker_selected_count", unit="1", description="Candidates selected after reranking.").record(selected_count, labels)
+            _histogram("reranker_latency_ms", unit="ms", description="Latency of one reranker call.").record(latency_ms, labels)
+    except Exception:
+        logger.debug("record_reranker_outcome failed", exc_info=True)
+
+
 def record_guardrail_outcome(*, layer: str, guardrail: str, verdict: str, blocked: bool) -> None:
     """One guardrail layer verdict (app.observability.ai_trace_recorder.record_guardrail) -
     layer/guardrail_name/verdict are already a fixed vocabulary (see

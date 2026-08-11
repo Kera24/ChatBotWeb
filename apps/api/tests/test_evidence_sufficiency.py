@@ -101,6 +101,105 @@ def test_extract_values_numeric_requires_unit_hint() -> None:
     assert extract_values("allows 300 requests per minute", ExpectedValueType.NUMERIC)
 
 
+def test_verify_matrix_build_combinations_regression() -> None:
+    # Regression for the known Retrieval V2 Phase 2 defect: the correct
+    # evidence is retrieved but was rejected because "a maximum of 25 matrix
+    # combinations" did not contain any of the old narrow unit-hint words
+    # (requests/calls/times/codes/characters/attempts/allowance), so
+    # _extract_numeric_values returned value_missing despite a legitimate
+    # quantity being present in a "maximum of N" construction.
+    verdict = verify_evidence_sufficiency(
+        question="What is the maximum number of matrix build combinations allowed?",
+        chunk_contents=["A workflow may define a maximum of 25 matrix combinations per build."],
+        chunk_titles=["CI Matrix Build Limits"],
+        retrieval_scores=[0.55],
+    )
+    assert verdict.sufficient is True
+    assert verdict.reason_code == GuardrailReasonCode.SUFFICIENT_EVIDENCE
+
+
+# --- numeric extraction: qualifier-anchored quantity forms (Retrieval V2 Phase 2) ---
+
+def test_extract_values_numeric_accepts_maximum_of() -> None:
+    assert extract_values("a maximum of 25 matrix combinations", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_up_to() -> None:
+    assert extract_values("you may configure up to 25 items", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_limit_is() -> None:
+    assert extract_values("the limit is 25 per workspace", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_capped_at() -> None:
+    assert extract_values("the pool size is capped at 25", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_no_more_than() -> None:
+    assert extract_values("no more than 25 combinations may be queued", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_trailing_maximum() -> None:
+    assert extract_values("25 combinations maximum", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_minimum_of() -> None:
+    assert extract_values("a minimum of 3 reviewers is required", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_at_least() -> None:
+    assert extract_values("at least 3 approvals are needed", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_accepts_between_range() -> None:
+    values = extract_values("choose between 3 and 10 reviewers", ExpectedValueType.NUMERIC)
+    assert "3" in values
+    assert "10" in values
+
+
+def test_extract_values_duration_accepts_days() -> None:
+    assert extract_values("logs are retained for 30 days", ExpectedValueType.DURATION)
+
+
+def test_extract_values_duration_accepts_months() -> None:
+    assert extract_values("archives expire after 24 months", ExpectedValueType.DURATION)
+
+
+def test_extract_values_currency_accepts_dollar_amount() -> None:
+    assert extract_values("the add-on costs $50", ExpectedValueType.CURRENCY)
+
+
+def test_extract_values_percentage_accepts_percent_amount() -> None:
+    assert extract_values("throughput improves by 15%", ExpectedValueType.PERCENTAGE)
+
+
+# --- numeric extraction: adversarial forms that must remain rejected ---
+
+def test_extract_values_numeric_rejects_unrelated_bare_number() -> None:
+    assert not extract_values("Document ID 4521 was archived last week.", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_rejects_plain_version_number() -> None:
+    assert not extract_values("See API v3 documentation for details.", ExpectedValueType.NUMERIC)
+    assert not extract_values("This behaviour was introduced in version 3.", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_rejects_version_number_even_near_qualifier_word() -> None:
+    # Adversarial: a qualifier word ("up to") appears near the number, but the
+    # number is actually a version identifier, not a quantity - the version
+    # marker must take precedence over the qualifier match.
+    assert not extract_values("Supported up to version 3 of the API.", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_rejects_coincidental_phone_number_digits() -> None:
+    assert not extract_values("Call support at 555-0199 for help.", ExpectedValueType.NUMERIC)
+
+
+def test_extract_values_numeric_rejects_bare_date_year() -> None:
+    assert not extract_values("The policy was published on 2024-05-01.", ExpectedValueType.NUMERIC)
+
+
 def test_extract_values_date_accepts_relative_phrasing() -> None:
     assert extract_values("Billing occurs on the anniversary of the signup date.", ExpectedValueType.DATE)
 

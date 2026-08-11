@@ -115,19 +115,65 @@ _VALUE_EXTRACTORS: dict[ExpectedValueType, re.Pattern[str]] = {
 
 # NUMERIC is deliberately not a static pattern in _VALUE_EXTRACTORS: a bare
 # digit is satisfied by any incidental number nearby (a version string like
-# "v2.3", an hour range like "24/7") which is not evidence of the specific
-# quantity requested. A number only counts if a quantity-unit word appears
-# shortly after it in the same sentence - see _extract_numeric_values.
+# "v2.3", an hour range like "24/7", a document ID, a phone number) which is
+# not evidence of the specific quantity requested. A number only counts if
+# either (a) a quantity-unit word appears shortly after it, or (b) it sits in
+# a recognisable bound/limit construction - see _extract_numeric_values.
 _BARE_NUMBER = re.compile(rf"\b(?:\d+(?:\.\d+)?|{_WORD_NUMBERS})\b", re.IGNORECASE)
 _NUMERIC_UNIT_HINT = re.compile(r"(?i)\b(requests?|calls?|times?|codes?|characters?|attempts?|allowance|per\s+(?:minute|second|hour|day|request|call))\b")
+
+# Bound/limit qualifiers that anchor a number as a genuine quantity regardless
+# of the noun it counts ("a maximum of 25 matrix combinations", "no more than
+# 25 items") - the general fix for the numeric-value-extraction defect where
+# only a small closed vocabulary of unit-hint nouns was recognised. Anchored
+# to the end of the preceding context window with \s*$ so the qualifier must
+# immediately precede the number (not merely appear somewhere earlier in the
+# sentence, which would risk anchoring on an unrelated quantity).
+_NUMERIC_QUALIFIER_BEFORE = re.compile(
+    r"(?i)\b(?:maximum|minimum|max|min)\s+of\s*$"
+    r"|\bup\s+to\s*$"
+    r"|\bno\s+more\s+than\s*$|\bnot\s+more\s+than\s*$"
+    r"|\bno\s+fewer\s+than\s*$|\bno\s+less\s+than\s*$"
+    r"|\bat\s+least\s*$|\bat\s+most\s*$"
+    r"|\bcapped\s+at\s*$"
+    r"|\blimit(?:ed)?\s+to\s*$|\blimit\s+is\s*$|\blimit\s+of\s*$"
+    r"|\bno\s+greater\s+than\s*$|\bnot\s+to\s+exceed\s*$|\bnot\s+exceed(?:ing)?\s*$"
+    r"|\bbetween\s*$"
+)
+# Bound/limit qualifiers that follow the number ("25 combinations maximum",
+# "3 or more reviewers"), bounded to a short trailing window like
+# _NUMERIC_UNIT_HINT to avoid anchoring on a qualifier that belongs to a
+# later, unrelated number.
+_NUMERIC_QUALIFIER_AFTER = re.compile(r"(?i)\b(maximum|minimum|max|min|or\s+(?:fewer|more|less|greater))\b")
+
+# A number immediately preceded by a version marker ("v2.3", "version 3",
+# "ver. 3") is a version identifier, not a quantity - this must be checked
+# before, and take precedence over, any qualifier match above, since an
+# adversarial construction like "supported up to version 3" would otherwise
+# be misread as a bound on a quantity of 3.
+_VERSION_MARKER_BEFORE = re.compile(r"(?i)\bv(?:er(?:sion)?)?\.?\s*$")
+
+# "between 3 and 10": the first number is caught by _NUMERIC_QUALIFIER_BEFORE
+# ("between"), but the second number's only local anchor is the word "and",
+# which is too generic to treat as a qualifier on its own (would false-anchor
+# on unrelated adjacent numbers). Extracted explicitly as a pair instead.
+_NUMERIC_RANGE = re.compile(rf"(?i)\bbetween\s+(\d+(?:\.\d+)?|{_WORD_NUMBERS})\s+and\s+(\d+(?:\.\d+)?|{_WORD_NUMBERS})\b")
+
+_NUMERIC_CONTEXT_WINDOW = 35
 
 
 def _extract_numeric_values(text: str) -> list[str]:
     matches = []
     for match in _BARE_NUMBER.finditer(text):
-        tail = text[match.end(): match.end() + 40]
-        if _NUMERIC_UNIT_HINT.search(tail):
+        before = text[max(0, match.start() - _NUMERIC_CONTEXT_WINDOW): match.start()]
+        if _VERSION_MARKER_BEFORE.search(before):
+            continue
+        after = text[match.end(): match.end() + 40]
+        if _NUMERIC_UNIT_HINT.search(after) or _NUMERIC_QUALIFIER_BEFORE.search(before) or _NUMERIC_QUALIFIER_AFTER.search(after):
             matches.append(match.group())
+    for range_match in _NUMERIC_RANGE.finditer(text):
+        matches.append(range_match.group(1))
+        matches.append(range_match.group(2))
     return matches
 
 # Attribute types precise enough that two genuinely different values found for

@@ -152,6 +152,26 @@ class Settings:
     # independently tunable knob for the Phase 9 bake-off experiments.
     RETRIEVAL_HYBRID_FINAL_TOP_K: int = _get_int("RETRIEVAL_HYBRID_FINAL_TOP_K", 0) or RETRIEVAL_MAX_CONTEXT_CHUNKS
 
+    # Retrieval V2 Phase 2 - Reranking (docs/future/Reranking.md). "none" is
+    # the production baseline and rollback target (see app.services.reranking) -
+    # switching this back to "none" is the entire rollback procedure, no code
+    # change required. "cross_encoder" reranks the dense candidate pool with a
+    # local sentence-transformers cross-encoder before the existing
+    # evidence-sufficiency/citation guardrails run.
+    RERANKER_PROVIDER: str = getenv("RERANKER_PROVIDER", "none")
+    RERANKER_MODEL: str = getenv("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+    # Dense candidates fetched BEFORE reranking - larger than
+    # RETRIEVAL_MAX_CONTEXT_CHUNKS on purpose, mirroring
+    # RETRIEVAL_DENSE_CANDIDATE_POOL_SIZE's rationale: a chunk that only ranks
+    # well after cross-encoder scoring still needs a chance to be in the pool.
+    RERANKER_DENSE_CANDIDATE_POOL_SIZE: int = _get_int("RERANKER_DENSE_CANDIDATE_POOL_SIZE", 25)
+    # How many reranked candidates advance into context assembly. Defaults to
+    # RETRIEVAL_MAX_CONTEXT_CHUNKS (no extra truncation beyond what dense_only
+    # already does) but is kept independently tunable for controlled
+    # candidate-pool/top-k experiments (Retrieval V2 Phase 2, Part 9).
+    RERANKER_FINAL_TOP_K: int = _get_int("RERANKER_FINAL_TOP_K", 0) or RETRIEVAL_MAX_CONTEXT_CHUNKS
+    RERANKER_TIMEOUT_SECONDS: float = _get_float("RERANKER_TIMEOUT_SECONDS", 5.0)
+
     PROMPT_VERSION: str = getenv("PROMPT_VERSION", "grounded-answer-v1")
 
     # Generation provider selection (app.ai.dependencies.create_ai_core). Only

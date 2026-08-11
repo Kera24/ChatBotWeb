@@ -4,6 +4,7 @@ from time import perf_counter
 from app.core.config import settings
 from app.services.embeddings import EmbeddingProvider
 from app.services.lexical_search import search_lexical_chunks
+from app.services.reranking import NoOpReranker, Reranker, rerank_candidates
 from app.services.retrieval_fusion import FusedCandidate, reciprocal_rank_fusion
 from app.services.vector_search import VectorSearchMatch, search_embedded_chunks
 from sqlalchemy.orm import Session
@@ -26,6 +27,17 @@ class RetrievalDebugInfo:
     dense_latency_ms: int
     lexical_latency_ms: int
     fusion_latency_ms: int
+    # Retrieval V2 Phase 2 - Reranking (docs/future/Reranking.md). All default
+    # to the "disabled" shape so every existing construction site in this
+    # file (and any external caller) that doesn't know about reranking keeps
+    # producing byte-identical RetrievalDebugInfo values.
+    reranker_enabled: bool = False
+    reranker_provider: str | None = None
+    reranker_model: str | None = None
+    reranker_candidate_count: int = 0
+    reranker_selected_count: int = 0
+    reranker_latency_ms: int = 0
+    reranker_status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,26 +85,57 @@ def assemble_retrieval_context(
     lexical_candidate_pool_size: int | None = None,
     rrf_k: int | None = None,
     hybrid_final_top_k: int | None = None,
+    reranker: Reranker | None = None,
+    reranker_candidate_pool_size: int | None = None,
+    reranker_final_top_k: int | None = None,
+    reranker_fail_loud: bool = False,
 ) -> RetrievalContextResult:
     effective_strategy = retrieval_strategy or settings.RETRIEVAL_STRATEGY
+    # NoOpReranker (the default when `reranker` is None/unset, mirroring how
+    # every RAGOrchestratorDependencies field defaults to a no-op) means
+    # "reranking disabled" - the dense_only branch below is then byte-for-byte
+    # identical to the pre-reranking behaviour, the one-line rollback
+    # guarantee (Retrieval V2 Phase 2, Part 4 requirement 7).
+    reranker_active = reranker is not None and not isinstance(reranker, NoOpReranker)
 
     if effective_strategy != HYBRID_RRF_STRATEGY:
-        # Unchanged dense_only path - the rollback baseline. Byte-for-byte
-        # identical to the pre-hybrid behaviour for every existing caller
-        # that never passes retrieval_strategy at all.
         effective_limit = min(search_limit, max_context_chunks)
+        dense_search_limit = effective_limit
+        rerank_top_k = max_context_chunks
+        if reranker_active:
+            # Fetch a wider dense candidate pool before reranking (Part 4
+            # requirement 1) - never narrower than the non-reranked limit, so
+            # enabling reranking can only add candidates for it to consider,
+            # never remove ones dense_only would have kept.
+            pool_size = reranker_candidate_pool_size or settings.RERANKER_DENSE_CANDIDATE_POOL_SIZE
+            dense_search_limit = max(pool_size, effective_limit)
+            rerank_top_k = reranker_final_top_k or settings.RERANKER_FINAL_TOP_K
+
         dense_started_at = perf_counter()
-        matches = search_embedded_chunks(
+        dense_matches = search_embedded_chunks(
             db,
             organisation_id=organisation_id,
             workspace_id=workspace_id,
             query=query,
-            limit=effective_limit,
+            limit=dense_search_limit,
             provider=provider,
             document_ids=document_ids,
+            # The calibrated similarity threshold still gates the dense
+            # candidate pool exactly as it does for the non-reranked
+            # baseline - reranking only re-orders/re-selects among chunks
+            # that already cleared it, it never loosens the threshold.
             min_similarity_score=min_similarity_score,
         )
         dense_latency_ms = _elapsed_ms(dense_started_at)
+
+        matches = dense_matches
+        rerank_outcome = None
+        if reranker_active:
+            rerank_outcome = rerank_candidates(
+                reranker, query=query, candidates=dense_matches, top_k=rerank_top_k, fail_loud=reranker_fail_loud
+            )
+            matches = [candidate.match for candidate in rerank_outcome.candidates]
+
         result = assemble_context_from_matches(
             query=query,
             matches=matches,
@@ -101,12 +144,19 @@ def assemble_retrieval_context(
         )
         debug = RetrievalDebugInfo(
             strategy=DENSE_ONLY_STRATEGY,
-            dense_candidate_count=len(matches),
+            dense_candidate_count=len(dense_matches),
             lexical_candidate_count=0,
             fused_candidate_count=len(matches),
             dense_latency_ms=dense_latency_ms,
             lexical_latency_ms=0,
             fusion_latency_ms=0,
+            reranker_enabled=reranker_active,
+            reranker_provider=rerank_outcome.provider_name if rerank_outcome else None,
+            reranker_model=rerank_outcome.model_name if rerank_outcome else None,
+            reranker_candidate_count=len(dense_matches) if reranker_active else 0,
+            reranker_selected_count=len(matches) if reranker_active else 0,
+            reranker_latency_ms=rerank_outcome.latency_ms if rerank_outcome else 0,
+            reranker_status=rerank_outcome.status if rerank_outcome else None,
         )
         return _with_debug(result, debug)
 
@@ -154,6 +204,15 @@ def assemble_retrieval_context(
     fusion_latency_ms = _elapsed_ms(fusion_started_at)
 
     matches = [_fused_to_vector_match(candidate) for candidate in fused]
+    rerank_outcome = None
+    if reranker_active:
+        # Exploratory-only path (Retrieval V2 Phase 2, Part 10): rerank the
+        # already-fused hybrid candidate pool. Never promoted by default -
+        # dense_only/hybrid_rrf selection is unaffected by whether this runs.
+        rerank_top_k = reranker_final_top_k or settings.RERANKER_FINAL_TOP_K
+        rerank_outcome = rerank_candidates(reranker, query=query, candidates=matches, top_k=rerank_top_k, fail_loud=reranker_fail_loud)
+        matches = [candidate.match for candidate in rerank_outcome.candidates]
+
     result = assemble_context_from_matches(
         query=query,
         matches=matches,
@@ -168,6 +227,13 @@ def assemble_retrieval_context(
         dense_latency_ms=dense_latency_ms,
         lexical_latency_ms=lexical_latency_ms,
         fusion_latency_ms=fusion_latency_ms,
+        reranker_enabled=reranker_active,
+        reranker_provider=rerank_outcome.provider_name if rerank_outcome else None,
+        reranker_model=rerank_outcome.model_name if rerank_outcome else None,
+        reranker_candidate_count=len(fused) if reranker_active else 0,
+        reranker_selected_count=len(matches) if reranker_active else 0,
+        reranker_latency_ms=rerank_outcome.latency_ms if rerank_outcome else 0,
+        reranker_status=rerank_outcome.status if rerank_outcome else None,
     )
     return _with_debug(result, debug)
 

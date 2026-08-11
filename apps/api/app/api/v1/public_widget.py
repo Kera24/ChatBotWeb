@@ -46,6 +46,7 @@ from app.operations.telemetry import record_access_event, telemetry_span
 from app.operations.widget_controls import evaluate_widget_access, resolve_controls
 from app.db.models import Organisation, PublicCredential, Workspace
 from app.services.embeddings import build_embedding_provider
+from app.services.reranking import build_reranker
 from app.schemas.public_widget import PublicWidgetConfigurationResponse, PublicWidgetMessageCreateRequest, PublicWidgetMessageResponse, PublicWidgetSessionCreateRequest, PublicWidgetSessionCreateResponse
 
 router = APIRouter(tags=["public-widget"])
@@ -328,11 +329,17 @@ def _gateway(request: Request, db: Session, event_sink: InMemoryAccessEventSink)
             model_name=settings.EMBEDDING_MODEL,
             dimension=settings.EMBEDDING_DIMENSION,
         )
+        reranker = build_reranker(
+            provider_name=settings.RERANKER_PROVIDER,
+            model_name=settings.RERANKER_MODEL,
+            timeout_seconds=settings.RERANKER_TIMEOUT_SECONDS,
+        )
         rag_adapter = PublicWidgetRAGAdapter(
             orchestrator=RAGOrchestrator(
                 RAGOrchestratorDependencies(
                     db=db, ai_core=ai_core, embedding_provider=embedding_provider,
                     trace_recorder=build_ai_trace_recorder(db),
+                    reranker=reranker,
                 )
             ),
             idempotency_service=idempotency_service,

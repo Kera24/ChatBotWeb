@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
 from app.db.models import Chunk, Document, DocumentVersion, Membership, Organisation, User, Workspace
+from app.services.reranking import NoOpReranker, RerankedCandidate, RerankerError, RerankOutcome
 from app.services.retrieval_context import DENSE_ONLY_STRATEGY, HYBRID_RRF_STRATEGY, assemble_retrieval_context
 
 
@@ -135,3 +136,162 @@ def test_hybrid_rrf_respects_empty_knowledge_scope(db_session: Session) -> None:
 
     assert result.context_blocks == []
     assert result.citations == []
+
+
+# --- Retrieval V2 Phase 2 - reranker wiring (docs/future/Reranking.md) ---
+
+
+class _ReverseOrderReranker:
+    """Deterministically reverses dense order - lets tests assert reranking
+    actually changed the final selection, not just that a call happened."""
+
+    provider_name = "fake_reverse"
+    model_name = "fake-reverse-v1"
+
+    def rerank(self, *, query, candidates, top_k):
+        reversed_candidates = list(reversed(candidates))[:top_k]
+        ranked = [
+            RerankedCandidate(match=match, dense_score=match.score, dense_rank=len(candidates) - index, rerank_score=float(index), rerank_rank=index + 1)
+            for index, match in enumerate(reversed_candidates)
+        ]
+        return RerankOutcome(candidates=ranked, status="ok", provider_name=self.provider_name, model_name=self.model_name, latency_ms=1)
+
+
+class _FailingReranker:
+    provider_name = "fake_failing"
+    model_name = "fake-failing-v1"
+
+    def rerank(self, *, query, candidates, top_k):
+        raise RerankerError("simulated reranker failure")
+
+
+def _seed_three_chunks(db_session: Session, *, organisation_id: str, workspace_id: str, provider: _ControlledEmbeddingProvider) -> list[str]:
+    ids = []
+    for key, vector in (("first", [1.0, 0.0]), ("second", [0.9, 0.1]), ("third", [0.8, 0.2])):
+        provider.vectors[f"content {key}"] = vector
+        ids.append(_seed_chunk(db_session, organisation_id=organisation_id, workspace_id=workspace_id, key=key, content=f"content {key}", provider=provider))
+    return ids
+
+
+def test_reranker_disabled_by_default_is_byte_identical_to_dense_only(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="rerank-default")
+    provider = _ControlledEmbeddingProvider({"query": [1.0, 0.0]})
+    _seed_three_chunks(db_session, organisation_id=organisation_id, workspace_id=workspace_id, provider=provider)
+
+    without_reranker_kwarg = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider,
+    )
+    with_explicit_no_op = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider, reranker=NoOpReranker(),
+    )
+    assert [c.chunk_id for c in without_reranker_kwarg.citations] == [c.chunk_id for c in with_explicit_no_op.citations]
+    assert without_reranker_kwarg.retrieval_debug.reranker_enabled is False
+    assert with_explicit_no_op.retrieval_debug.reranker_enabled is False
+
+
+def test_reranker_reorders_final_selection_and_preserves_dense_score(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="rerank-reorder")
+    provider = _ControlledEmbeddingProvider({"query": [1.0, 0.0]})
+    _seed_three_chunks(db_session, organisation_id=organisation_id, workspace_id=workspace_id, provider=provider)
+
+    dense_only = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider,
+    )
+    reranked = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider,
+        reranker=_ReverseOrderReranker(),
+    )
+
+    dense_order = [c.chunk_id for c in dense_only.citations]
+    reranked_order = [c.chunk_id for c in reranked.citations]
+    assert reranked_order == list(reversed(dense_order))
+    # Dense (cosine-similarity) scores are unchanged by reranking - only order moved.
+    dense_scores_by_chunk = {c.chunk_id: c.score for c in dense_only.citations}
+    for citation in reranked.citations:
+        assert citation.score == dense_scores_by_chunk[citation.chunk_id]
+    assert reranked.retrieval_debug.reranker_enabled is True
+    assert reranked.retrieval_debug.reranker_status == "ok"
+    assert reranked.retrieval_debug.reranker_provider == "fake_reverse"
+
+
+def test_reranker_widens_dense_candidate_pool_before_reranking(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="rerank-pool")
+    provider = _ControlledEmbeddingProvider({"query": [1.0, 0.0]})
+    _seed_three_chunks(db_session, organisation_id=organisation_id, workspace_id=workspace_id, provider=provider)
+
+    # max_context_chunks=1 would normally limit the dense search itself to 1
+    # candidate - with reranking enabled, the wider candidate pool size must
+    # still be used so the reranker has more than one candidate to consider.
+    result = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=1, max_context_chunks=1, max_context_chars=2000, provider=provider,
+        reranker=_ReverseOrderReranker(), reranker_candidate_pool_size=3, reranker_final_top_k=1,
+    )
+    assert result.retrieval_debug.reranker_candidate_count == 3
+    assert len(result.context_blocks) == 1
+
+
+def test_reranker_failure_falls_back_safely_by_default(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="rerank-fail-safe")
+    provider = _ControlledEmbeddingProvider({"query": [1.0, 0.0]})
+    _seed_three_chunks(db_session, organisation_id=organisation_id, workspace_id=workspace_id, provider=provider)
+
+    dense_only = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider,
+    )
+    result = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider,
+        reranker=_FailingReranker(),
+    )
+    assert [c.chunk_id for c in result.citations] == [c.chunk_id for c in dense_only.citations]
+    assert result.retrieval_debug.reranker_status == "failed"
+
+
+def test_reranker_failure_raises_when_fail_loud_for_evaluation(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="rerank-fail-loud")
+    provider = _ControlledEmbeddingProvider({"query": [1.0, 0.0]})
+    _seed_three_chunks(db_session, organisation_id=organisation_id, workspace_id=workspace_id, provider=provider)
+
+    with pytest.raises(RerankerError):
+        assemble_retrieval_context(
+            db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+            search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider,
+            reranker=_FailingReranker(), reranker_fail_loud=True,
+        )
+
+
+def test_reranker_still_respects_empty_knowledge_scope(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="rerank-scope")
+    provider = _ControlledEmbeddingProvider({"query": [1.0, 0.0]})
+    _seed_three_chunks(db_session, organisation_id=organisation_id, workspace_id=workspace_id, provider=provider)
+
+    result = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query",
+        search_limit=3, max_context_chunks=3, max_context_chars=2000, provider=provider,
+        reranker=_ReverseOrderReranker(), document_ids=[],
+    )
+    assert result.context_blocks == []
+    assert result.citations == []
+
+
+def test_reranker_never_surfaces_a_different_organisations_documents(db_session: Session) -> None:
+    org_a_id, workspace_a_id = _seed_tenant(db_session, suffix="rerank-tenant-a")
+    org_b_id, workspace_b_id = _seed_tenant(db_session, suffix="rerank-tenant-b")
+    provider = _ControlledEmbeddingProvider({"query": [1.0, 0.0], "content a-doc": [1.0, 0.0], "content b-doc": [1.0, 0.0]})
+    document_id_a = _seed_chunk(db_session, organisation_id=org_a_id, workspace_id=workspace_a_id, key="a-doc", content="content a-doc", provider=provider)
+    document_id_b = _seed_chunk(db_session, organisation_id=org_b_id, workspace_id=workspace_b_id, key="b-doc", content="content b-doc", provider=provider)
+
+    result = assemble_retrieval_context(
+        db_session, organisation_id=org_a_id, workspace_id=workspace_a_id, query="query",
+        search_limit=5, max_context_chunks=5, max_context_chars=2000, provider=provider,
+        reranker=_ReverseOrderReranker(),
+    )
+    retrieved_document_ids = [citation.document_id for citation in result.citations]
+    assert document_id_b not in retrieved_document_ids
+    assert retrieved_document_ids == [document_id_a]

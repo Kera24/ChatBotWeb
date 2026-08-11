@@ -43,6 +43,7 @@ from app.evaluation.scoring import score_case
 from app.evaluation.shadow_session import shadow_rag_session
 from app.repositories import evaluation_repository
 from app.services.embeddings import EmbeddingProvider, build_embedding_provider
+from app.services.reranking import Reranker, RerankerError, build_reranker
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,15 @@ class EvaluationRunOptions:
     # a controlled comparison; None means "use the global default" for
     # organic runs.
     retrieval_strategy_override: str | None = None
+    # Retrieval V2 Phase 2 (docs/future/Reranking.md) - explicit reranker
+    # instance for this whole run, mirroring embedding_provider's override
+    # pattern above (resolved once, reused across every case, rather than
+    # re-loading a cross-encoder model per case). None means "use
+    # settings.RERANKER_PROVIDER" (i.e. NoOpReranker/disabled for an organic
+    # run that never asked for reranking).
+    reranker_override: Reranker | None = None
+    reranker_candidate_pool_size: int | None = None
+    reranker_final_top_k: int | None = None
     # Evaluation-performance fix (Retrieval V2 Phase 1 follow-up,
     # app.evaluation.embedding_cache) - memoises embed() by exact
     # (provider, model, dimension, content) so a real-embedding run against
@@ -185,6 +195,11 @@ def run_evaluation(
     if options.embedding_cache_enabled:
         embedding_provider = CachingEmbeddingProvider(embedding_provider)
     min_similarity_score = options.min_similarity_score if options.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE
+    reranker = options.reranker_override or build_reranker(
+        provider_name=settings.RERANKER_PROVIDER,
+        model_name=settings.RERANKER_MODEL,
+        timeout_seconds=settings.RERANKER_TIMEOUT_SECONDS,
+    )
 
     allowed_document_ids = _resolve_allowed_document_ids(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
 
@@ -205,6 +220,10 @@ def run_evaluation(
             "embedding_dimension": embedding_provider.dimension,
             "category_filter": options.category_filter,
             "retrieval_strategy_override": options.retrieval_strategy_override,
+            "reranker_provider": reranker.provider_name,
+            "reranker_model": reranker.model_name,
+            "reranker_candidate_pool_size": options.reranker_candidate_pool_size,
+            "reranker_final_top_k": options.reranker_final_top_k,
         },
         created_by=options.created_by,
         trigger_source=options.trigger_source,
@@ -227,6 +246,7 @@ def run_evaluation(
                 allowed_document_ids=allowed_document_ids,
                 ai_core=ai_core,
                 embedding_provider=embedding_provider,
+                reranker=reranker,
                 min_similarity_score=min_similarity_score,
                 options=options,
                 trace_recorder=trace_recorder,
@@ -284,6 +304,7 @@ def _run_single_case(
     allowed_document_ids: list[str] | None,
     ai_core: AICoreContainer,
     embedding_provider,
+    reranker: Reranker,
     min_similarity_score: float,
     options: EvaluationRunOptions,
     trace_recorder,
@@ -311,12 +332,21 @@ def _run_single_case(
         trace_context=AITraceContext(trace_id=new_trace_id(), eval_run_id=eval_run_id, eval_case_id=case.id),
         prompt_version_override_id=options.prompt_version_override_id,
         retrieval_strategy=options.retrieval_strategy_override,
+        reranker_candidate_pool_size=options.reranker_candidate_pool_size,
+        reranker_final_top_k=options.reranker_final_top_k,
     )
 
     def call() -> object:
         with shadow_rag_session(options.shadow_database_url) as shadow_db:
             orchestrator = RAGOrchestrator(
-                RAGOrchestratorDependencies(db=shadow_db, ai_core=ai_core, embedding_provider=embedding_provider, trace_recorder=trace_recorder)
+                RAGOrchestratorDependencies(
+                    db=shadow_db, ai_core=ai_core, embedding_provider=embedding_provider, trace_recorder=trace_recorder,
+                    # Evaluation must never silently mask a reranker defect
+                    # behind the production safe-fallback - see
+                    # app.services.reranking.rerank_candidates and this
+                    # module's docstring / Retrieval V2 Phase 2 Part 6.
+                    reranker=reranker, reranker_fail_loud=True,
+                )
             )
             return orchestrator.answer(request)
 
@@ -333,6 +363,13 @@ def _run_single_case(
         return _CaseOutcome(payload=_unexpected_tenant_error_payload(case, exc))
     except RAGProviderExecutionError as exc:
         return _CaseOutcome(payload=_provider_error_payload(case, exc, allowed_document_ids=allowed_document_ids, options=options))
+    except RerankerError as exc:
+        # reranker_fail_loud=True above means this is a real reranker defect,
+        # not the production safe-fallback - classified distinctly
+        # ("reranker_failed") so case-level analysis (Retrieval V2 Phase 2,
+        # Part 8) can attribute it mechanically instead of lumping it into
+        # unexpected_engine_error.
+        return _CaseOutcome(payload=_failure_payload(safe_error_message(exc), hard_failure=False, reason="reranker_failed"))
     except Exception as exc:  # noqa: BLE001 - continue after any unexpected case failure
         logger.exception("Evaluation case %s raised an unexpected error", case.id)
         return _CaseOutcome(payload=_unexpected_error_payload(case, exc))
