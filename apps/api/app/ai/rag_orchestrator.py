@@ -8,9 +8,11 @@ from app.ai.accounting import AIUsageRecord
 from app.ai.contracts import FinishReason, TokenUsage
 from app.ai.dependencies import AICoreContainer
 from app.ai.errors import AIProviderError
+from app.ai.guardrails.answer_constraints import AnswerConstraints, AnswerDecision, build_answer_constraints
 from app.ai.guardrails.citation_policy import verify_citations
 from app.ai.guardrails.document_sanitizer import sanitise_evidence_content
-from app.ai.guardrails.evidence_sufficiency import verify_evidence_sufficiency
+from app.ai.guardrails.evidence_confidence import ChunkEvidenceSignal, compute_evidence_confidence
+from app.ai.guardrails.evidence_sufficiency import EvidenceSufficiencyV1Verifier, EvidenceVerifier
 from app.ai.guardrails.input_policy import evaluate_input_policy
 from app.ai.guardrails.output_safety import check_output_safety
 from app.ai.guardrails.reason_codes import GuardrailReasonCode
@@ -21,7 +23,13 @@ from app.db.models.prompt import LAYER_PLATFORM_CORE
 from app.observability import context as trace_stages
 from app.observability.ai_trace_recorder import AITraceRecorder, NoOpAITraceRecorder, RetrievalTraceEntry
 from app.observability.context import AITraceContext, new_trace_id
-from app.observability.otel_metrics import record_reranker_outcome, record_retrieval_fusion
+from app.observability.otel_metrics import (
+    record_evidence_confidence_outcome,
+    record_evidence_verifier_outcome,
+    record_query_transformation_outcome,
+    record_reranker_outcome,
+    record_retrieval_fusion,
+)
 from app.prompts.resolution import ResolvedComposite, resolve_composite_prompt
 from app.repositories import conversation_repository
 from app.access.widget_admin.service import WidgetAdminNotFound, get_current_draft, get_widget
@@ -33,6 +41,7 @@ from app.services.conversation import (
     start_conversation,
 )
 from app.services.embeddings import EmbeddingProvider
+from app.services.query_transformation import IdentityQueryTransformer, QueryTransformer, transform_query
 from app.services.reranking import NoOpReranker, Reranker
 from app.services.retrieval_context import (
     RetrievalCitationData,
@@ -40,6 +49,7 @@ from app.services.retrieval_context import (
     RetrievalDebugInfo,
     assemble_retrieval_context,
 )
+from app.services.retrieval_v3 import assemble_v3_retrieval_context
 
 
 def _elapsed_ms(started_at: float) -> int:
@@ -70,6 +80,15 @@ def _retrieval_debug_metadata(debug: RetrievalDebugInfo | None) -> dict:
         "reranker_selected_count": debug.reranker_selected_count,
         "reranker_latency_ms": debug.reranker_latency_ms,
         "reranker_status": debug.reranker_status,
+        "query_transformer_enabled": debug.query_transformer_enabled,
+        "query_transformer_type": debug.query_transformer_type,
+        "query_transformer_provider": debug.query_transformer_provider,
+        "query_transformer_model": debug.query_transformer_model,
+        "query_transformer_status": debug.query_transformer_status,
+        "query_transformer_latency_ms": debug.query_transformer_latency_ms,
+        "query_transformer_query_count": debug.query_transformer_query_count,
+        "query_transformer_raw_candidate_count": debug.query_transformer_raw_candidate_count,
+        "query_transformer_deduplicated_candidate_count": debug.query_transformer_deduplicated_candidate_count,
     }
 
 
@@ -199,6 +218,36 @@ class RAGOrchestratorDependencies:
     # a hard case failure instead of silently "succeeding" via that same
     # fallback - see app.services.reranking.rerank_candidates.
     reranker_fail_loud: bool = False
+    # Retrieval V2 Phase 3 (docs/future/QueryRewrite.md). Defaults to
+    # IdentityQueryTransformer (transformation disabled, one retrieval query -
+    # the original question, unchanged) for every existing call site that
+    # doesn't construct one explicitly - same pattern as reranker above.
+    query_transformer: QueryTransformer | None = None
+    # Production traffic (default False) falls back safely to the identity
+    # plan (original query only) on any transformer failure; evaluation runs
+    # set this True so a transformer defect surfaces as a hard case failure
+    # instead of silently "succeeding" via that same fallback - see
+    # app.services.query_transformation.transform_query.
+    query_transformer_fail_loud: bool = False
+    # Evidence Sufficiency V2 (docs/future/GuardrailsV2.md task). Defaults to
+    # EvidenceSufficiencyV1Verifier (today's exact production behaviour) for
+    # every existing call site that doesn't construct one explicitly - same
+    # pattern as reranker/query_transformer above. See
+    # app.ai.guardrails.evidence_sufficiency's V2 section docstring for what
+    # V2 changes and why; settings.EVIDENCE_VERIFIER_VERSION controls which
+    # one organic production traffic actually gets.
+    evidence_verifier: EvidenceVerifier | None = None
+    # Retrieval & Answer Pipeline V3 experiment (docs/future/RetrievalOptimisation.md).
+    # Defaults to False (today's exact production behaviour: dense_only/
+    # hybrid_rrf via assemble_retrieval_context, no evidence-confidence/
+    # constraints stage) for every existing call site - same one-flag,
+    # default-off pattern as every other experimental dependency above. When
+    # True: retrieval goes through app.services.retrieval_v3's hybrid
+    # dense+lexical+RRF+reranker composition (full per-chunk provenance
+    # preserved), and an additive Evidence Confidence / AnswerConstraints
+    # stage runs after evidence sufficiency - never replaces or reorders any
+    # existing stage, only adds to what already runs.
+    use_v3_retrieval: bool = False
 
 
 class RAGOrchestrator:
@@ -213,6 +262,14 @@ class RAGOrchestrator:
         # working unchanged - see app.services.reranking.
         self.reranker = dependencies.reranker or NoOpReranker()
         self.reranker_fail_loud = dependencies.reranker_fail_loud
+        # Every existing call site that doesn't construct a query_transformer
+        # keeps working unchanged - see app.services.query_transformation.
+        self.query_transformer = dependencies.query_transformer or IdentityQueryTransformer()
+        self.query_transformer_fail_loud = dependencies.query_transformer_fail_loud
+        # Every existing call site that doesn't construct an evidence_verifier
+        # keeps working unchanged - see app.ai.guardrails.evidence_sufficiency.
+        self.evidence_verifier = dependencies.evidence_verifier or EvidenceSufficiencyV1Verifier()
+        self.use_v3_retrieval = dependencies.use_v3_retrieval
 
     def answer(self, request: RAGOrchestrationRequest) -> RAGOrchestrationResult:
         trace_context = request.trace_context or AITraceContext(trace_id=new_trace_id())
@@ -295,24 +352,79 @@ class RAGOrchestrator:
         retrieval_limit = request.retrieval_limit or settings.RETRIEVAL_MAX_CONTEXT_CHUNKS
         max_context_chars = request.max_context_chars or settings.RETRIEVAL_MAX_CONTEXT_CHARS
         allowed_document_ids = self._knowledge_scope_for_request(request, assistant)
+
+        # Retrieval V2 Phase 3 (docs/future/QueryRewrite.md) - produces
+        # ADDITIONAL retrieval-only query strings alongside request.query.
+        # HARD REQUIREMENT: query_plan.retrieval_queries is only ever passed
+        # into assemble_retrieval_context below - request.query (the original
+        # question) remains untouched everywhere else in this method
+        # (evidence sufficiency, prompt resolution, generation variables,
+        # persisted user_message content) - see this module's and
+        # app.services.query_transformation's docstrings.
+        query_plan = transform_query(self.query_transformer, query=request.query, fail_loud=self.query_transformer_fail_loud)
+
+        effective_min_similarity_score = request.min_similarity_score if request.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE
         retrieval_started_at = perf_counter()
-        retrieval = assemble_retrieval_context(
-            self.db,
-            organisation_id=request.organisation_id,
-            workspace_id=request.workspace_id,
-            query=request.query,
-            search_limit=retrieval_limit,
-            max_context_chunks=settings.RETRIEVAL_MAX_CONTEXT_CHUNKS,
-            max_context_chars=max_context_chars,
-            provider=self.embedding_provider,
-            document_ids=allowed_document_ids,
-            min_similarity_score=request.min_similarity_score if request.min_similarity_score is not None else settings.RETRIEVAL_MIN_SIMILARITY_SCORE,
-            retrieval_strategy=request.retrieval_strategy,
-            reranker=self.reranker,
-            reranker_candidate_pool_size=request.reranker_candidate_pool_size,
-            reranker_final_top_k=request.reranker_final_top_k,
-            reranker_fail_loud=self.reranker_fail_loud,
-        )
+        if self.use_v3_retrieval:
+            # Retrieval & Answer Pipeline V3 experiment - hybrid dense+lexical
+            # candidate generation with full provenance preserved (see
+            # app.services.retrieval_v3's own docstring for why this is a
+            # separate composition rather than a change to
+            # assemble_retrieval_context, which stays the untouched baseline
+            # path below). Reuses the SAME bounded pool-size settings
+            # hybrid_rrf already uses - no new candidate-pool config surface.
+            v3_result = assemble_v3_retrieval_context(
+                self.db,
+                organisation_id=request.organisation_id,
+                workspace_id=request.workspace_id,
+                query=request.query,
+                provider=self.embedding_provider,
+                document_ids=allowed_document_ids,
+                dense_pool_size=settings.RETRIEVAL_DENSE_CANDIDATE_POOL_SIZE,
+                lexical_pool_size=settings.RETRIEVAL_LEXICAL_CANDIDATE_POOL_SIZE,
+                rrf_k=settings.RETRIEVAL_RRF_K,
+                fused_pool_size=settings.RETRIEVAL_HYBRID_FINAL_TOP_K,
+                reranker=self.reranker,
+                reranker_top_k=request.reranker_final_top_k or settings.RERANKER_FINAL_TOP_K,
+                reranker_fail_loud=self.reranker_fail_loud,
+                max_context_chunks=settings.RETRIEVAL_MAX_CONTEXT_CHUNKS,
+                max_context_chars=max_context_chars,
+            )
+            retrieval = replace(
+                v3_result.context,
+                retrieval_debug=RetrievalDebugInfo(
+                    strategy="hybrid_rrf_v3",
+                    dense_candidate_count=v3_result.debug.dense_candidate_count,
+                    lexical_candidate_count=v3_result.debug.lexical_candidate_count,
+                    fused_candidate_count=v3_result.debug.fused_candidate_count,
+                    dense_latency_ms=0, lexical_latency_ms=0, fusion_latency_ms=0,
+                    reranker_enabled=v3_result.debug.reranker_enabled,
+                    reranker_provider=v3_result.debug.reranker_provider,
+                    reranker_model=v3_result.debug.reranker_model,
+                    reranker_candidate_count=v3_result.debug.fused_candidate_count if v3_result.debug.reranker_enabled else 0,
+                    reranker_selected_count=len(v3_result.context.context_blocks) if v3_result.debug.reranker_enabled else 0,
+                    reranker_status=v3_result.debug.reranker_status,
+                ),
+            )
+        else:
+            retrieval = assemble_retrieval_context(
+                self.db,
+                organisation_id=request.organisation_id,
+                workspace_id=request.workspace_id,
+                query=request.query,
+                search_limit=retrieval_limit,
+                max_context_chunks=settings.RETRIEVAL_MAX_CONTEXT_CHUNKS,
+                max_context_chars=max_context_chars,
+                provider=self.embedding_provider,
+                document_ids=allowed_document_ids,
+                min_similarity_score=effective_min_similarity_score,
+                retrieval_strategy=request.retrieval_strategy,
+                reranker=self.reranker,
+                reranker_candidate_pool_size=request.reranker_candidate_pool_size,
+                reranker_final_top_k=request.reranker_final_top_k,
+                reranker_fail_loud=self.reranker_fail_loud,
+                query_plan=query_plan,
+            )
         retrieval_latency_ms = _elapsed_ms(retrieval_started_at)
         # Embedding happens inside assemble_retrieval_context and isn't
         # separately timed there - recorded as its own (unmeasured, bundled
@@ -345,6 +457,17 @@ class RAGOrchestrator:
                 selected_count=debug.reranker_selected_count,
                 latency_ms=debug.reranker_latency_ms,
                 status=debug.reranker_status,
+            )
+            record_query_transformation_outcome(
+                enabled=debug.query_transformer_enabled,
+                strategy=debug.query_transformer_type,
+                provider=debug.query_transformer_provider,
+                model=debug.query_transformer_model,
+                status=debug.query_transformer_status,
+                latency_ms=debug.query_transformer_latency_ms,
+                generated_query_count=debug.query_transformer_query_count,
+                raw_candidate_count=debug.query_transformer_raw_candidate_count,
+                deduplicated_candidate_count=debug.query_transformer_deduplicated_candidate_count,
             )
         self.trace_recorder.record_stage(
             trace_context, trace_stages.STAGE_RETRIEVAL, status="ok" if retrieval.context_blocks else "empty",
@@ -414,7 +537,7 @@ class RAGOrchestrator:
         # proximity, and retrieval-confidence-based domain relevance - and
         # its honest limitations).
         evidence_started_at = perf_counter()
-        evidence_verdict = verify_evidence_sufficiency(
+        evidence_verdict = self.evidence_verifier.verify(
             question=request.query,
             chunk_contents=[block.content for block in sanitised_blocks],
             chunk_titles=[block.source_title for block in sanitised_blocks],
@@ -430,17 +553,84 @@ class RAGOrchestrator:
             trace_context, layer="A+B", guardrail_name="evidence_sufficiency",
             verdict="passed" if evidence_verdict.sufficient else "blocked", blocked=not evidence_verdict.sufficient,
             reason_code=None if evidence_verdict.sufficient else evidence_verdict.reason_code.value,
+            safe_detail={"evidence_verifier_version": self.evidence_verifier.version},
+        )
+        record_evidence_verifier_outcome(
+            version=self.evidence_verifier.version,
+            verdict="sufficient" if evidence_verdict.sufficient else "insufficient",
+            reason_code=evidence_verdict.reason_code.value,
+            chunks_considered=len(sanitised_blocks),
+            conflict_detected=evidence_verdict.reason_code == GuardrailReasonCode.CONFLICTING_EVIDENCE,
+            latency_ms=_elapsed_ms(evidence_started_at),
         )
         # Grounding is currently only functionally covered by evidence
         # sufficiency above - app.ai.guardrails.grounding.verify_grounding is
         # not wired into the live pipeline, so this stage is recorded as
         # explicitly skipped rather than fabricating a pass/fail it never ran.
         self.trace_recorder.record_stage(trace_context, trace_stages.STAGE_GROUNDING_VERIFICATION, status="skipped", reason_code="not_wired_into_pipeline")
+
+        # Retrieval & Answer Pipeline V3 experiment - Evidence Confidence
+        # (app.ai.guardrails.evidence_confidence) + AnswerConstraints
+        # (app.ai.guardrails.answer_constraints) additive stage. Purely
+        # derived from evidence_verdict/retrieval provenance already
+        # computed above - no model call, no new network I/O, no change to
+        # the guardrail chain's pass/fail determination itself (constraints
+        # never grant an answer evidence_sufficiency rejected). Only changes
+        # observable behaviour in two additive ways when use_v3_retrieval is
+        # on: (1) a CONFLICTING_EVIDENCE verdict that looks like a genuine
+        # scope choice ("which plan do you mean?") gets a more specific
+        # fallback message/reason_code than the generic conflicting-evidence
+        # one; (2) generation context is restricted to only
+        # direct_support-outcome chunks (Part 11's "the model must never see
+        # rejected evidence as authoritative context where avoidable").
+        fallback_content = evidence_verdict.safe_message or FALLBACK_ANSWER
+        fallback_reason_code = evidence_verdict.reason_code.value
+        if self.use_v3_retrieval:
+            chunk_signals = tuple(
+                ChunkEvidenceSignal(
+                    chunk_id=block.chunk_id, outcome=outcome,
+                    dense_score=block.dense_score, lexical_score=block.lexical_score, rerank_score=block.rerank_score,
+                    source_channels=block.source_channels,
+                    matched_value=detail.matched_value if detail else None,
+                    matched_sentence=detail.matched_sentence if detail else None,
+                )
+                for block, outcome, detail in zip(
+                    sanitised_blocks, evidence_verdict.chunk_outcomes,
+                    evidence_verdict.chunk_support_details or (None,) * len(evidence_verdict.chunk_outcomes),
+                    strict=True,
+                )
+            ) if len(evidence_verdict.chunk_outcomes) == len(sanitised_blocks) else ()
+            v3_confidence = compute_evidence_confidence(verdict=evidence_verdict, chunk_signals=chunk_signals)
+            v3_constraints = build_answer_constraints(verdict=evidence_verdict, confidence=v3_confidence, chunk_signals=chunk_signals)
+            self.trace_recorder.record_guardrail(
+                trace_context, layer="V3", guardrail_name="evidence_confidence",
+                verdict=v3_constraints.decision.value, blocked=not v3_constraints.answer_allowed,
+                reason_code=v3_constraints.reason_codes[-1] if v3_constraints.reason_codes else None,
+                safe_detail={"confidence_score": v3_confidence.score, "confidence_band": v3_confidence.band.value},
+            )
+            record_evidence_confidence_outcome(
+                decision=v3_constraints.decision.value, confidence_band=v3_confidence.band.value,
+                conflicting_evidence=v3_constraints.conflicting_evidence, clarification_required=v3_constraints.clarification_required,
+            )
+            if v3_constraints.decision == AnswerDecision.CLARIFICATION_REQUIRED:
+                fallback_content = v3_constraints.safe_message or fallback_content
+                fallback_reason_code = v3_constraints.reason_codes[-1] if v3_constraints.reason_codes else fallback_reason_code
+            elif v3_constraints.answer_allowed and v3_constraints.allowed_chunk_ids:
+                allowed_ids = set(v3_constraints.allowed_chunk_ids)
+                filtered_pairs = [
+                    (citation, block) for citation, block in zip(retrieval.citations, sanitised_blocks, strict=True)
+                    if block.chunk_id in allowed_ids
+                ]
+                if filtered_pairs:  # fail-safe: never filter down to zero chunks - fall through with the full set instead
+                    filtered_citations, sanitised_blocks = (list(x) for x in zip(*filtered_pairs))
+                    context = "\n\n".join(block.context_text for block in sanitised_blocks)
+                    retrieval = replace(retrieval, citations=filtered_citations)
+
         if not evidence_verdict.sufficient:
             return self._persist_fallback(
                 request=request, conversation_id=conversation.id, user_message_id=user_message.id,
                 model=model, prompt_key=prompt_key, trace_context=trace_context, request_started_at=request_started_at,
-                content=evidence_verdict.safe_message or FALLBACK_ANSWER, reason_code=evidence_verdict.reason_code.value,
+                content=fallback_content, reason_code=fallback_reason_code,
                 retrieval_debug=retrieval.retrieval_debug,
             )
 

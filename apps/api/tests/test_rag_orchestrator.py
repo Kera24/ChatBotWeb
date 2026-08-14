@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.main import create_app
 from app.repositories.conversation_repository import list_citations_for_message, list_messages
 from app.services.embeddings import build_embedding_provider
+from app.services.query_transformation import QueryTransformerError, RetrievalQueryPlan
 
 
 @pytest.fixture()
@@ -520,6 +521,211 @@ def hybrid_retrieval_strategy():
     object.__setattr__(settings, "RETRIEVAL_STRATEGY", "hybrid_rrf")
     yield
     object.__setattr__(settings, "RETRIEVAL_STRATEGY", original)
+
+
+# --- Retrieval V2 Phase 3: query transformation wiring (docs/future/QueryRewrite.md) ---
+
+class _FakeQueryTransformer:
+    """A minimal QueryTransformer double - returns a plan whose
+    retrieval_queries include an obviously different rewritten string, so any
+    test asserting original-question immutability would fail loudly if the
+    rewrite ever leaked into generation/persistence."""
+
+    provider_name = "fake"
+    model_name = "fake-model"
+
+    def __init__(self, *, raise_error: Exception | None = None) -> None:
+        self.raise_error = raise_error
+
+    def transform(self, *, query: str, context: dict | None = None) -> RetrievalQueryPlan:
+        if self.raise_error is not None:
+            raise self.raise_error
+        return RetrievalQueryPlan(
+            original_query=query,
+            retrieval_queries=(query, "a completely different rewritten retrieval string"),
+            extracted_terms=("rewritten",),
+            transformation_type="fake",
+            provider=self.provider_name,
+            model=self.model_name,
+            latency_ms=1,
+            status="ok",
+        )
+
+
+def test_query_transformer_never_replaces_persisted_question_or_generation_prompt(client: TestClient) -> None:
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client, organisation_name="Alpha College", organisation_slug="alpha-qt-1", user_email="viewer@example.test", role="viewer",
+    )
+    add_embedded_chunk(client, organisation_id=organisation_id, workspace_id=workspace_id, content="applications close in december", title="Admissions")
+
+    with client.app.state.testing_session() as db:
+        baseline = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+            )
+        ).answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december"))
+
+    with client.app.state.testing_session() as db:
+        transformed = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+                query_transformer=_FakeQueryTransformer(),
+            )
+        ).answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december"))
+
+        # The mock provider's response text is a deterministic hash of the
+        # full rendered prompt (system + user, which embeds "question" and
+        # "context" - see app.ai.providers.mock.MockAIProvider.generate).
+        # Both runs retrieve the same single seeded chunk, so an identical
+        # answer here proves the rewritten retrieval string never reached
+        # generation - only retrieval saw it.
+        assert transformed.answer == baseline.answer
+        assert transformed.metadata["query_transformer_type"] == "fake"
+        assert transformed.metadata["query_transformer_query_count"] == 2
+
+        messages = list_messages(db, organisation_id=organisation_id, workspace_id=workspace_id, conversation_id=transformed.conversation_id)
+        user_message = next(message for message in messages if message.role == "user")
+        assert user_message.content == "applications close in december"  # never the rewritten string
+
+
+def test_query_transformer_failure_falls_back_safely_by_default(client: TestClient) -> None:
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client, organisation_name="Alpha College", organisation_slug="alpha-qt-2", user_email="viewer@example.test", role="viewer",
+    )
+    add_embedded_chunk(client, organisation_id=organisation_id, workspace_id=workspace_id, content="applications close in december", title="Admissions")
+
+    with client.app.state.testing_session() as db:
+        result = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+                query_transformer=_FakeQueryTransformer(raise_error=RuntimeError("transformer exploded")),
+            )
+        ).answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december"))
+
+    assert result.answer_state == "answered"
+    assert result.metadata["query_transformer_status"] == "failed"
+
+
+def test_query_transformer_failure_raises_when_fail_loud_for_evaluation(client: TestClient) -> None:
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client, organisation_name="Alpha College", organisation_slug="alpha-qt-3", user_email="viewer@example.test", role="viewer",
+    )
+    add_embedded_chunk(client, organisation_id=organisation_id, workspace_id=workspace_id, content="applications close in december", title="Admissions")
+
+    with client.app.state.testing_session() as db:
+        orchestrator = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+                query_transformer=_FakeQueryTransformer(raise_error=QueryTransformerError("transformer exploded")),
+                query_transformer_fail_loud=True,
+            )
+        )
+        with pytest.raises(QueryTransformerError):
+            orchestrator.answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december"))
+
+
+def test_query_transformer_default_is_identity_and_byte_identical(client: TestClient) -> None:
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client, organisation_name="Alpha College", organisation_slug="alpha-qt-4", user_email="viewer@example.test", role="viewer",
+    )
+    add_embedded_chunk(client, organisation_id=organisation_id, workspace_id=workspace_id, content="applications close in december", title="Admissions")
+
+    with client.app.state.testing_session() as db:
+        result = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+            )
+        ).answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december"))
+
+    assert result.metadata["query_transformer_type"] == "identity"
+    assert result.metadata["query_transformer_enabled"] is False  # multi-query path never activated for a single-query identity plan
+    assert result.metadata["query_transformer_query_count"] == 1
+    assert result.answer_state == "answered"
+
+
+def test_use_v3_retrieval_defaults_false_and_baseline_is_unaffected(client: TestClient) -> None:
+    """Retrieval & Answer Pipeline V3 experiment (docs/future/RetrievalOptimisation.md) -
+    every existing call site that doesn't construct use_v3_retrieval keeps
+    working exactly as before this dependency existed."""
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client, organisation_name="Alpha College", organisation_slug="alpha-v3-default", user_email="viewer@example.test", role="viewer",
+    )
+    add_embedded_chunk(client, organisation_id=organisation_id, workspace_id=workspace_id, content="applications close in december", title="Admissions")
+
+    with client.app.state.testing_session() as db:
+        orchestrator = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+            )
+        )
+        assert orchestrator.use_v3_retrieval is False
+        result = orchestrator.answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december"))
+
+    assert result.answer_state == "answered"
+    assert "dense_candidate_count" in result.metadata  # v2 debug shape, unchanged
+
+
+def test_v3_pipeline_produces_grounded_cited_answer_with_hybrid_provenance(client: TestClient) -> None:
+    """use_v3_retrieval=True runs the hybrid dense+lexical+RRF composition
+    (app.services.retrieval_v3) end to end through the real orchestrator -
+    still grounded/cited/guardrail-checked exactly like the v2 baseline."""
+    organisation_id, workspace_id, _user_id = seed_tenant(
+        client, organisation_name="Alpha College", organisation_slug="alpha-v3", user_email="viewer@example.test", role="viewer",
+    )
+    _document_id, _version_id, chunk_id = add_embedded_chunk(
+        client, organisation_id=organisation_id, workspace_id=workspace_id,
+        content="applications close in december", title="Admissions Handbook",
+    )
+
+    with client.app.state.testing_session() as db:
+        result = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+                use_v3_retrieval=True,
+            )
+        ).answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december"))
+
+    assert result.answer_state == "answered"
+    assert result.fallback_used is False
+    assert result.citations[0].chunk_id == chunk_id
+    assert result.metadata["retrieval_strategy"] == "hybrid_rrf_v3"
+    assert "lexical_candidate_count" in result.metadata
+    assert "fused_candidate_count" in result.metadata
+
+
+def test_v3_pipeline_respects_empty_knowledge_scope(client: TestClient) -> None:
+    """Same tenant-isolation regression this file already guards for
+    dense_only/hybrid_rrf must hold identically under the V3 pipeline -
+    app.services.retrieval_v3 reuses the exact same search_embedded_chunks/
+    search_lexical_chunks functions, never its own filtering logic."""
+    organisation_id, workspace_id, user_id = seed_tenant(
+        client, organisation_name="Alpha College", organisation_slug="alpha-v3-scope", user_email="owner@example.test", role="org_owner",
+    )
+    add_embedded_chunk(client, organisation_id=organisation_id, workspace_id=workspace_id, content="applications close in december", title="Admissions")
+    with client.app.state.testing_session() as db:
+        widget = create_widget(
+            db, organisation_id=organisation_id, workspace_id=workspace_id,
+            display_name="Empty Scope Assistant", environment="development", actor_user_id=user_id, initial_configuration={"knowledge_scope_json": []},
+        )
+
+    with client.app.state.testing_session() as db:
+        result = RAGOrchestrator(
+            RAGOrchestratorDependencies(
+                db=db, ai_core=client.app.state.ai_core,
+                embedding_provider=build_embedding_provider(provider_name="local-mock", model_name="rag-test", dimension=8),
+                use_v3_retrieval=True,
+            )
+        ).answer(RAGOrchestrationRequest(organisation_id=organisation_id, workspace_id=workspace_id, query="applications close in december", assistant_id=widget.id))
+
+    assert result.retrieved_chunk_count == 0
+    assert result.answer_state == "fallback"
 
 
 def test_hybrid_strategy_still_produces_grounded_cited_answer(client: TestClient, hybrid_retrieval_strategy) -> None:

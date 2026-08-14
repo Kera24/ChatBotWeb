@@ -146,6 +146,10 @@ def test_no_high_cardinality_labels_are_ever_attached(in_memory_metrics: InMemor
     otel_metrics.record_evaluation_gate_outcome(gate="release_gate", passed=True)
     otel_metrics.record_email_delivery(provider="dev", email_type="email_verification", success=True, error_code=None)
     otel_metrics.record_unhandled_exception(route="/api/v1/observability/alerts", exception_type="RuntimeError")
+    otel_metrics.record_query_transformation_outcome(
+        enabled=True, strategy="model_assisted", provider="model_assisted", model="fake-model", status="ok",
+        latency_ms=250, generated_query_count=2, raw_candidate_count=10, deduplicated_candidate_count=7,
+    )
 
     data = in_memory_metrics.get_metrics_data()
     for rm in data.resource_metrics:
@@ -153,6 +157,34 @@ def test_no_high_cardinality_labels_are_ever_attached(in_memory_metrics: InMemor
             for m in sm.metrics:
                 for point in m.data.data_points:
                     assert _FORBIDDEN_LABEL_NAMES.isdisjoint(point.attributes.keys()), f"{m.name} attached a high-cardinality label: {point.attributes}"
+
+
+# --- Retrieval V2 Phase 3 (docs/future/QueryRewrite.md): query-transformation
+# metrics never carry a raw query string or tenant identifier -------------
+
+
+def test_query_transformation_metrics_never_carry_raw_query_text(in_memory_metrics: InMemoryMetricReader) -> None:
+    # Part 9 requirement: raw/transformed query text must never reach a
+    # Prometheus label - only the closed strategy/provider/model/status
+    # vocabulary and numeric counts/latencies are recorded.
+    raw_query_text = "what is the refund window for a customer named Alice Smith at acme-corp-12345"
+    otel_metrics.record_query_transformation_outcome(
+        enabled=True, strategy="deterministic", provider="deterministic", model="builtin", status="ok",
+        latency_ms=5, generated_query_count=2, raw_candidate_count=8, deduplicated_candidate_count=6,
+    )
+    data = in_memory_metrics.get_metrics_data()
+    seen_metric = False
+    for rm in data.resource_metrics:
+        for sm in rm.scope_metrics:
+            for m in sm.metrics:
+                if not m.name.startswith("query_transformation_"):
+                    continue
+                for point in m.data.data_points:
+                    seen_metric = True
+                    assert _FORBIDDEN_LABEL_NAMES.isdisjoint(point.attributes.keys())
+                    assert set(point.attributes.keys()) <= {"strategy", "provider", "model", "status", "enabled"}
+                    assert raw_query_text not in point.attributes.values()
+    assert seen_metric
 
 
 # --- MetricsEmittingAITraceRecorder: forwards + records ----------------------

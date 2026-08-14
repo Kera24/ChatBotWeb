@@ -168,6 +168,91 @@ def record_reranker_outcome(
         logger.debug("record_reranker_outcome failed", exc_info=True)
 
 
+def record_query_transformation_outcome(
+    *,
+    enabled: bool,
+    strategy: str | None,
+    provider: str | None,
+    model: str | None,
+    status: str | None,
+    latency_ms: int,
+    generated_query_count: int,
+    raw_candidate_count: int = 0,
+    deduplicated_candidate_count: int = 0,
+) -> None:
+    """One RAG request's retrieval query transformation shape (Retrieval V2
+    Phase 3, docs/future/QueryRewrite.md) - `strategy`/`provider`/`model`/
+    `status` are the closed "identity"/"deterministic"/"model_assisted" and
+    "ok"/"unchanged"/"identity"/"failed"/"timeout"/"malformed_output"/
+    "unavailable"/"empty_rewrite" vocabularies from
+    app.services.query_transformation, never a tenant/request id or raw query
+    text, per this module's CARDINALITY POLICY. Recorded even when
+    transformation is disabled/a no-op (enabled=False) so that state is
+    itself visible in the same dashboards, not just inferred from absence."""
+    try:
+        labels = {"strategy": _label(strategy), "provider": _label(provider), "model": _label(model), "status": _label(status), "enabled": str(bool(enabled)).lower()}
+        _counter("query_transformation_requests_total", unit="1", description="Completed query transformation calls by strategy/status.").add(1, labels)
+        _histogram("query_transformation_latency_ms", unit="ms", description="Latency of one query transformation call.").record(latency_ms, labels)
+        _histogram(
+            "query_transformation_generated_query_count", unit="1", description="Retrieval query count produced by the transformer (including the original)."
+        ).record(generated_query_count, labels)
+        if enabled:
+            _histogram("query_transformation_raw_candidate_count", unit="1", description="Total dense candidates across all retrieval queries before merge.").record(
+                raw_candidate_count, labels
+            )
+            _histogram(
+                "query_transformation_deduplicated_candidate_count", unit="1", description="Distinct chunk count after the multi-query merge."
+            ).record(deduplicated_candidate_count, labels)
+    except Exception:
+        logger.debug("record_query_transformation_outcome failed", exc_info=True)
+
+
+def record_evidence_verifier_outcome(
+    *, version: str, verdict: str, reason_code: str | None, chunks_considered: int, conflict_detected: bool, latency_ms: int
+) -> None:
+    """One evidence-sufficiency verifier call (Evidence Sufficiency V2 task,
+    docs/future/GuardrailsV2.md) - `version` ("v1"/"v2"), `verdict`
+    ("sufficient"/"insufficient"), and `reason_code` are the closed
+    GuardrailReasonCode vocabulary from app.ai.guardrails.evidence_sufficiency,
+    never a tenant/request id or raw question/chunk text, per this module's
+    CARDINALITY POLICY. `chunks_considered` is bucketed (not the raw count)
+    since it is otherwise an effectively unbounded histogram dimension
+    combined with the other labels."""
+    try:
+        bucket = "0" if chunks_considered == 0 else "1-3" if chunks_considered <= 3 else "4-10" if chunks_considered <= 10 else "10+"
+        labels = {
+            "version": _label(version), "verdict": _label(verdict), "reason_code": _label(reason_code),
+            "chunks_considered_bucket": bucket, "conflict_detected": str(bool(conflict_detected)).lower(),
+        }
+        _counter("evidence_verifier_outcomes_total", unit="1", description="Evidence-sufficiency verifier verdicts.").add(1, labels)
+        _histogram("evidence_verifier_latency_ms", unit="ms", description="Latency of one evidence-sufficiency verifier call.").record(
+            latency_ms, {"version": _label(version)}
+        )
+    except Exception:
+        logger.debug("record_evidence_verifier_outcome failed", exc_info=True)
+
+
+def record_evidence_confidence_outcome(*, decision: str, confidence_band: str, conflicting_evidence: bool, clarification_required: bool) -> None:
+    """One Retrieval & Answer Pipeline V3 experiment (docs/future/RetrievalOptimisation.md)
+    Evidence Confidence / AnswerConstraints outcome - `decision`
+    ("answer"/"fallback"/"clarification_required") and `confidence_band`
+    ("high"/"medium"/"low"/"none") are the closed vocabularies from
+    app.ai.guardrails.answer_constraints/evidence_confidence, never a
+    tenant/request id or raw question/answer text, per this module's
+    CARDINALITY POLICY. Only emitted when the V3 experimental pipeline is
+    active (opt-in, not the production baseline)."""
+    try:
+        _counter("evidence_confidence_outcomes_total", unit="1", description="V3 evidence-confidence/answer-constraint decisions.").add(
+            1,
+            {
+                "decision": _label(decision), "confidence_band": _label(confidence_band),
+                "conflicting_evidence": str(bool(conflicting_evidence)).lower(), "clarification_required": str(bool(clarification_required)).lower(),
+            },
+        )
+    except Exception:
+        logger.debug("record_evidence_confidence_outcome failed", exc_info=True)
+
+
 def record_guardrail_outcome(*, layer: str, guardrail: str, verdict: str, blocked: bool) -> None:
     """One guardrail layer verdict (app.observability.ai_trace_recorder.record_guardrail) -
     layer/guardrail_name/verdict are already a fixed vocabulary (see

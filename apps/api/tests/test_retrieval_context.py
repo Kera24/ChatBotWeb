@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
 from app.db.models import Chunk, Document, DocumentVersion, Membership, Organisation, User, Workspace
+from app.services.query_transformation import RetrievalQueryPlan
 from app.services.reranking import NoOpReranker, RerankedCandidate, RerankerError, RerankOutcome
 from app.services.retrieval_context import DENSE_ONLY_STRATEGY, HYBRID_RRF_STRATEGY, assemble_retrieval_context
 
@@ -294,4 +295,131 @@ def test_reranker_never_surfaces_a_different_organisations_documents(db_session:
     )
     retrieved_document_ids = [citation.document_id for citation in result.citations]
     assert document_id_b not in retrieved_document_ids
+    assert retrieved_document_ids == [document_id_a]
+
+
+# --- Retrieval V2 Phase 3: query transformation / multi-query merge (docs/future/QueryRewrite.md) ---
+
+def _plan(original: str, *retrieval_queries: str) -> RetrievalQueryPlan:
+    return RetrievalQueryPlan(
+        original_query=original,
+        retrieval_queries=retrieval_queries or (original,),
+        extracted_terms=(),
+        transformation_type="deterministic",
+        provider="deterministic",
+        model="builtin",
+        latency_ms=1,
+        status="ok",
+    )
+
+
+def test_no_query_plan_is_byte_identical_to_pre_phase3_dense_only(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="no-plan")
+    provider = _ControlledEmbeddingProvider({"the query": [1.0, 0.0], "matching content": [1.0, 0.0]})
+    _seed_chunk(db_session, organisation_id=organisation_id, workspace_id=workspace_id, key="doc", content="matching content", provider=provider)
+
+    result = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="the query",
+        search_limit=5, max_context_chunks=5, max_context_chars=1000, provider=provider,
+    )
+    assert result.retrieval_debug.query_transformer_enabled is False
+    assert result.retrieval_debug.query_transformer_query_count == 1
+    assert len(result.context_blocks) == 1
+
+
+def test_identity_single_query_plan_is_byte_identical_to_no_plan(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="identity-plan")
+    provider = _ControlledEmbeddingProvider({"the query": [1.0, 0.0], "matching content": [1.0, 0.0]})
+    _seed_chunk(db_session, organisation_id=organisation_id, workspace_id=workspace_id, key="doc", content="matching content", provider=provider)
+
+    result = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="the query",
+        search_limit=5, max_context_chunks=5, max_context_chars=1000, provider=provider,
+        query_plan=_plan("the query"),
+    )
+    assert result.retrieval_debug.query_transformer_enabled is False
+    assert len(result.context_blocks) == 1
+
+
+def test_multi_query_plan_surfaces_chunk_only_matched_by_rewritten_query(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="multi-query")
+    # "original phrasing" has no semantic overlap with "canonical content" in
+    # this controlled 2D embedding space (orthogonal vectors) - only the
+    # rewritten query finds it.
+    provider = _ControlledEmbeddingProvider({
+        "original phrasing": [1.0, 0.0],
+        "rewritten phrasing": [0.0, 1.0],
+        "canonical content": [0.0, 1.0],
+    })
+    document_id = _seed_chunk(db_session, organisation_id=organisation_id, workspace_id=workspace_id, key="doc", content="canonical content", provider=provider)
+
+    baseline = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="original phrasing",
+        search_limit=5, max_context_chunks=5, max_context_chars=1000, provider=provider, min_similarity_score=0.5,
+    )
+    assert baseline.context_blocks == []  # the rescue case: absent from Top-K under the original query alone
+
+    rescued = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="original phrasing",
+        search_limit=5, max_context_chunks=5, max_context_chars=1000, provider=provider, min_similarity_score=0.5,
+        query_plan=_plan("original phrasing", "original phrasing", "rewritten phrasing"),
+    )
+    assert [c.document_id for c in rescued.citations] == [document_id]
+    assert rescued.retrieval_debug.query_transformer_enabled is True
+    assert rescued.retrieval_debug.query_transformer_query_count == 2
+
+
+def test_multi_query_merge_deduplicates_chunk_found_by_both_queries_and_keeps_max_score(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="multi-query-dedup")
+    provider = _ControlledEmbeddingProvider({
+        "query one": [1.0, 0.0],
+        "query two": [0.6, 0.8],
+        "shared content": [0.8, 0.6],
+    })
+    _seed_chunk(db_session, organisation_id=organisation_id, workspace_id=workspace_id, key="doc", content="shared content", provider=provider)
+
+    result = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query one",
+        search_limit=5, max_context_chunks=5, max_context_chars=1000, provider=provider, min_similarity_score=0.0,
+        query_plan=_plan("query one", "query one", "query two"),
+    )
+    assert len(result.citations) == 1  # not duplicated even though both queries matched the same chunk
+    assert result.retrieval_debug.query_transformer_raw_candidate_count == 2
+    assert result.retrieval_debug.query_transformer_deduplicated_candidate_count == 1
+
+
+def test_multi_query_plan_only_applies_to_dense_only_not_hybrid_rrf(db_session: Session) -> None:
+    organisation_id, workspace_id = _seed_tenant(db_session, suffix="multi-query-hybrid-scope")
+    provider = _ControlledEmbeddingProvider({"query one": [1.0, 0.0], "matching content": [1.0, 0.0]})
+    _seed_chunk(db_session, organisation_id=organisation_id, workspace_id=workspace_id, key="doc", content="matching content", provider=provider)
+
+    result = assemble_retrieval_context(
+        db_session, organisation_id=organisation_id, workspace_id=workspace_id, query="query one",
+        search_limit=5, max_context_chunks=5, max_context_chars=1000, provider=provider,
+        retrieval_strategy=HYBRID_RRF_STRATEGY,
+        query_plan=_plan("query one", "query one", "query two"),
+    )
+    # Retrieval V2 Phase 3 is scoped to dense_only only - a multi-query plan
+    # passed alongside hybrid_rrf is accepted but has no effect (documented
+    # scope limit, not a silent bug).
+    assert result.retrieval_debug.strategy == HYBRID_RRF_STRATEGY
+    assert result.retrieval_debug.query_transformer_enabled is False
+
+
+def test_multi_query_plan_never_surfaces_a_different_organisations_documents(db_session: Session) -> None:
+    org_a_id, workspace_a_id = _seed_tenant(db_session, suffix="multi-query-tenant-a")
+    org_b_id, workspace_b_id = _seed_tenant(db_session, suffix="multi-query-tenant-b")
+    provider = _ControlledEmbeddingProvider({
+        "query": [1.0, 0.0], "rewritten query": [0.0, 1.0],
+        "content a-doc": [1.0, 0.0], "content b-doc": [0.0, 1.0],
+    })
+    document_id_a = _seed_chunk(db_session, organisation_id=org_a_id, workspace_id=workspace_a_id, key="a-doc", content="content a-doc", provider=provider)
+    _seed_chunk(db_session, organisation_id=org_b_id, workspace_id=workspace_b_id, key="b-doc", content="content b-doc", provider=provider)
+
+    result = assemble_retrieval_context(
+        db_session, organisation_id=org_a_id, workspace_id=workspace_a_id, query="query",
+        search_limit=5, max_context_chunks=5, max_context_chars=2000, provider=provider,
+        query_plan=_plan("query", "query", "rewritten query"),
+    )
+    retrieved_document_ids = [citation.document_id for citation in result.citations]
     assert retrieved_document_ids == [document_id_a]

@@ -39,6 +39,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Protocol
 
 from app.ai.guardrails.grounding import extract_distinctive_terms
 from app.ai.guardrails.reason_codes import GuardrailReasonCode
@@ -218,6 +219,14 @@ class EvidenceSufficiencyVerdict:
     requested_fact: RequestedFact
     chunk_outcomes: tuple[str, ...]
     safe_message: str | None = None
+    # Retrieval & Answer Pipeline V3 experiment (docs/future/RetrievalOptimisation.md) -
+    # the full per-chunk ChunkSupportOutcome (matched_value/matched_sentence),
+    # not just the outcome label chunk_outcomes already carries. Defaults to
+    # `()` and is populated ONLY by verify_evidence_sufficiency_v2 below -
+    # verify_evidence_sufficiency (V1) never sets it, so every V1 caller/test
+    # keeps producing byte-identical verdicts. Positionally aligned with
+    # chunk_outcomes/the original chunk_contents list when present.
+    chunk_support_details: tuple[ChunkSupportOutcome, ...] = ()
 
 
 
@@ -409,3 +418,371 @@ def verify_evidence_sufficiency(
         sufficient=False, reason_code=GuardrailReasonCode.REQUESTED_FACT_ABSENT, requested_fact=requested,
         chunk_outcomes=outcome_labels, safe_message=SAFE_MESSAGE_REQUESTED_FACT_ABSENT,
     )
+
+
+# ============================================================================
+# Evidence Sufficiency V2 - additive, evidence-driven fixes to specific false-
+# rejection mechanisms proven against the real corpus by
+# app.operations.eval_evidence_sufficiency_failure_analysis (--real, both
+# golden_dataset.json and chunking_dataset.json, nomic-embed-text-v2-moe,
+# threshold 0.32). Everything above this line (V1) is completely unmodified -
+# every existing call site/test keeps its exact current behaviour. V2 is
+# opt-in via build_evidence_verifier()/settings.EVIDENCE_VERIFIER_VERSION,
+# defaulting to "v1" in production until promoted (see the promotion report
+# this task produced).
+#
+# Concrete, reproduced root causes fixed here (case IDs and raw
+# retrieved-chunk evidence live in the promotion report, not repeated here -
+# "do not infer a category without inspecting retrieved evidence"):
+#
+#   1. Case-sensitivity bug: `evaluate_chunk_support` above extracts values
+#      from an ALREADY-LOWERCASED window, which silently defeats any pattern
+#      requiring an uppercase first letter - LOCATION's `[A-Z][a-zA-Z]+`
+#      could never match a real city/region name, ever, regardless of
+#      whether it was actually present in the retrieved chunk (100% of
+#      LOCATION-typed questions in the failure analysis were false
+#      rejections for exactly this reason). V2 extracts against the
+#      ORIGINAL-case window text; anchor matching stays case-insensitive.
+#   2. First-match bug: V1 takes `values[0]`, the first value anywhere in the
+#      anchor window, even when several typed values appear in the same
+#      window - a markdown pricing table with no terminal punctuation
+#      collapses into one "sentence", so a question about the Team plan's
+#      price could silently be attributed the Starter row's price instead.
+#      V2 splits markdown table rows as their own sentence-like unit AND
+#      picks the value positioned nearest the matched anchor, not merely the
+#      first one found in the window.
+#   3. Weak-anchor false collision: when a question has no extractable
+#      entity, V1's keyword-fallback anchor requires as few as ONE shared
+#      generic word (e.g. "days") to treat a chunk as supporting evidence -
+#      across multi-section policy documents this repeatedly produced
+#      several spurious `direct_support` outcomes with DIFFERENT
+#      numeric/duration/currency values for the SAME question, which V1's
+#      conflict check then reports as `conflicting_evidence` even though
+#      only one of them is the real answer (an "unrelated numeric collision"
+#      - not a genuine contradiction, supersession, or scope difference).
+#      V2 raises the keyword-hit threshold specifically when a typed value
+#      is being verified, since precision matters far more once a specific
+#      number/date is about to be asserted as the answer.
+#   4. DATE's extraction pattern required a day-of-month ("February 15") and
+#      rejected the common "Month YYYY" prose form ("In February 2025,
+#      Meridian completed..."). V2 adds that alternative.
+#   5. Value-type misdetection: the CONTACT trigger pattern
+#      (`\bphone\b|\bemail\b`) fired on plain availability questions ("Is
+#      phone support available on the Team tier?"), routing them through a
+#      phone-number/email regex that could never match availability prose.
+#      V2 requires an explicit contact-detail-seeking frame for CONTACT and
+#      routes bare "is/are ... available" phrasing to ELIGIBILITY instead.
+#   6. PROCEDURE's trigger pattern missed common escalation/contact-support
+#      phrasing ("escalate", "contact the support team") - V2 adds a small,
+#      reviewed set of equivalents, not a broad keyword net.
+#
+# Explicitly NOT changed by V2 (evidence did not support it - "implement X
+# only if the failure analysis proves it is needed"): multi-chunk evidence
+# composition (only one case across both corpora needed it - see the
+# promotion report's Part 3 finding) and a semantic/paraphrase fallback (no
+# case's rejection traced to a lexical-only miss once the above were
+# accounted for).
+# ============================================================================
+
+_LOCATION_VALUE_PATTERN = re.compile(r"\b[A-Z][a-zA-Z]+(?:,\s*[A-Z]{2})?\b")
+
+# DATE V2: adds a "Month YYYY" (no day-of-month) alternative to V1's pattern,
+# which required a day. Both alternatives kept case-insensitive at the
+# pattern level (re.IGNORECASE) since V2 now extracts from original-case
+# text where the month name could be capitalised or not depending on
+# position in the sentence.
+_DATE_VALUE_PATTERN_V2 = re.compile(
+    r"\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s*\d{4})?\b"
+    r"|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b"
+    r"|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b"
+    r"|\banniversary\b|\brenewal date\b|\bbilling date\b|\bsignup date\b|\beach (?:month|year)\b|\bevery (?:month|year)\b",
+    re.IGNORECASE,
+)
+
+# PROCEDURE V2: adds escalation/contact-support phrasing observed missing in
+# the failure analysis - a small, reviewed extension, not a broad net.
+_PROCEDURE_VALUE_PATTERN_V2 = re.compile(
+    r"(?i)\b(step \d|first,|then,|next,|finally,|submit|navigate to|go to|click"
+    r"|escalates?|escalation|contact (the|your) (support|account) team|open a (ticket|case)|respond(s)? within)\b"
+)
+
+_VALUE_EXTRACTORS_V2: dict[ExpectedValueType, re.Pattern[str]] = {
+    **_VALUE_EXTRACTORS,
+    ExpectedValueType.DATE: _DATE_VALUE_PATTERN_V2,
+    ExpectedValueType.LOCATION: _LOCATION_VALUE_PATTERN,
+    ExpectedValueType.PROCEDURE: _PROCEDURE_VALUE_PATTERN_V2,
+}
+
+# CONTACT V2: narrowed to an explicit ask for contact details (a phone
+# number/email address/how-to-reach-someone framing) - fixes 100% of the
+# reproduced CONTACT misdetections, which were all plain availability
+# questions ("is phone support available") that this bare pattern used to
+# swallow. ELIGIBILITY V2 gains the "is/are ... available" framing those
+# questions actually are, so they still resolve to a real value type instead
+# of falling through to None.
+_CONTACT_TRIGGER_V2 = re.compile(r"(?i)\bcontact (details|information|number)\b|\bphone number\b|\bemail address\b|\bhow (do|can) i contact\b|\bwho (do|can) i contact\b|\breach (support|someone|a human)\b")
+_ELIGIBILITY_TRIGGER_V2 = re.compile(r"(?i)\beligib(le|ility)\b|\bqualify\b|\brequirement(s)? to\b|\bwho (can|is able to)\b|\bis\b.{0,30}\bavailable\b|\bare\b.{0,30}\bavailable\b")
+
+_VALUE_TYPE_PATTERNS_V2: tuple[tuple[re.Pattern[str], ExpectedValueType], ...] = tuple(
+    (_CONTACT_TRIGGER_V2, ExpectedValueType.CONTACT) if value_type == ExpectedValueType.CONTACT
+    else (_ELIGIBILITY_TRIGGER_V2, ExpectedValueType.ELIGIBILITY) if value_type == ExpectedValueType.ELIGIBILITY
+    else (pattern, value_type)
+    for pattern, value_type in _VALUE_TYPE_PATTERNS
+)
+
+# Stricter than V1's _MIN_KEYWORD_MATCHES (1-2): once a typed value is about
+# to be asserted as the answer, a single coincidentally shared generic word
+# is not enough evidence that a chunk describes the SAME fact as the
+# question - see root cause 3 above.
+_MIN_KEYWORD_MATCHES_TYPED_V2 = 2
+
+
+def _detect_value_type_v2(question: str) -> ExpectedValueType | None:
+    for pattern, value_type in _VALUE_TYPE_PATTERNS_V2:
+        if pattern.search(question):
+            return value_type
+    return None
+
+
+def split_sentences_v2(text: str) -> list[str]:
+    """Like split_sentences, but also splits markdown table rows (lines
+    starting with `|`) and bare newlines as their own unit - fixes root
+    cause 2 (a whole multi-row table collapsing into one "sentence" because
+    it has no terminal punctuation)."""
+    units: list[str] = []
+    for block in text.split("\n"):
+        block = block.strip()
+        if not block:
+            continue
+        units.extend(s for s in _SENTENCE_SPLIT.split(block) if s)
+    return units
+
+
+def extract_values_v2(text: str, value_type: ExpectedValueType) -> list[tuple[str, int]]:
+    """Like extract_values, but returns (value, start_index) pairs against
+    the given (original-case, for LOCATION correctness) text, so the caller
+    can pick the value nearest the matched anchor instead of merely the
+    first one found - fixes root cause 1 (case-sensitivity) and enables
+    root cause 2's nearest-value selection."""
+    if value_type == ExpectedValueType.NUMERIC:
+        return [(m, text.find(m)) for m in _extract_numeric_values(text)]
+    pattern = _VALUE_EXTRACTORS_V2.get(value_type)
+    if pattern is None:
+        return []
+    return [(match.group(), match.start()) for match in pattern.finditer(text)]
+
+
+def _anchor_position_v2(window_lower: str, requested: RequestedFact, *, required_hits: int) -> int | None:
+    """Position of the anchor match within window_lower, or None if the
+    anchor is absent - the entity/keyword-presence check V1's closures made,
+    reworked to also report WHERE the anchor matched so extract_values_v2's
+    nearest-value selection has something to measure distance from."""
+    if requested.entities:
+        positions = [window_lower.find(term.lower()) for term in requested.entities]
+        if any(pos < 0 for pos in positions):
+            return None
+        return min(positions)
+    keywords = requested.topic_keywords
+    if not keywords:
+        return 0
+    positions = [window_lower.find(keyword) for keyword in keywords if keyword in window_lower]
+    if len(positions) < required_hits:
+        return None
+    return min(positions)
+
+
+def evaluate_chunk_support_v2(requested: RequestedFact, chunk_content: str, chunk_title: str, *, proximity_window: int = _PROXIMITY_WINDOW) -> ChunkSupportOutcome:
+    sentences = split_sentences_v2(chunk_content)
+
+    if not requested.entities and requested.attribute_type is None:
+        return ChunkSupportOutcome(outcome="direct_support", matched_sentence=None)
+
+    include_title = bool(requested.entities)
+    keywords = requested.topic_keywords
+    # Deliberately IDENTICAL to V1's threshold here (root cause 3's stricter
+    # bar is applied only at conflict-arbitration time in
+    # verify_evidence_sufficiency_v2, not here) - tightening this primary
+    # anchor check directly regressed a real single-document paraphrase case
+    # ("When does my billing cycle renew?" / "Billing occurs on the
+    # anniversary...", only one shared keyword - "billing" - yet the correct
+    # and only answer) during the Part 8 bake-off. A weak keyword anchor is a
+    # real problem specifically when it lets a SECOND, unrelated value
+    # masquerade as a competing answer - not when it is the only evidence
+    # found at all.
+    required_hits = len(requested.entities) if requested.entities else (1 if len(keywords) <= 3 else _MIN_KEYWORD_MATCHES)
+
+    def find_best(window_original: str, window_lower: str) -> tuple[str | None, str | None]:
+        anchor_pos = _anchor_position_v2(window_lower, requested, required_hits=required_hits)
+        if anchor_pos is None:
+            return None, None
+        if requested.attribute_type is None:
+            return "matched", None
+        candidates = extract_values_v2(window_original, requested.attribute_type)
+        if not candidates:
+            return None, None
+        nearest_value = min(candidates, key=lambda pair: abs(pair[1] - anchor_pos))[0]
+        return "matched", nearest_value
+
+    for sentence in sentences:
+        original_window = f"{sentence} {chunk_title}" if include_title else sentence
+        lowered = original_window.lower()
+        matched, value = find_best(original_window, lowered)
+        if matched is None:
+            continue
+        if requested.attribute_type is None:
+            return ChunkSupportOutcome(outcome="direct_support", matched_sentence=sentence)
+        if value is not None:
+            return ChunkSupportOutcome(outcome="direct_support", matched_sentence=sentence, matched_value=value)
+
+    for index in range(len(sentences)):
+        window = " ".join(sentences[max(0, index - proximity_window): index + proximity_window + 1])
+        original_window = f"{window} {chunk_title}" if include_title else window
+        lowered = original_window.lower()
+        matched, value = find_best(original_window, lowered)
+        if matched is None:
+            continue
+        if requested.attribute_type is None:
+            return ChunkSupportOutcome(outcome="direct_support", matched_sentence=sentences[index])
+        if value is not None:
+            return ChunkSupportOutcome(outcome="direct_support", matched_sentence=sentences[index], matched_value=value)
+
+    whole_text = f"{chunk_content} {chunk_title}".lower() if include_title else chunk_content.lower()
+
+    if not requested.entities:
+        if not keywords:
+            return ChunkSupportOutcome(outcome="insufficient_evidence", matched_sentence=None)
+        hits = sum(1 for keyword in keywords if keyword in whole_text)
+        fallback_required_hits = 1 if len(keywords) <= 3 else _MIN_KEYWORD_MATCHES
+        if hits >= fallback_required_hits:
+            return ChunkSupportOutcome(outcome="value_missing" if requested.attribute_type else "topic_match_only", matched_sentence=None)
+        if hits:
+            return ChunkSupportOutcome(outcome="topic_match_only", matched_sentence=None)
+        return ChunkSupportOutcome(outcome="insufficient_evidence", matched_sentence=None)
+
+    entities_anywhere = [term for term in requested.entities if term.lower() in whole_text]
+    if len(entities_anywhere) == len(requested.entities):
+        if requested.attribute_type is not None:
+            return ChunkSupportOutcome(outcome="value_missing", matched_sentence=None)
+        return ChunkSupportOutcome(outcome="nearby_but_incomplete", matched_sentence=None)
+    if entities_anywhere:
+        return ChunkSupportOutcome(outcome="topic_match_only", matched_sentence=None)
+    return ChunkSupportOutcome(outcome="insufficient_evidence", matched_sentence=None)
+
+
+def extract_requested_fact_v2(question: str, *, best_retrieval_score: float | None = None) -> RequestedFact:
+    entities = extract_distinctive_terms(question)[:_MAX_ENTITIES_TO_CHECK]
+    attribute_type = _detect_value_type_v2(question)
+    if entities and attribute_type == ExpectedValueType.DURATION and set(entities) <= _DURATION_UNIT_ENTITY_ROOTS:
+        entities = ()
+    off_topic_likely = (
+        not entities
+        and attribute_type is None
+        and best_retrieval_score is not None
+        and best_retrieval_score < _OFF_TOPIC_SCORE_THRESHOLD
+    )
+    topic_keywords = _topic_keywords(question) if not entities else ()
+    return RequestedFact(entities=entities, attribute_type=attribute_type, off_topic_likely=off_topic_likely, topic_keywords=topic_keywords)
+
+
+def verify_evidence_sufficiency_v2(
+    *,
+    question: str,
+    chunk_contents: list[str],
+    chunk_titles: list[str] | None = None,
+    retrieval_scores: list[float] | None = None,
+) -> EvidenceSufficiencyVerdict:
+    best_score = max(retrieval_scores) if retrieval_scores else None
+    requested = extract_requested_fact_v2(question, best_retrieval_score=best_score)
+
+    if requested.off_topic_likely:
+        return EvidenceSufficiencyVerdict(
+            sufficient=False, reason_code=GuardrailReasonCode.RELATED_TOPIC_ONLY, requested_fact=requested,
+            chunk_outcomes=("off_topic",), safe_message=SAFE_MESSAGE_OFF_TOPIC,
+        )
+
+    if not chunk_contents:
+        return EvidenceSufficiencyVerdict(
+            sufficient=False, reason_code=GuardrailReasonCode.NO_AUTHORISED_EVIDENCE, requested_fact=requested,
+            chunk_outcomes=(), safe_message=SAFE_MESSAGE_REQUESTED_FACT_ABSENT,
+        )
+
+    if not requested.entities and requested.attribute_type is None:
+        return EvidenceSufficiencyVerdict(
+            sufficient=True, reason_code=GuardrailReasonCode.SUFFICIENT_EVIDENCE, requested_fact=requested,
+            chunk_outcomes=(), safe_message=None,
+        )
+
+    titles = chunk_titles or [""] * len(chunk_contents)
+    outcomes = [evaluate_chunk_support_v2(requested, content, title) for content, title in zip(chunk_contents, titles)]
+    outcome_labels = tuple(o.outcome for o in outcomes)
+
+    if any(label == "direct_support" for label in outcome_labels):
+        if requested.attribute_type in _CONFLICT_ELIGIBLE_TYPES:
+            supporting = [o for o in outcomes if o.outcome == "direct_support" and o.matched_value]
+            if not requested.entities and requested.topic_keywords:
+                # Root cause 3, applied ONLY here (conflict arbitration) - a
+                # second "supporting" occurrence anchored by just one shared
+                # generic word (e.g. "logs" alone matching an unrelated
+                # Audit Logs sentence when the question is about Build Logs)
+                # is not trustworthy enough to assert a genuine second value
+                # for the SAME fact; require the same stricter hit count the
+                # primary match would need if it were the only evidence.
+                # Never discards the single-answer case - a chunk that
+                # doesn't clear this bar just stops counting toward the
+                # conflict set, it does not become "insufficient" on its own.
+                required = min(_MIN_KEYWORD_MATCHES_TYPED_V2, len(requested.topic_keywords))
+                supporting = [
+                    o for o in supporting
+                    if o.matched_sentence and sum(1 for kw in requested.topic_keywords if kw in o.matched_sentence.lower()) >= required
+                ]
+            supporting_values = {o.matched_value for o in supporting}
+            if len(supporting_values) > 1:
+                return EvidenceSufficiencyVerdict(
+                    sufficient=False, reason_code=GuardrailReasonCode.CONFLICTING_EVIDENCE, requested_fact=requested,
+                    chunk_outcomes=outcome_labels, safe_message=SAFE_MESSAGE_CONFLICTING, chunk_support_details=tuple(outcomes),
+                )
+        return EvidenceSufficiencyVerdict(
+            sufficient=True, reason_code=GuardrailReasonCode.SUFFICIENT_EVIDENCE, requested_fact=requested,
+            chunk_outcomes=outcome_labels, safe_message=None, chunk_support_details=tuple(outcomes),
+        )
+
+    return EvidenceSufficiencyVerdict(
+        sufficient=False, reason_code=GuardrailReasonCode.REQUESTED_FACT_ABSENT, requested_fact=requested,
+        chunk_outcomes=outcome_labels, safe_message=SAFE_MESSAGE_REQUESTED_FACT_ABSENT, chunk_support_details=tuple(outcomes),
+    )
+
+
+class EvidenceVerifier(Protocol):
+    """Injectable evidence-sufficiency verifier - mirrors
+    app.services.reranking.Reranker / app.services.query_transformation.QueryTransformer's
+    exact pattern (a `version`/provider identity attribute + one call
+    method) so RAGOrchestrator and the evaluation engine can swap V1/V2
+    without any change to the pipeline's control flow."""
+
+    version: str
+
+    def verify(
+        self, *, question: str, chunk_contents: list[str], chunk_titles: list[str] | None = None, retrieval_scores: list[float] | None = None,
+    ) -> EvidenceSufficiencyVerdict: ...
+
+
+@dataclass(frozen=True)
+class EvidenceSufficiencyV1Verifier:
+    version: str = "v1"
+
+    def verify(self, **kwargs) -> EvidenceSufficiencyVerdict:
+        return verify_evidence_sufficiency(**kwargs)
+
+
+@dataclass(frozen=True)
+class EvidenceSufficiencyV2Verifier:
+    version: str = "v2"
+
+    def verify(self, **kwargs) -> EvidenceSufficiencyVerdict:
+        return verify_evidence_sufficiency_v2(**kwargs)
+
+
+def build_evidence_verifier(version: str) -> EvidenceVerifier:
+    if version == "v2":
+        return EvidenceSufficiencyV2Verifier()
+    return EvidenceSufficiencyV1Verifier()

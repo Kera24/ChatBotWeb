@@ -41,6 +41,14 @@ Fused candidates keep `RetrievalCitationData.score` = the dense cosine-similarit
 
 `app.evaluation.embedding_cache.CachingEmbeddingProvider` (default-on via `EvaluationRunOptions.embedding_cache_enabled`) memoises `embed()` by exact `(provider, model, dimension, content-hash)` inside `run_evaluation()` only — SQLite's no-vector-index retrieval path otherwise re-embeds every candidate chunk on every case. Evaluation-only; never touches production retrieval.
 
+## Query transformation (Retrieval V2 Phase 3)
+
+Before retrieval, `RAGOrchestrator.answer()` calls `app.services.query_transformation.transform_query()` on `request.query`, producing a `RetrievalQueryPlan` (`retrieval_queries[0]` is always the original question). Only `query_plan.retrieval_queries` is passed into `assemble_retrieval_context()` — `request.query` itself is never replaced anywhere else (generation variables, evidence sufficiency, prompt resolution, persisted `ChatMessage` content, guardrail input policy). Controlled by `settings.QUERY_TRANSFORMER_PROVIDER` (or a per-request override): `identity` (default, unchanged behavior — one retrieval query), `deterministic` (local, LLM-free conversational-filler stripping + abbreviation expansion), `model_assisted` (a concise reformulation via the existing `AICoreService`/`AIProvider` abstraction, never a new provider). **`identity` remains the production default** — see the Phase 3 evaluation report for the promotion decision.
+
+When a plan produces more than one retrieval query (`dense_only` strategy only — never `hybrid_rrf`), `assemble_retrieval_context()` runs dense search once per query and merges results via `app.services.query_transformation.merge_multi_query_candidates()`: per distinct chunk, keeps the highest dense cosine-similarity score seen across queries (never an incomparable fused score — same calibrated-threshold-comparable scale `evidence_sufficiency` relies on), orders by best score → appearances → best rank → first-seen. Query-transformer provenance (strategy/provider/model/status/latency/query counts) is exposed via `RetrievalContextResult.retrieval_debug` and `RAGOrchestrationResult.metadata`, never fed into any guardrail, never placed in a Prometheus label (see `observability.md`'s cardinality policy).
+
+Production traffic falls back safely to the identity plan on any transformer error (`query_transformer_fail_loud=False`); `app.evaluation.engine` sets this `True` so a transformer defect surfaces as a hard case failure (`reason="query_transformer_failed"`) instead of silently succeeding via the same fallback. See `docs/future/QueryRewrite.md` for the full design and evaluation report.
+
 ## Adding a new stage or changing pipeline behavior
 
 - Add stages/checks as additive steps in `answer()`, after the value they need is already computed — never restructure the existing control flow of a passing stage.

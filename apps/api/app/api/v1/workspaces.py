@@ -3,7 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.api.deps import DbSession, DevelopmentCurrentUser, require_organisation_role
-from app.ai.dependencies import AICoreContainer, get_ai_core
+from app.ai.dependencies import AICoreContainer, build_default_query_transformer, get_ai_core
+from app.ai.guardrails.evidence_sufficiency import build_evidence_verifier
 from app.ai.errors import (
     AIProviderDegradedError,
     AIProviderError,
@@ -92,6 +93,8 @@ def answer_workspace_rag_question(
             model_name=settings.RERANKER_MODEL,
             timeout_seconds=settings.RERANKER_TIMEOUT_SECONDS,
         )
+        query_transformer = build_default_query_transformer(ai_core)
+        evidence_verifier = build_evidence_verifier(settings.EVIDENCE_VERIFIER_VERSION)
         trace_context = AITraceContext(
             trace_id=getattr(http_request.state, "trace_id", None) or new_trace_id(),
             request_id=getattr(http_request.state, "request_id", None),
@@ -103,6 +106,8 @@ def answer_workspace_rag_question(
                 embedding_provider=provider,
                 trace_recorder=build_ai_trace_recorder(db),
                 reranker=reranker,
+                query_transformer=query_transformer,
+                evidence_verifier=evidence_verifier,
             )
         ).answer(
             RAGOrchestrationRequest(

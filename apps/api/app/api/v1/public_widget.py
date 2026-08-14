@@ -31,6 +31,7 @@ from app.access.rate_limit.local_fallback import LocalFallbackLimiter
 from app.access.rate_limit.redis_store import InMemoryRateLimitStore, create_redis_rate_limit_store
 from app.access.rate_limit.service import RateLimitService
 from app.access.sessions.service import PublicSessionChecks, PublicSessionService
+from app.ai.dependencies import build_default_query_transformer
 from app.ai.rag_orchestrator import RAGOrchestrator, RAGOrchestratorDependencies
 from app.access.tenant_resolution.service import PublicTenantResolutionService, TenantResolutionChecks
 from app.access.widget_config.public_projection import project_public_widget_configuration, public_widget_config_etag
@@ -45,6 +46,7 @@ from app.operations.metrics import metric_name_for_event
 from app.operations.telemetry import record_access_event, telemetry_span
 from app.operations.widget_controls import evaluate_widget_access, resolve_controls
 from app.db.models import Organisation, PublicCredential, Workspace
+from app.ai.guardrails.evidence_sufficiency import build_evidence_verifier
 from app.services.embeddings import build_embedding_provider
 from app.services.reranking import build_reranker
 from app.schemas.public_widget import PublicWidgetConfigurationResponse, PublicWidgetMessageCreateRequest, PublicWidgetMessageResponse, PublicWidgetSessionCreateRequest, PublicWidgetSessionCreateResponse
@@ -334,12 +336,16 @@ def _gateway(request: Request, db: Session, event_sink: InMemoryAccessEventSink)
             model_name=settings.RERANKER_MODEL,
             timeout_seconds=settings.RERANKER_TIMEOUT_SECONDS,
         )
+        query_transformer = build_default_query_transformer(ai_core)
+        evidence_verifier = build_evidence_verifier(settings.EVIDENCE_VERIFIER_VERSION)
         rag_adapter = PublicWidgetRAGAdapter(
             orchestrator=RAGOrchestrator(
                 RAGOrchestratorDependencies(
                     db=db, ai_core=ai_core, embedding_provider=embedding_provider,
                     trace_recorder=build_ai_trace_recorder(db),
                     reranker=reranker,
+                    query_transformer=query_transformer,
+                    evidence_verifier=evidence_verifier,
                 )
             ),
             idempotency_service=idempotency_service,

@@ -22,7 +22,12 @@ from app.db.models import (
     User,
     Workspace,
 )
-from app.ai.guardrails.evidence_sufficiency import EvidenceSufficiencyVerdict, RequestedFact
+from app.ai.guardrails.evidence_sufficiency import (
+    EvidenceSufficiencyV1Verifier,
+    EvidenceSufficiencyV2Verifier,
+    EvidenceSufficiencyVerdict,
+    RequestedFact,
+)
 from app.ai.guardrails.reason_codes import GuardrailReasonCode
 from app.evaluation.engine import EvaluationRunOptions, run_evaluation
 from app.operations import eval_launch, eval_report, eval_run
@@ -181,16 +186,21 @@ def test_eval_report_cli_gate_flag_fails_exit_code_on_hard_failure(db_session: S
     # its own dedicated tests in tests/test_guardrails.py), so bypass the
     # guardrail directly to deterministically simulate "the model answered
     # when it should have fallen back" - the exact hard-failure condition the
-    # gate must report on.
-    monkeypatch.setattr(
-        "app.ai.rag_orchestrator.verify_evidence_sufficiency",
-        lambda **kwargs: EvidenceSufficiencyVerdict(
+    # gate must report on. Patched on both verifier classes' `verify` method
+    # (not the old module-level `app.ai.rag_orchestrator.verify_evidence_sufficiency`
+    # import, which Evidence Sufficiency V2's injectable-verifier wiring
+    # replaced - see docs/adr/0034) so this test is unaffected by whichever
+    # version settings.EVIDENCE_VERIFIER_VERSION currently resolves to.
+    def _always_sufficient(self, **kwargs):
+        return EvidenceSufficiencyVerdict(
             sufficient=True,
             reason_code=GuardrailReasonCode.SUFFICIENT_EVIDENCE,
             requested_fact=RequestedFact(entities=(), attribute_type=None, off_topic_likely=False),
             chunk_outcomes=(),
-        ),
-    )
+        )
+
+    monkeypatch.setattr(EvidenceSufficiencyV1Verifier, "verify", _always_sufficient)
+    monkeypatch.setattr(EvidenceSufficiencyV2Verifier, "verify", _always_sufficient)
     dataset = EvaluationDataset(organisation_id=organisation.id, workspace_id=workspace.id, widget_id=widget.id, name="Gate failure dataset", version="1", status="active")
     db_session.add(dataset)
     db_session.flush()

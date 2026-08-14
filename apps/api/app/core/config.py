@@ -152,6 +152,23 @@ class Settings:
     # independently tunable knob for the Phase 9 bake-off experiments.
     RETRIEVAL_HYBRID_FINAL_TOP_K: int = _get_int("RETRIEVAL_HYBRID_FINAL_TOP_K", 0) or RETRIEVAL_MAX_CONTEXT_CHUNKS
 
+    # Retrieval & Answer Pipeline V3 experiment (docs/future/RetrievalOptimisation.md) -
+    # pgvector HNSW approximate-nearest-neighbour index
+    # (alembic/versions/0022_pgvector_hnsw_index.py). NOT wired into
+    # app.services.vector_search - the index's mere existence is what the
+    # migration creates; these are inspection/benchmark constants only (see
+    # app.operations.eval_hnsw_benchmark), never read by the production
+    # query path, so the dense_only baseline's exact-search behaviour is
+    # unaffected by this section regardless of value. m/ef_construction
+    # mirror the migration's own literal build-time values (pgvector library
+    # defaults - deliberately not tuned against the small synthetic
+    # evaluation corpus); ef_search is the query-time accuracy/speed knob,
+    # exposed here so a future promotion could apply `SET LOCAL
+    # hnsw.ef_search` explicitly, but no code path does that today.
+    PGVECTOR_HNSW_M: int = _get_int("PGVECTOR_HNSW_M", 16)
+    PGVECTOR_HNSW_EF_CONSTRUCTION: int = _get_int("PGVECTOR_HNSW_EF_CONSTRUCTION", 64)
+    PGVECTOR_HNSW_EF_SEARCH: int = _get_int("PGVECTOR_HNSW_EF_SEARCH", 40)  # pgvector's own library default
+
     # Retrieval V2 Phase 2 - Reranking (docs/future/Reranking.md). "none" is
     # the production baseline and rollback target (see app.services.reranking) -
     # switching this back to "none" is the entire rollback procedure, no code
@@ -171,6 +188,51 @@ class Settings:
     # candidate-pool/top-k experiments (Retrieval V2 Phase 2, Part 9).
     RERANKER_FINAL_TOP_K: int = _get_int("RERANKER_FINAL_TOP_K", 0) or RETRIEVAL_MAX_CONTEXT_CHUNKS
     RERANKER_TIMEOUT_SECONDS: float = _get_float("RERANKER_TIMEOUT_SECONDS", 5.0)
+
+    # Retrieval V2 Phase 3 - Query Intelligence / Retrieval Query
+    # Transformation (docs/future/QueryRewrite.md). "identity" is the
+    # production baseline and rollback target (see
+    # app.services.query_transformation) - switching this back to "identity"
+    # is the entire rollback procedure, no code change required.
+    # "deterministic" applies local, LLM-free normalization/acronym
+    # expansion/conversational-filler stripping. "model_assisted" uses the
+    # existing AICoreService/AIProvider abstraction (settings.AI_PROVIDER) to
+    # produce a small, concise retrieval-oriented reformulation - this never
+    # introduces a new/paid provider of its own.
+    QUERY_TRANSFORMER_PROVIDER: str = getenv("QUERY_TRANSFORMER_PROVIDER", "identity")
+    # model_key passed to AICoreService.generate() for "model_assisted" -
+    # empty string (the default) means "use settings.DEFAULT_AI_MODEL_KEY",
+    # mirroring RAGOrchestrationRequest.model_key's own fallback so this never
+    # needs a distinct model registered just for query rewriting.
+    QUERY_TRANSFORMER_MODEL_KEY: str = getenv("QUERY_TRANSFORMER_MODEL_KEY", "")
+    # Hard cap (Part 7/Part 3 token/cost discipline): original query + at most
+    # one rewrite + at most one alternate = 3 by default. A transformer that
+    # produces more is truncated deterministically, never silently allowed to
+    # grow unbounded.
+    QUERY_TRANSFORMER_MAX_QUERIES: int = _get_int("QUERY_TRANSFORMER_MAX_QUERIES", 3)
+    # A rewritten/alternate query longer than this many characters is treated
+    # as malformed output - guards against a runaway/degenerate generation
+    # rather than silently embedding an oversized string.
+    QUERY_TRANSFORMER_MAX_QUERY_CHARS: int = _get_int("QUERY_TRANSFORMER_MAX_QUERY_CHARS", 300)
+    QUERY_TRANSFORMER_TIMEOUT_SECONDS: float = _get_float("QUERY_TRANSFORMER_TIMEOUT_SECONDS", 3.0)
+    # Per-retrieval-query dense candidate pool size before the multi-query
+    # merge - independently tunable from RETRIEVAL_DENSE_CANDIDATE_POOL_SIZE
+    # since a transformed-query run fetches this many candidates per query,
+    # not once.
+    QUERY_TRANSFORMER_CANDIDATE_POOL_SIZE: int = _get_int("QUERY_TRANSFORMER_CANDIDATE_POOL_SIZE", 25)
+
+    # Evidence Sufficiency V2 (docs/future/GuardrailsV2.md task, promoted by
+    # docs/adr/0034-promote-evidence-sufficiency-v2.md). "v2" fixes specific,
+    # proven false-rejection mechanisms (case-sensitive value extraction,
+    # first-match-in-window value selection, weak keyword-anchor conflict
+    # false positives) without changing retrieval, chunking, or the
+    # guardrail chain's overall shape - see
+    # app.ai.guardrails.evidence_sufficiency's V2 section docstring and
+    # ADR-0034 for the real-embedding bake-off evidence behind the
+    # promotion. "v1" (today's exact prior behaviour, see that module) is
+    # retained and selectable - switching back to it is the entire rollback
+    # procedure, no code change required.
+    EVIDENCE_VERIFIER_VERSION: str = getenv("EVIDENCE_VERIFIER_VERSION", "v2")
 
     PROMPT_VERSION: str = getenv("PROMPT_VERSION", "grounded-answer-v1")
 

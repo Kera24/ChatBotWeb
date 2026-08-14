@@ -19,7 +19,8 @@ from typing import Literal
 from sqlalchemy.orm import Session
 
 from app.access.widget_admin.service import WidgetAdminNotFound, get_current_draft, get_widget
-from app.ai.dependencies import AICoreContainer, create_ai_core
+from app.ai.dependencies import AICoreContainer, build_default_query_transformer, create_ai_core
+from app.ai.guardrails.evidence_sufficiency import EvidenceVerifier, build_evidence_verifier
 from app.ai.rag_orchestrator import (
     RAGConversationNotFoundError,
     RAGOrchestrationRequest,
@@ -43,6 +44,7 @@ from app.evaluation.scoring import score_case
 from app.evaluation.shadow_session import shadow_rag_session
 from app.repositories import evaluation_repository
 from app.services.embeddings import EmbeddingProvider, build_embedding_provider
+from app.services.query_transformation import QueryTransformer, QueryTransformerError
 from app.services.reranking import Reranker, RerankerError, build_reranker
 
 logger = logging.getLogger(__name__)
@@ -143,6 +145,22 @@ class EvaluationRunOptions:
     reranker_override: Reranker | None = None
     reranker_candidate_pool_size: int | None = None
     reranker_final_top_k: int | None = None
+    # Retrieval V2 Phase 3 (docs/future/QueryRewrite.md) - explicit query
+    # transformer instance for this whole run, mirroring reranker_override's
+    # exact pattern. None means "use settings.QUERY_TRANSFORMER_PROVIDER"
+    # (i.e. IdentityQueryTransformer/disabled for an organic run that never
+    # asked for query transformation). Used by the Part 11 controlled
+    # bake-off CLI (app.operations.eval_query_transform_bakeoff) to run the
+    # same dataset under identity/deterministic/model_assisted variants.
+    query_transformer_override: QueryTransformer | None = None
+    # Evidence Sufficiency V2 (docs/future/GuardrailsV2.md task) - explicit
+    # verifier instance for this whole run, mirroring
+    # query_transformer_override's exact pattern. None means "use
+    # settings.EVIDENCE_VERIFIER_VERSION" (i.e. today's v1 behaviour for an
+    # organic run that never asked for V2). Used by the Part 8 bake-off CLI
+    # (app.operations.eval_evidence_sufficiency_bakeoff) to run the same
+    # dataset under v1/v2 for a controlled comparison.
+    evidence_verifier_override: EvidenceVerifier | None = None
     # Evaluation-performance fix (Retrieval V2 Phase 1 follow-up,
     # app.evaluation.embedding_cache) - memoises embed() by exact
     # (provider, model, dimension, content) so a real-embedding run against
@@ -151,6 +169,14 @@ class EvaluationRunOptions:
     # exposed as a flag so a test can assert cache-enabled and
     # cache-disabled runs produce byte-identical retrieval results.
     embedding_cache_enabled: bool = True
+    # Retrieval & Answer Pipeline V3 experiment (docs/future/RetrievalOptimisation.md) -
+    # mirrors evidence_verifier_override's exact pattern: forces every
+    # case's RAGOrchestratorDependencies.use_v3_retrieval to this value.
+    # False (default) is today's exact production behaviour for an organic
+    # run that never asked for V3. Used by the ablation-matrix CLI
+    # (app.operations.eval_v3_ablation) to run the same dataset under the
+    # baseline and V3 candidate pipelines for a controlled comparison.
+    use_v3_retrieval: bool = False
 
 
 def run_evaluation(
@@ -200,6 +226,8 @@ def run_evaluation(
         model_name=settings.RERANKER_MODEL,
         timeout_seconds=settings.RERANKER_TIMEOUT_SECONDS,
     )
+    query_transformer = options.query_transformer_override or build_default_query_transformer(ai_core)
+    evidence_verifier = options.evidence_verifier_override or build_evidence_verifier(settings.EVIDENCE_VERIFIER_VERSION)
 
     allowed_document_ids = _resolve_allowed_document_ids(db, organisation_id=organisation_id, workspace_id=workspace_id, widget_id=widget_id)
 
@@ -224,6 +252,10 @@ def run_evaluation(
             "reranker_model": reranker.model_name,
             "reranker_candidate_pool_size": options.reranker_candidate_pool_size,
             "reranker_final_top_k": options.reranker_final_top_k,
+            "query_transformer_provider": query_transformer.provider_name,
+            "query_transformer_model": query_transformer.model_name,
+            "evidence_verifier_version": evidence_verifier.version,
+            "use_v3_retrieval": options.use_v3_retrieval,
         },
         created_by=options.created_by,
         trigger_source=options.trigger_source,
@@ -247,6 +279,8 @@ def run_evaluation(
                 ai_core=ai_core,
                 embedding_provider=embedding_provider,
                 reranker=reranker,
+                query_transformer=query_transformer,
+                evidence_verifier=evidence_verifier,
                 min_similarity_score=min_similarity_score,
                 options=options,
                 trace_recorder=trace_recorder,
@@ -305,6 +339,8 @@ def _run_single_case(
     ai_core: AICoreContainer,
     embedding_provider,
     reranker: Reranker,
+    query_transformer: QueryTransformer,
+    evidence_verifier: EvidenceVerifier,
     min_similarity_score: float,
     options: EvaluationRunOptions,
     trace_recorder,
@@ -346,6 +382,13 @@ def _run_single_case(
                     # app.services.reranking.rerank_candidates and this
                     # module's docstring / Retrieval V2 Phase 2 Part 6.
                     reranker=reranker, reranker_fail_loud=True,
+                    # Evaluation must never silently mask a query-transformer
+                    # defect behind the production safe-fallback either - see
+                    # app.services.query_transformation.transform_query and
+                    # this module's docstring / Retrieval V2 Phase 3 Part 8.
+                    query_transformer=query_transformer, query_transformer_fail_loud=True,
+                    evidence_verifier=evidence_verifier,
+                    use_v3_retrieval=options.use_v3_retrieval,
                 )
             )
             return orchestrator.answer(request)
@@ -370,6 +413,13 @@ def _run_single_case(
         # Part 8) can attribute it mechanically instead of lumping it into
         # unexpected_engine_error.
         return _CaseOutcome(payload=_failure_payload(safe_error_message(exc), hard_failure=False, reason="reranker_failed"))
+    except QueryTransformerError as exc:
+        # query_transformer_fail_loud=True above means this is a real
+        # transformer defect, not the production safe-fallback - classified
+        # distinctly ("query_transformer_failed") so evaluation never
+        # silently falls back and then reports the experiment as successful
+        # (Retrieval V2 Phase 3, Part 8/Part 11 requirement).
+        return _CaseOutcome(payload=_failure_payload(safe_error_message(exc), hard_failure=False, reason="query_transformer_failed"))
     except Exception as exc:  # noqa: BLE001 - continue after any unexpected case failure
         logger.exception("Evaluation case %s raised an unexpected error", case.id)
         return _CaseOutcome(payload=_unexpected_error_payload(case, exc))
